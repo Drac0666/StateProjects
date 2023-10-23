@@ -1,6 +1,7 @@
 import wx
 import win32com.client
 import re
+import wx.html2 as webview
 
 class OutlookEmailSearchFrame(wx.Frame):
     def __init__(self):
@@ -12,12 +13,14 @@ class OutlookEmailSearchFrame(wx.Frame):
         self.label = wx.StaticText(self.panel, label='Enter a date (e.g., "01/01/2023"):')
         self.date_input = wx.TextCtrl(self.panel)
         self.search_button = wx.Button(self.panel, label='Search Outlook Emails')
-        self.email_list = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
+
+        self.browser = webview.WebView.New(self.panel)
+        self.browser.Bind(webview.EVT_WEBVIEW_NAVIGATING, self.on_link_click)
 
         self.vbox.Add(self.label, 0, wx.ALL | wx.EXPAND, 5)
         self.vbox.Add(self.date_input, 0, wx.ALL | wx.EXPAND, 5)
         self.vbox.Add(self.search_button, 0, wx.ALL | wx.EXPAND, 5)
-        self.vbox.Add(self.email_list, 1, wx.ALL | wx.EXPAND, 5)
+        self.vbox.Add(self.browser, 1, wx.ALL | wx.EXPAND, 5)
 
         self.panel.SetSizer(self.vbox)
 
@@ -53,11 +56,23 @@ class OutlookEmailSearchFrame(wx.Frame):
             return []
 
     def on_search(self, event):
-        self.email_list.Clear()
+        self.browser.SetPage("")
         path = self.date_input.GetValue()
         found_emails = self.search_outlook_emails(path)
+
+        html = "<html><body>"
         for email in found_emails:
-            self.email_list.AppendText(email + '\n')
+            match = re.search(r'Subject: (.+),', email)
+            if match:
+                email_subject = match.group(1)
+                html += f"<a href=\"{email_subject}\">{email_subject}</a><br>"
+        html += "</body></html>"
+
+        self.browser.SetPage(html, "")
+
+    def on_link_click(self, event):
+        url = event.GetURL()
+        self.open_outlook_email(url)
 
 if __name__ == '__main__':
     app = wx.App()
