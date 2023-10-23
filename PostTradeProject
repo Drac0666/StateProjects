@@ -3,6 +3,7 @@ import os
 import win32com.client
 
 def search_outlook_emails(path):
+    found_emails = []
     try:
         outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
         inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
@@ -11,10 +12,13 @@ def search_outlook_emails(path):
         emails = inbox.Items
         emails.Restrict(f"[ReceivedTime] >= '{path}'")
 
-        email_count = len(emails)
-        sg.popup(f"Number of emails received since {path}: {email_count}")
+        for email in emails:
+            found_emails.append(f"Subject: {email.Subject}, Received Time: {email.ReceivedTime}")
+
+        return found_emails
     except Exception as e:
         sg.popup_error(f"Error: {e}")
+        return []
 
 def main():
     sg.theme("SystemDefaultForReal")
@@ -22,7 +26,8 @@ def main():
     layout = [
         [sg.Text('Enter a date (e.g., "01/01/2023"):')],
         [sg.InputText(key='date_input')],
-        [sg.Button('Search Outlook Emails'), sg.Button('Exit')]
+        [sg.Button('Search Outlook Emails'), sg.Button('Exit')],
+        [sg.Output(size=(40, 10))]  # Output element to display found emails
     ]
 
     window = sg.Window('Search Outlook Emails', layout)
@@ -34,7 +39,9 @@ def main():
             break
         elif event == 'Search Outlook Emails':
             path = values['date_input']
-            search_outlook_emails(path)
+            found_emails = search_outlook_emails(path)
+            for email in found_emails:
+                sg.Print(email)  # Display each email in the Output element
 
     window.close()
 
