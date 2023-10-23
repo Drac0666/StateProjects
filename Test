@@ -5,20 +5,28 @@ import wx.html2 as webview
 
 class OutlookEmailSearchFrame(wx.Frame):
     def __init__(self):
-        super().__init__(None, title="Search Outlook Emails", size=(600, 400))
+        super().__init__(None, title="Search Outlook Emails", size=(800, 600))
 
         self.panel = wx.Panel(self)
         self.vbox = wx.BoxSizer(wx.VERTICAL)
 
-        self.label = wx.StaticText(self.panel, label='Enter a date (e.g., "01/01/2023"):')
+        self.label_date = wx.StaticText(self.panel, label='Enter a date (e.g., "01/01/2023"):')
         self.date_input = wx.TextCtrl(self.panel)
+        
+        self.label_folder = wx.StaticText(self.panel, label='Enter the full path to Outlook folder hierarchy:')
+        self.folder_input = wx.TextCtrl(self.panel)
+        
         self.search_button = wx.Button(self.panel, label='Search Outlook Emails')
 
         self.browser = webview.WebView.New(self.panel)
         self.browser.Bind(webview.EVT_WEBVIEW_NAVIGATING, self.on_link_click)
 
-        self.vbox.Add(self.label, 0, wx.ALL | wx.EXPAND, 5)
+        self.vbox.Add(self.label_date, 0, wx.ALL | wx.EXPAND, 5)
         self.vbox.Add(self.date_input, 0, wx.ALL | wx.EXPAND, 5)
+        
+        self.vbox.Add(self.label_folder, 0, wx.ALL | wx.EXPAND, 5)
+        self.vbox.Add(self.folder_input, 0, wx.ALL | wx.EXPAND, 5)
+
         self.vbox.Add(self.search_button, 0, wx.ALL | wx.EXPAND, 5)
         self.vbox.Add(self.browser, 1, wx.ALL | wx.EXPAND, 5)
 
@@ -38,13 +46,18 @@ class OutlookEmailSearchFrame(wx.Frame):
         except Exception as e:
             print(f"Error: {e}")
 
-    def search_outlook_emails(self, path):
+    def search_outlook_emails(self, path, folder_path):
         found_emails = []
         try:
             outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
             inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+            
+            # Get the folder based on the provided folder_path
+            folder = inbox
+            for folder_name in folder_path.split("\\"):
+                folder = folder.Folders[folder_name]
 
-            emails = inbox.Items
+            emails = folder.Items
             emails.Restrict(f"[ReceivedTime] >= '{path}'")
 
             for email in emails:
@@ -58,7 +71,8 @@ class OutlookEmailSearchFrame(wx.Frame):
     def on_search(self, event):
         self.browser.SetPage("")
         path = self.date_input.GetValue()
-        found_emails = self.search_outlook_emails(path)
+        folder_path = self.folder_input.GetValue()
+        found_emails = self.search_outlook_emails(path, folder_path)
 
         html = "<html><body>"
         for email in found_emails:
@@ -68,7 +82,7 @@ class OutlookEmailSearchFrame(wx.Frame):
                 html += f"<a href=\"{email_subject}\">{email_subject}</a><br>"
         html += "</body></html>"
 
-        self.browser.SetPage(html, "")
+        self.browser.SetPage(html.encode("utf-8"), "")
 
     def on_link_click(self, event):
         url = event.GetURL()
