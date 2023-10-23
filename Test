@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import scrolledtext
 import win32com.client
 import re
 
@@ -31,15 +32,20 @@ def search_outlook_emails(path):
         print(f"Error: {e}")
         return []
 
+def on_email_click(event):
+    email_subject = event.widget.get("current linestart", "current lineend")
+    match = re.search(r'Subject: (.+),', email_subject)
+    if match:
+        email_subject = match.group(1)
+        open_outlook_email(email_subject)
+
 def insert_email_links(email_list, found_emails):
     for email in found_emails:
         match = re.search(r'Subject: (.+),', email)
         if match:
             email_subject = match.group(1)
-            email_list.tag_configure(email_subject, foreground="blue", underline=True)
-            email_list.insert(tk.END, email_subject, email_subject)
-            email_list.insert(tk.END, f"\nReceived Time: {re.search(r'Received Time: (.+)', email).group(1)}\n\n")
-            email_list.tag_bind(email_subject, "<Button-1>", lambda event, subject=email_subject: open_outlook_email(subject))
+            email_list.insert(tk.END, email_subject + '\n', "clickable")
+            email_list.tag_bind("clickable", "<Button-1>", on_email_click)
 
 def main():
     root = tk.Tk()
@@ -53,7 +59,7 @@ def main():
     date_input = tk.Entry(frame)
     date_input.pack()
 
-    email_list = tk.Text(frame, wrap=tk.WORD, width=40, height=10)
+    email_list = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=40, height=10)
     email_list.pack()
 
     def search_emails():
