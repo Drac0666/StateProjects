@@ -1,0 +1,97 @@
+import sys
+import win32com.client
+import re
+from PySide2.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QTextBrowser
+from PySide2.QtCore import Qt
+from PySide2.QtWebEngineWidgets import QWebEngineView
+
+class OutlookEmailSearchApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Search Outlook Emails")
+        self.setGeometry(100, 100, 800, 600)
+
+        self.label_date = QLabel('Enter a date (e.g., "01/01/2023"):')
+        self.date_input = QLineEdit()
+        self.label_folder = QLabel('Enter the full path to Outlook folder hierarchy:')
+        self.folder_input = QLineEdit()
+        self.search_button = QPushButton('Search Outlook Emails')
+        self.email_list = QTextBrowser()
+
+        self.browser = QWebEngineView()
+
+        layout = self.centralWidget().layout()
+        if layout is None:
+            layout = QVBoxLayout()
+
+        layout.addWidget(self.label_date)
+        layout.addWidget(self.date_input)
+        layout.addWidget(self.label_folder)
+        layout.addWidget(self.folder_input)
+        layout.addWidget(self.search_button)
+        layout.addWidget(self.email_list)
+        layout.addWidget(self.browser)
+
+        self.search_button.clicked.connect(self.on_search)
+        self.browser.page().profile().downloadRequested.connect(self.on_link_click)
+
+    def open_outlook_email(self, email_subject):
+        try:
+            outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+            inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+
+            for email in inbox.Items:
+                if re.search(email_subject, email.Subject, re.I):
+                    email.Display()
+                    break
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def search_outlook_emails(self, path, folder_path):
+        found_emails = []
+        try:
+            outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+            inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+
+            # Get the folder based on the provided folder_path
+            folder = inbox
+            for folder_name in folder_path.split("\\"):
+                folder = folder.Folders[folder_name]
+
+            emails = folder.Items
+            emails.Restrict(f"[ReceivedTime] >= '{path}'")
+
+            for email in emails:
+                found_emails.append(f"Subject: {email.Subject}, Received Time: {email.ReceivedTime}")
+
+            return found_emails
+        except Exception as e:
+            print(f"Error: {e}")
+            return []
+
+    def on_search(self):
+        self.browser.setHtml("")
+        path = self.date_input.text()
+        folder_path = self.folder_input.text()
+        found_emails = self.search_outlook_emails(path, folder_path)
+
+        html = "<html><body>"
+        for email in found_emails:
+            match = re.search(r'Subject: (.+),', email)
+            if match:
+                email_subject = match.group(1)
+                html += f'<a href="{email_subject}">{email_subject}</a><br>'
+        html += "</body></html>"
+
+        self.browser.setHtml(html)
+
+    def on_link_click(self, request):
+        url = request.url().toString()
+        self.open_outlook_email(url)
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = OutlookEmailSearchApp()
+    window.show()
+    sys.exit(app.exec_())
