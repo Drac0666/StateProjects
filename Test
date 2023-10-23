@@ -33,6 +33,14 @@ def search_outlook_emails(path):
         print(f"Error: {e}")
         return []
 
+def on_email_double_click(event):
+    item = email_list.nearest(event.y)
+    text = email_list.get(item)
+    match = re.search(r'Subject: (.+),', text)
+    if match:
+        email_subject = match.group(1)
+        open_outlook_email(email_subject)
+
 def main():
     root = tk.Tk()
     root.title("Search Outlook Emails")
@@ -53,20 +61,13 @@ def main():
         path = date_input.get()
         found_emails = search_outlook_emails(path)
         for email in found_emails:
-            email_list.insert(tk.END, email + '\n')
-
-    def on_email_click(event):
-        text = email_list.get(tk.CURRENT)
-        match = re.search(r'Subject: (.+),', text)
-        if match:
-            email_subject = match.group(1)
-            open_outlook_email(email_subject)
+            email_list.insert(tk.END, email + '\n', "clickable")
 
     search_button = tk.Button(frame, text='Search Outlook Emails', command=search_emails)
     search_button.pack()
 
     email_list.tag_configure("clickable", foreground="blue", underline=True)
-    email_list.tag_bind("clickable", "<Button-1>", on_email_click)
+    email_list.tag_bind("clickable", "<Double-1>", on_email_double_click)
 
     root.mainloop()
 
