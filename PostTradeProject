@@ -1,0 +1,42 @@
+import PySimpleGUI as sg
+import os
+import win32com.client
+
+def search_outlook_emails(path):
+    try:
+        outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+        inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+
+        # Search for emails in the specified path
+        emails = inbox.Items
+        emails.Restrict(f"[ReceivedTime] >= '{path}'")
+
+        email_count = len(emails)
+        sg.popup(f"Number of emails received since {path}: {email_count}")
+    except Exception as e:
+        sg.popup_error(f"Error: {e}")
+
+def main():
+    sg.theme("SystemDefaultForReal")
+
+    layout = [
+        [sg.Text('Enter a date (e.g., "01/01/2023"):')],
+        [sg.InputText(key='date_input')],
+        [sg.Button('Search Outlook Emails'), sg.Button('Exit')]
+    ]
+
+    window = sg.Window('Search Outlook Emails', layout)
+
+    while True:
+        event, values = window.read()
+
+        if event in (sg.WIN_CLOSED, 'Exit'):
+            break
+        elif event == 'Search Outlook Emails':
+            path = values['date_input']
+            search_outlook_emails(path)
+
+    window.close()
+
+if __name__ == '__main__':
+    main()
