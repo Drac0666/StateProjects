@@ -1,3 +1,11 @@
+from urllib.parse import quote
+
+# ...
+
+# Inside the on_search method, when creating the HTML links:
+encoded_subject = quote(email_subject)
+html += f"<a href=\"{encoded_subject}\">{email_subject}</a><br>"
+
 import wx
 import win32com.client
 import re
