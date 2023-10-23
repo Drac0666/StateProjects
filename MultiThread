@@ -1,0 +1,36 @@
+import os
+import openpyxl
+import threading
+
+# Function to process Excel files in a folder
+def process_excel_files(folder_path):
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith(".xlsx"):
+                file_path = os.path.join(root, file)
+                print(f"Processing Excel file: {file_path}")
+
+                try:
+                    workbook = openpyxl.load_workbook(file_path)
+
+                    # Now, you can work with the workbook as needed
+                    # For example, you can iterate through sheets and cells.
+
+                    # Close the workbook
+                    workbook.close()
+
+                except Exception as e:
+                    print(f"Error processing {file_path}: {str(e)}")
+
+# Function to create threads for processing subfolders
+def process_subfolders(root_folder):
+    for root, _, _ in os.walk(root_folder):
+        thread = threading.Thread(target=process_excel_files, args=(root,))
+        thread.start()
+        thread.join()
+
+# Set the root folder where you want to start searching
+root_folder = '/path/to/your/root/folder'
+
+# Call the function to create threads for processing subfolders
+process_subfolders(root_folder)
