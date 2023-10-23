@@ -1,58 +1,39 @@
-import pyautogui
-import time
+import os
+import subprocess
+import tkinter as tk
+from tkinter import filedialog
 
-print("Move the cursor to the top-left corner of the area.")
-time.sleep(5)  # Give you 5 seconds to move the cursor
-x1, y1 = pyautogui.position()
-print(f"Top-left coordinates: ({x1}, {y1})")
+def find_msg_files(directory, msg_files=[]):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".msg"):
+                msg_files.append(os.path.join(root, file))
+    return msg_files
 
-print("Move the cursor to the bottom-right corner of the area.")
-time.sleep(5)  # Give you 5 seconds to move the cursor
-x2, y2 = pyautogui.position()
-print(f"Bottom-right coordinates: ({x2}, {y2})")
+def double_click_open(event):
+    selected_item = listbox.get(listbox.curselection())
+    subprocess.Popen(["start", "outlook", "/eml", selected_item[0]], shell=True)
 
+# Create the main window
+root = tk.Tk()
+root.title("MSG File Viewer")
 
-import pytesseract
-import pyautogui
-from PIL import ImageGrab
+# Create a listbox for displaying the .msg files
+listbox = tk.Listbox(root, selectmode=tk.SINGLE, width=50, height=15)
+listbox.pack()
 
-# Take a screenshot of the portion of the screen you want to read
-screen_area = (x1, y1, x2, y2)  # Define the coordinates of the region to capture
-screenshot = ImageGrab.grab(bbox=screen_area)
+# Create a button to open a file dialog for choosing the root directory
+def open_folder():
+    directory = filedialog.askdirectory()
+    msg_files = find_msg_files(directory)
+    listbox.delete(0, tk.END)
+    for msg_file in msg_files:
+        listbox.insert(tk.END, msg_file)
 
-# Use pytesseract to extract text from the screenshot
-text = pytesseract.image_to_string(screenshot)
+open_button = tk.Button(root, text="Open Folder", command=open_folder)
+open_button.pack()
 
-# Print the extracted text
-print(text)
+# Bind the double click event to open the selected .msg file
+listbox.bind("<Double-Button-1>", double_click_open)
 
-
-
-import pandas as pd
-
-# First DataFrame with only 'Security' and empty 'Price' and 'Volume' columns
-data1 = {'Security': ['AAPL', 'GOOGL', 'TSLA', 'MSFT']}
-df1 = pd.DataFrame(data1, columns=['Security', 'Price', 'Volume'])
-
-# Second DataFrame with 'Security', 'Price', 'Volume', and 'Date' data
-data2 = {'Security': ['TSLA', 'AAPL', 'MSFT', 'TSLA'],
-         'Price': [850.0, 150.0, 300.0, 900.0],
-         'Volume': [2500000, 1000000, 750000, 2800000],
-         'Date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01']}
-df2 = pd.DataFrame(data2)
-
-# Convert 'Date' column to datetime
-df2['Date'] = pd.to_datetime(df2['Date'])
-
-# Update the first DataFrame based on matching securities in the second DataFrame
-for index, row in df1.iterrows():
-    security = row['Security']
-    matching_rows = df2[df2['Security'] == security]
-    if not matching_rows.empty:
-        # Sort by 'Date' in descending order and select the first row (most recent)
-        matching_row = matching_rows.sort_values(by='Date', ascending=False).iloc[0]
-        df1.at[index, 'Price'] = matching_row['Price']
-        df1.at[index, 'Volume'] = matching_row['Volume']
-
-# Display the updated first DataFrame
-print(df1)
+root.mainloop()
