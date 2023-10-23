@@ -33,10 +33,9 @@ def search_outlook_emails(path):
         print(f"Error: {e}")
         return []
 
-def on_email_double_click(event, email_list):
-    item = email_list.nearest(event.y)
-    text = email_list.get(item)
-    match = re.search(r'Subject: (.+),', text)
+def on_email_click(event):
+    email_subject = email_list.get("insert linestart", "insert lineend")
+    match = re.search(r'Subject: (.+),', email_subject)
     if match:
         email_subject = match.group(1)
         open_outlook_email(email_subject)
@@ -67,7 +66,7 @@ def main():
     search_button.pack()
 
     email_list.tag_configure("clickable", foreground="blue", underline=True)
-    email_list.tag_bind("clickable", "<Double-1>", lambda event, email_list=email_list: on_email_double_click(event, email_list))
+    email_list.tag_bind("clickable", "<Button-1>", on_email_click)
 
     root.mainloop()
 
