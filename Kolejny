@@ -1,3 +1,17 @@
+import pyautogui
+import time
+
+print("Move the cursor to the top-left corner of the area.")
+time.sleep(5)  # Give you 5 seconds to move the cursor
+x1, y1 = pyautogui.position()
+print(f"Top-left coordinates: ({x1}, {y1})")
+
+print("Move the cursor to the bottom-right corner of the area.")
+time.sleep(5)  # Give you 5 seconds to move the cursor
+x2, y2 = pyautogui.position()
+print(f"Bottom-right coordinates: ({x2}, {y2})")
+
+
 import pytesseract
 import pyautogui
 from PIL import ImageGrab
