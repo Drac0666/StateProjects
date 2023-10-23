@@ -1,3 +1,22 @@
+def on_search(self, event):
+    self.browser.SetPage("")
+    path = self.date_input.GetValue()
+    folder_path = self.folder_input.GetValue()
+    found_emails = self.search_outlook_emails(path, folder_path)
+
+    html = "<html><body>"
+    for email in found_emails:
+        match = re.search(r'Subject: (.+),', email)
+        if match:
+            email_subject = match.group(1)
+            # Encode the email subject as a URL
+            encoded_subject = quote(email_subject)
+            html += f"<a href=\"{encoded_subject}\">{email_subject}</a><br>"
+    html += "</body></html>"
+
+    self.browser.SetPage(html.encode("utf-8"), "")
+
+
 from urllib.parse import quote
 
 # ...
