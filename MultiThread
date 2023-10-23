@@ -1,3 +1,15 @@
+# Specify the path where you want to create the file
+output_path = '/path/to/your/directory/MCC_Note.txt'
+
+# Specify the text content for the file
+note_text = "MCC file was updated to update Treshold for Corporates ABS and CLOs from 0.075 to 0.439"
+
+# Create and write to the file
+with open(output_path, 'w') as file:
+    file.write(note_text)
+
+print(f'File "{output_path}" created with the specified text.')
+
 import os
 import openpyxl
 import threading
