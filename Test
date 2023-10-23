@@ -1,0 +1,74 @@
+import tkinter as tk
+from tkinter import scrolledtext
+import os
+import win32com.client
+import re
+
+def open_outlook_email(email_subject):
+    try:
+        outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+        inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+
+        for email in inbox.Items:
+            if re.search(email_subject, email.Subject, re.I):
+                email.Display()
+                break
+    except Exception as e:
+        print(f"Error: {e}")
+
+def search_outlook_emails(path):
+    found_emails = []
+    try:
+        outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+        inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+
+        emails = inbox.Items
+        emails.Restrict(f"[ReceivedTime] >= '{path}'")
+
+        for email in emails:
+            found_emails.append(f"Subject: {email.Subject}, Received Time: {email.ReceivedTime}")
+
+        return found_emails
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
+
+def main():
+    root = tk.Tk()
+    root.title("Search Outlook Emails")
+
+    frame = tk.Frame(root)
+    frame.pack(padx=10, pady=10)
+
+    tk.Label(frame, text='Enter a date (e.g., "01/01/2023"):').pack()
+
+    date_input = tk.Entry(frame)
+    date_input.pack()
+
+    email_list = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=40, height=10)
+    email_list.pack()
+
+    def search_emails():
+        email_list.delete(1.0, tk.END)  # Clear the existing content
+        path = date_input.get()
+        found_emails = search_outlook_emails(path)
+        for email in found_emails:
+            email_list.insert(tk.END, email + '\n')
+
+    def on_email_click(event):
+        text = email_list.get(tk.CURRENT)
+        match = re.search(r'Subject: (.+),', text)
+        if match:
+            email_subject = match.group(1)
+            open_outlook_email(email_subject)
+
+    search_button = tk.Button(frame, text='Search Outlook Emails', command=search_emails)
+    search_button.pack()
+
+    email_list.tag_configure("clickable", foreground="blue", underline=True)
+    email_list.tag_bind("clickable", "<Button-1>", on_email_click)
+
+    root.mainloop()
+
+if __name__ == '__main__':
+    main()
