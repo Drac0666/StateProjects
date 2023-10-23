@@ -1,3 +1,19 @@
+import pytesseract
+import pyautogui
+from PIL import ImageGrab
+
+# Take a screenshot of the portion of the screen you want to read
+screen_area = (x1, y1, x2, y2)  # Define the coordinates of the region to capture
+screenshot = ImageGrab.grab(bbox=screen_area)
+
+# Use pytesseract to extract text from the screenshot
+text = pytesseract.image_to_string(screenshot)
+
+# Print the extracted text
+print(text)
+
+
+
 import pandas as pd
 
 # First DataFrame with only 'Security' and empty 'Price' and 'Volume' columns
