@@ -4,19 +4,25 @@ import pandas as pd
 data1 = {'Security': ['AAPL', 'GOOGL', 'TSLA', 'MSFT']}
 df1 = pd.DataFrame(data1, columns=['Security', 'Price', 'Volume'])
 
-# Second DataFrame with 'Security', 'Price', and 'Volume' data
-data2 = {'Security': ['TSLA', 'AAPL', 'MSFT'],
-         'Price': [850.0, 150.0, 300.0],
-         'Volume': [2500000, 1000000, 750000]}
+# Second DataFrame with 'Security', 'Price', 'Volume', and 'Date' data
+data2 = {'Security': ['TSLA', 'AAPL', 'MSFT', 'TSLA'],
+         'Price': [850.0, 150.0, 300.0, 900.0],
+         'Volume': [2500000, 1000000, 750000, 2800000],
+         'Date': ['2023-01-01', '2023-01-01', '2023-01-01', '2023-02-01']}
 df2 = pd.DataFrame(data2)
+
+# Convert 'Date' column to datetime
+df2['Date'] = pd.to_datetime(df2['Date'])
 
 # Update the first DataFrame based on matching securities in the second DataFrame
 for index, row in df1.iterrows():
     security = row['Security']
-    matching_row = df2[df2['Security'] == security]
-    if not matching_row.empty:
-        df1.at[index, 'Price'] = matching_row['Price'].values[0]
-        df1.at[index, 'Volume'] = matching_row['Volume'].values[0]
+    matching_rows = df2[df2['Security'] == security]
+    if not matching_rows.empty:
+        # Sort by 'Date' in descending order and select the first row (most recent)
+        matching_row = matching_rows.sort_values(by='Date', ascending=False).iloc[0]
+        df1.at[index, 'Price'] = matching_row['Price']
+        df1.at[index, 'Volume'] = matching_row['Volume']
 
 # Display the updated first DataFrame
 print(df1)
