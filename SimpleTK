@@ -18,6 +18,12 @@ def double_click(event):
     full_path = tree.item(selected_item, "values")[1]
     messagebox.showinfo("File Details", f"Filename: {filename}\nPath: {full_path}")
 
+# Function to handle a right-click on a Treeview item
+def right_click(event):
+    selected_item = tree.selection()[0]  # Get the selected item
+    full_path = tree.item(selected_item, "values")[1]
+    os.startfile(full_path)
+
 # Create the main window
 root = tk.Tk()
 root.title("Dark Theme Tkinter GUI")
@@ -40,5 +46,8 @@ button1.pack(pady=10)
 
 # Bind the double-click event to the Treeview
 tree.bind("<Double-1>", double_click)
+
+# Bind the right-click event to the Treeview
+tree.bind("<Button-3>", right_click)
 
 root.mainloop()
