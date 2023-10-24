@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 import os
 
 # Function for the Select Folder button
@@ -8,7 +8,15 @@ def select_folder():
     if folder_path:
         tree.delete(*tree.get_children())  # Clear existing items in the Treeview
         for filename in os.listdir(folder_path):
-            tree.insert("", "end", values=(filename, os.path.join(folder_path, filename)))
+            full_path = os.path.join(folder_path, filename)
+            tree.insert("", "end", values=(filename, full_path))
+
+# Function to handle a double click on a Treeview item
+def double_click(event):
+    selected_item = tree.selection()[0]  # Get the selected item
+    filename = tree.item(selected_item, "values")[0]
+    full_path = tree.item(selected_item, "values")[1]
+    messagebox.showinfo("File Details", f"Filename: {filename}\nPath: {full_path}")
 
 # Create the main window
 root = tk.Tk()
@@ -29,5 +37,8 @@ tree.pack(pady=10)
 # Create Select Folder button
 button1 = tk.Button(root, text="Select Folder", command=select_folder)
 button1.pack(pady=10)
+
+# Bind the double-click event to the Treeview
+tree.bind("<Double-1>", double_click)
 
 root.mainloop()
