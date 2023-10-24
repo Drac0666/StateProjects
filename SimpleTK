@@ -1,0 +1,51 @@
+import tkinter as tk
+from tkinter import ttk
+
+# Function placeholders for button actions
+def function1():
+    print("Button 1 clicked")
+
+def function2():
+    print("Button 2 clicked")
+
+def function3():
+    print("Button 3 clicked")
+
+def function4():
+    print("Button 4 clicked")
+
+# Create the main window
+root = tk.Tk()
+root.title("Dark Theme Tkinter GUI")
+root.geometry("400x300")
+root.configure(bg="black")  # Set the background color for the dark theme
+root.attributes('-topmost', 1)  # Make the window stay on top
+
+# Make the window movable
+root.bind("<ButtonPress-1>", lambda e: root.geometry(''))
+root.bind("<ButtonRelease-1>", lambda e: root.geometry('400x300'))
+
+# Make the window resizable
+root.resizable(True, True)
+
+# Create 5 text inputs with default values
+text_inputs = []
+for i in range(5):
+    label = tk.Label(root, text=f"Text Input {i+1}", fg="white", bg="black")
+    label.pack(pady=5)
+    text = tk.Entry(root)
+    text.insert(0, f"Default Value {i+1}")
+    text.pack()
+    text_inputs.append(text)
+
+# Create 4 buttons with dummy functions assigned
+button1 = tk.Button(root, text="Button 1", command=function1)
+button1.pack(pady=10)
+button2 = tk.Button(root, text="Button 2", command=function2)
+button2.pack(pady=10)
+button3 = tk.Button(root, text="Button 3", command=function3)
+button3.pack(pady=10)
+button4 = tk.Button(root, text="Button 4", command=function4)
+button4.pack(pady=10)
+
+root.mainloop()
