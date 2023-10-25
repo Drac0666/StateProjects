@@ -1,0 +1,65 @@
+import wx
+import sys
+
+class RedirectedOutput:
+    def __init__(self, wx_text_ctrl):
+        self.text_ctrl = wx_text_ctrl
+        self.original_stdout = sys.stdout
+        sys.stdout = self
+
+    def write(self, text):
+        self.original_stdout.write(text)
+        self.text_ctrl.AppendText(text)
+
+    def flush(self):
+        pass
+
+def function1(event):
+    # Function 1: Sample function that uses input fields
+    login = login_entry.GetValue()
+    password = password_entry.GetValue()
+    output_text.AppendText(f"Function 1 - Login: {login}, Password: {password}\n")
+
+def function2(event):
+    # Function 2: Sample function that generates output
+    for i in range(1, 4):
+        output_text.AppendText(f"Function 2 - Output line {i}\n")
+
+app = wx.App(False)
+frame = wx.Frame(None, wx.ID_ANY, "wxPython Script with Functions and Input Fields", size=(600, 400))
+
+# Create input fields for login and password
+login_label = wx.StaticText(frame, label="Login:")
+login_entry = wx.TextCtrl(frame)
+password_label = wx.StaticText(frame, label="Password:")
+password_entry = wx.TextCtrl(frame, style=wx.TE_PASSWORD)
+input_sizer = wx.BoxSizer(wx.HORIZONTAL)
+input_sizer.Add(login_label, 0, wx.ALL, 5)
+input_sizer.Add(login_entry, 1, wx.ALL, 5)
+input_sizer.Add(password_label, 0, wx.ALL, 5)
+input_sizer.Add(password_entry, 1, wx.ALL, 5)
+
+# Create a TextCtrl widget to display the output
+output_text = wx.TextCtrl(frame, style=wx.TE_MULTILINE | wx.TE_READONLY, size=(400, 300))
+
+# Create buttons to run the functions
+run_function1_button = wx.Button(frame, label="Run Function 1")
+run_function2_button = wx.Button(frame, label="Run Function 2")
+
+run_function1_button.Bind(wx.EVT_BUTTON, function1)
+run_function2_button.Bind(wx.EVT_BUTTON, function2)
+
+# Create a RedirectedOutput instance to capture and display the output
+output_redirector = RedirectedOutput(output_text)
+
+# Create a sizer to arrange the widgets
+sizer = wx.BoxSizer(wx.VERTICAL)
+sizer.Add(input_sizer, 0, wx.EXPAND)
+sizer.Add(output_text, 1, wx.EXPAND | wx.ALL, 5)
+sizer.Add(run_function1_button, 0, wx.EXPAND | wx.ALL, 5)
+sizer.Add(run_function2_button, 0, wx.EXPAND | wx.ALL, 5)
+
+frame.SetSizerAndFit(sizer)
+frame.Show()
+
+app.MainLoop()
