@@ -13,6 +13,16 @@ def calculate_date_differences(df):
     # Calculate the difference in years and add it as a new column
     df['Years Until Maturity'] = (df['Maturity Date'] - reference_date).dt.days / 365
 
+    # Create a new column based on "Years Until Maturity" categories
+    conditions = [
+        (df['Years Until Maturity'] < 1),
+        (df['Years Until Maturity'] >= 1) & (df['Years Until Maturity'] < 5),
+        (df['Years Until Maturity'] >= 5) & (df['Years Until Maturity'] < 10),
+        (df['Years Until Maturity'] >= 10)
+    ]
+    choices = ["<1", "1-5y", "5-10y", ">10"]
+    df['Maturity Category'] = np.select(conditions, choices, "ERROR")
+
     return df
 
 # Example usage:
