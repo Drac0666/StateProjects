@@ -30,3 +30,27 @@ data = {'Maturity Date': ['2024-09-29', '2025-12-15', '2023-07-20']}
 df = pd.DataFrame(data)
 df = calculate_date_differences(df)
 print(df)
+
+
+import pandas as pd
+
+def compare_dates(df, date_column1, date_column2):
+    # Ensure the specified columns exist in the DataFrame
+    if date_column1 not in df.columns or date_column2 not in df.columns:
+        raise ValueError("Date columns not found in the DataFrame")
+
+    # Create a new column for the comparison result
+    df['Comparison Result'] = 'ok'
+
+    # Compare the two date columns and set "not ok" when there is a difference
+    df.loc[df[date_column1] != df[date_column2], 'Comparison Result'] = 'not ok'
+
+    return df
+
+# Example usage:
+data = {'Date1': ['2023-10-26', '2023-10-27', '2023-10-28'],
+        'Date2': ['2023-10-26', '2023-10-27', '2023-10-29']}
+df = pd.DataFrame(data)
+
+df = compare_dates(df, 'Date1', 'Date2')
+print(df)
