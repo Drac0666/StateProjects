@@ -1,1 +1,14 @@
+def calculate_date_differences(df):
+    # Convert the "Maturity Date" column to datetime objects
+    df['Maturity Date'] = pd.to_datetime(df['Maturity Date'])
 
+    # Define the reference date
+    reference_date = pd.to_datetime('9/29/2023')
+
+    # Calculate the day difference and add it as a new column
+    df['Days Until Maturity'] = (df['Maturity Date'] - reference_date).dt.days
+
+    # Calculate the difference in years and add it as a new column
+    df['Years Until Maturity'] = (df['Maturity Date'] - reference_date).dt.days / 365
+
+    return df
