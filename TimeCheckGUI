@@ -1,30 +1,31 @@
-import win32com.client
-import psutil
+import os
 
-def get_outlook_app():
-    try:
-        # Attempt to get an instance of an existing Outlook process
-        outlook_app = win32com.client.GetActiveObject("Outlook.Application")
-        print("Outlook is already running. Dispatching the existing instance.")
-        return outlook_app
-    except:
-        # If Outlook is not running, start it
-        if not any("OUTLOOK.EXE" in p.name() for p in psutil.process_iter()):
-            try:
-                outlook_app = win32com.client.Dispatch("Outlook.Application")
-                print("Outlook started successfully.")
-                return outlook_app
-            except Exception as e:
-                print(f"Error starting Outlook: {e}")
-        else:
-            print("Outlook process found but could not be dispatched.")
-        return None  # Return None if Outlook is not running or encountered an error
+def rename_files_with_incremental_ids(folder_path):
+    # Create a dictionary to store the mapping between ConversationIDs and incremental numbers
+    id_mapping = {}
+    
+    # List files in the folder
+    files = os.listdir(folder_path)
+    
+    for file in files:
+        if file.endswith(".txt"):  # Adjust the file extension as needed
+            # Extract ConversationID from the file name
+            conversation_id = file.split("<ConversationID>")[1]
+            conversation_id = conversation_id.split(".txt")[0]
+            
+            # Check if the ConversationID is already in the mapping
+            if conversation_id not in id_mapping:
+                id_mapping[conversation_id] = len(id_mapping) + 1
 
-# Example usage
-outlook = get_outlook_app()
+            # Construct the new file name with an incremental number
+            new_name = f"{conversation_id}_({id_mapping[conversation_id]}).txt"
+            
+            # Rename the file
+            original_path = os.path.join(folder_path, file)
+            new_path = os.path.join(folder_path, new_name)
+            os.rename(original_path, new_path)
+            print(f"Renamed: {file} -> {new_name}")
 
-if outlook is not None:
-    # You can now use the 'outlook' object to work with Outlook.
-    inbox = outlook.GetNamespace("MAPI").GetDefaultFolder(6)  # 6 represents the Inbox folder
-    messages = inbox.Items
-    print(f"Number of emails in the Inbox: {len(messages)}")
+# Example usage:
+folder_path = "/path/to/your/folder"
+rename_files_with_incremental_ids(folder_path)
