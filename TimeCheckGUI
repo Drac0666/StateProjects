@@ -1,103 +1,30 @@
-def get_month_name(month_num):
-    """
-    Return the month name as a string for the given month number.
+import win32com.client
+import psutil
 
-    Args:
-        month_num (int): An integer representing the month (1 for January, 2 for February, etc.).
+def get_outlook_app():
+    try:
+        # Attempt to get an instance of an existing Outlook process
+        outlook_app = win32com.client.GetActiveObject("Outlook.Application")
+        print("Outlook is already running. Dispatching the existing instance.")
+        return outlook_app
+    except:
+        # If Outlook is not running, start it
+        if not any("OUTLOOK.EXE" in p.name() for p in psutil.process_iter()):
+            try:
+                outlook_app = win32com.client.Dispatch("Outlook.Application")
+                print("Outlook started successfully.")
+                return outlook_app
+            except Exception as e:
+                print(f"Error starting Outlook: {e}")
+        else:
+            print("Outlook process found but could not be dispatched.")
+        return None  # Return None if Outlook is not running or encountered an error
 
-    Returns:
-        str: The month name as a string.
-    """
-    month_names = [
-        "January", "February", "March", "April",
-        "May", "June", "July", "August",
-        "September", "October", "November", "December"
-    ]
-    
-    if 1 <= month_num <= 12:
-        return month_names[month_num - 1]
-    else:
-        return "Invalid month number"
+# Example usage
+outlook = get_outlook_app()
 
-# Example usage:
-month_number = 1
-month_name = get_month_name(month_number)
-print(f"Month {month_number} is {month_name}")
-
-
-
-import os
-
-def ensure_folder_exists(folder_path):
-    """
-    Check if a folder exists at the given 'folder_path' and create it if it doesn't.
-
-    Args:
-        folder_path (str): The path to the folder you want to ensure exists.
-    """
-    if not os.path.exists(folder_path):
-        # The folder doesn't exist, so create it
-        try:
-            os.makedirs(folder_path)
-            print(f"Folder '{folder_path}' created.")
-        except OSError as e:
-            print(f"Error: Failed to create folder '{folder_path}': {e}")
-    else:
-        print(f"Folder '{folder_path}' already exists.")
-
-# Example usage:
-folder_path = "my_folder"
-ensure_folder_exists(folder_path)
-
-
-
-import tkinter as tk
-from tkinter import ttk
-
-# Function to be called when Button 1 is clicked
-def button1_clicked():
-    text = entry1.get()
-    # Add your code here for Button 1 action
-
-# Function to be called when Button 2 is clicked
-def button2_clicked():
-    text = entry2.get()
-    # Add your code here for Button 2 action
-
-# Function to be called when the bottom button is clicked
-def bottom_button_clicked():
-    pass
-    # Add your code here for the bottom button action
-
-# Create the main window
-root = tk.Tk()
-root.title("Resizable Tkinter GUI")
-root.geometry("400x200")
-
-# Create a style with the "calm" theme
-
-# Create two input boxes with default text
-entry1 = ttk.Entry(root, width=20)
-entry1.insert(0, "Default Text 1")
-entry1.grid(row=0, column=0, padx=10, pady=10)
-
-entry2 = ttk.Entry(root, width=20)
-entry2.insert(0, "Default Text 2")
-entry2.grid(row=1, column=0, padx=10, pady=10)
-
-# Create two buttons
-button1 = ttk.Button(root, text="Button 1", command=button1_clicked)
-button1.grid(row=0, column=1, padx=10, pady=10)
-
-button2 = ttk.Button(root, text="Button 2", command=button2_clicked)
-button2.grid(row=1, column=1, padx=10, pady=10)
-
-# Create the bottom button
-bottom_button = ttk.Button(root, text="Bottom Button", command=bottom_button_clicked)
-bottom_button.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
-
-# Allow the window to be resized
-root.resizable(True, True)
-
-# Start the main loop
-root.mainloop()
+if outlook is not None:
+    # You can now use the 'outlook' object to work with Outlook.
+    inbox = outlook.GetNamespace("MAPI").GetDefaultFolder(6)  # 6 represents the Inbox folder
+    messages = inbox.Items
+    print(f"Number of emails in the Inbox: {len(messages)}")
