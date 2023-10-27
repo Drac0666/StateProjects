@@ -1,3 +1,28 @@
+import os
+
+def ensure_folder_exists(folder_path):
+    """
+    Check if a folder exists at the given 'folder_path' and create it if it doesn't.
+
+    Args:
+        folder_path (str): The path to the folder you want to ensure exists.
+    """
+    if not os.path.exists(folder_path):
+        # The folder doesn't exist, so create it
+        try:
+            os.makedirs(folder_path)
+            print(f"Folder '{folder_path}' created.")
+        except OSError as e:
+            print(f"Error: Failed to create folder '{folder_path}': {e}")
+    else:
+        print(f"Folder '{folder_path}' already exists.")
+
+# Example usage:
+folder_path = "my_folder"
+ensure_folder_exists(folder_path)
+
+
+
 import tkinter as tk
 from tkinter import ttk
 
