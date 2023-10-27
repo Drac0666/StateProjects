@@ -8,17 +8,17 @@ def rename_files_with_incremental_ids(folder_path):
     files = os.listdir(folder_path)
     
     for file in files:
-        if file.endswith(".txt"):  # Adjust the file extension as needed
+        if file.endswith(".msg"):  # Adjust the file extension as needed
             # Extract ConversationID from the file name
-            conversation_id = file.split("<ConversationID>")[1]
-            conversation_id = conversation_id.split(".txt")[0]
+            conversation_id = file.split("_")[0]
+            FileNameToKeep = file.split("_")[1:][0]
             
             # Check if the ConversationID is already in the mapping
             if conversation_id not in id_mapping:
                 id_mapping[conversation_id] = len(id_mapping) + 1
 
             # Construct the new file name with an incremental number
-            new_name = f"{conversation_id}_({id_mapping[conversation_id]}).txt"
+            new_name = f"{id_mapping[conversation_id]}_{FileNameToKeep}"
             
             # Rename the file
             original_path = os.path.join(folder_path, file)
