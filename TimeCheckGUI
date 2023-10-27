@@ -1,16 +1,21 @@
-import csv
+import pandas as pd
+import datetime
 
-def read_csv_to_list(csv_file):
-    data = []
-    with open(csv_file, 'r', newline='') as file:
-        csv_reader = csv.reader(file)
-        for row in csv_reader:
-            data.append(row)
-    return data
+def generate_business_days_for_month(month):
+    # Get the current year
+    current_year = datetime.datetime.now().year
+
+    # Create a date range for the specified month in the current year
+    start_date = f"{current_year}-{month}-01"
+    end_date = f"{current_year}-{month}-01"
+    business_days = pd.bdate_range(start_date, end_date)
+
+    return business_days
 
 # Example usage:
-csv_file_path = 'example.csv'  # Replace with the path to your CSV file
-csv_data = read_csv_to_list(csv_file_path)
+month = 3  # Replace with the desired month
+business_days = generate_business_days_for_month(month)
 
-for row in csv_data:
-    print(row)
+print("Business days for the specified month:")
+for day in business_days:
+    print(day)
