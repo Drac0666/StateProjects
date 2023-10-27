@@ -1,31 +1,16 @@
-import os
+import csv
 
-def rename_files_with_incremental_ids(folder_path):
-    # Create a dictionary to store the mapping between ConversationIDs and incremental numbers
-    id_mapping = {}
-    
-    # List files in the folder
-    files = os.listdir(folder_path)
-    
-    for file in files:
-        if file.endswith(".msg"):  # Adjust the file extension as needed
-            # Extract ConversationID from the file name
-            conversation_id = file.split("_")[0]
-            FileNameToKeep = file.split("_")[1:][0]
-            
-            # Check if the ConversationID is already in the mapping
-            if conversation_id not in id_mapping:
-                id_mapping[conversation_id] = len(id_mapping) + 1
-
-            # Construct the new file name with an incremental number
-            new_name = f"{id_mapping[conversation_id]}_{FileNameToKeep}"
-            
-            # Rename the file
-            original_path = os.path.join(folder_path, file)
-            new_path = os.path.join(folder_path, new_name)
-            os.rename(original_path, new_path)
-            print(f"Renamed: {file} -> {new_name}")
+def read_csv_to_list(csv_file):
+    data = []
+    with open(csv_file, 'r', newline='') as file:
+        csv_reader = csv.reader(file)
+        for row in csv_reader:
+            data.append(row)
+    return data
 
 # Example usage:
-folder_path = "/path/to/your/folder"
-rename_files_with_incremental_ids(folder_path)
+csv_file_path = 'example.csv'  # Replace with the path to your CSV file
+csv_data = read_csv_to_list(csv_file_path)
+
+for row in csv_data:
+    print(row)
