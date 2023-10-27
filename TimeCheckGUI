@@ -1,3 +1,31 @@
+def get_month_name(month_num):
+    """
+    Return the month name as a string for the given month number.
+
+    Args:
+        month_num (int): An integer representing the month (1 for January, 2 for February, etc.).
+
+    Returns:
+        str: The month name as a string.
+    """
+    month_names = [
+        "January", "February", "March", "April",
+        "May", "June", "July", "August",
+        "September", "October", "November", "December"
+    ]
+    
+    if 1 <= month_num <= 12:
+        return month_names[month_num - 1]
+    else:
+        return "Invalid month number"
+
+# Example usage:
+month_number = 1
+month_name = get_month_name(month_number)
+print(f"Month {month_number} is {month_name}")
+
+
+
 import os
 
 def ensure_folder_exists(folder_path):
