@@ -1,6 +1,20 @@
 import os
 import win32com.client
 
+Dim objItem As Object
+Dim strLastVerbExecuted As String
+
+Set objItem = Application.ActiveInspector.CurrentItem
+strLastVerbExecuted = objItem.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x10810003")
+
+If strLastVerbExecuted = 102 Then
+    MsgBox "This is a reply."
+Else
+    MsgBox "This is not a reply."
+End I
+
+
+
 def is_response_to_email(msg_file_path):
     try:
         outlook = win32com.client.Dispatch("Outlook.Application")
