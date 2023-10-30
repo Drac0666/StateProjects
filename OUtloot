@@ -1,5 +1,28 @@
 import win32com.client
 
+def list_outlook_item_properties(item):
+    try:
+        property_accessor = item.PropertyAccessor
+        all_properties = property_accessor.GetIDsFromNames()
+        for property_id, property_name in all_properties:
+            property_value = property_accessor.GetProperty(property_id)
+            print(f"{property_name}: {property_value}")
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Example usage:
+outlook = win32com.client.Dispatch("Outlook.Application")
+namespace = outlook.GetNamespace("MAPI")
+inbox = namespace.GetDefaultFolder(6)  # 6 corresponds to the Inbox folder
+
+# Iterate through emails in the Inbox
+for item in inbox.Items:
+    print(f"Subject: {item.Subject}")
+    list_outlook_item_properties(item)
+
+
+import win32com.client
+
 def print_outlook_item_properties(item):
     """Prints all Outlook item properties.
 
