@@ -1,3 +1,5 @@
+tree.bind("<Button-2>", on_treeview_middle_click)
+
 def display_dataframe_in_treeview(df, treeview):
     # Clear the Treeview
     for item in treeview.get_children():
