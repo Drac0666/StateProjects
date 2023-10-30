@@ -1,0 +1,28 @@
+import os
+import win32com.client
+
+def is_response_to_email(msg_file_path):
+    try:
+        outlook = win32com.client.Dispatch("Outlook.Application")
+        msg = outlook.Session.OpenSharedItem(msg_file_path)
+
+        # Get the PR_MESSAGE_FLAGS property
+        msg_flags = msg.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x0E070003")
+
+        # Check if the MSG file is a response or reply
+        if msg_flags & 0x01:  # Check if the MSG is a reply
+            return True
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+    return False
+
+# Example usage:
+msg_file_path = "path_to_your_msg_file.msg"
+is_response = is_response_to_email(msg_file_path)
+
+if is_response:
+    print("The MSG file is a response or reply to an email.")
+else:
+    print("The MSG file is not a response or reply to an email.")
