@@ -1,88 +1,28 @@
-import win32com.client
+import pandas as pd
+import random
 
-def list_outlook_item_properties(item):
-    try:
-        property_accessor = item.PropertyAccessor
-        all_properties = property_accessor.GetIDsFromNames()
-        for property_id, property_name in all_properties:
-            property_value = property_accessor.GetProperty(property_id)
-            print(f"{property_name}: {property_value}")
-    except Exception as e:
-        print(f"Error: {e}")
-
-# Example usage:
-outlook = win32com.client.Dispatch("Outlook.Application")
-namespace = outlook.GetNamespace("MAPI")
-inbox = namespace.GetDefaultFolder(6)  # 6 corresponds to the Inbox folder
-
-# Iterate through emails in the Inbox
-for item in inbox.Items:
-    print(f"Subject: {item.Subject}")
-    list_outlook_item_properties(item)
-
-
-import win32com.client
-
-def print_outlook_item_properties(item):
-    """Prints all Outlook item properties.
-
-    Args:
-        item: The Outlook item to print the properties of.
-    """
-
-    for prop in item.GetProperties():
-        print(f'{prop}: {item.GetInspector.GetActiveObject().GetProperty(prop)}')
-
-if __name__ == '__main__':
-    # Get the Outlook application object
-    outlook = win32com.client.Dispatch('Outlook.Application')
-
-    # Get the current Outlook item
-    item = outlook.ActiveInspector.CurrentItem
-
-    # Print the item properties
-    print_outlook_item_properties(item)
-
-
-import os
-import win32com.client
-
-Dim objItem As Object
-Dim strLastVerbExecuted As String
-
-Set objItem = Application.ActiveInspector.CurrentItem
-strLastVerbExecuted = objItem.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x10810003")
-
-If strLastVerbExecuted = 102 Then
-    MsgBox "This is a reply."
-Else
-    MsgBox "This is not a reply."
-End I
-
-
-
-def is_response_to_email(msg_file_path):
-    try:
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        msg = outlook.Session.OpenSharedItem(msg_file_path)
-
-        # Get the PR_MESSAGE_FLAGS property
-        msg_flags = msg.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x0E070003")
-
-        # Check if the MSG file is a response or reply
-        if msg_flags & 0x01:  # Check if the MSG is a reply
-            return True
-
-    except Exception as e:
-        print(f"Error: {e}")
-
-    return False
+def merge_random_rows(dataframes):
+    random_rows = []
+    
+    for df in dataframes:
+        if not df.empty:
+            random_index = random.randint(0, len(df) - 1)
+            random_row = df.iloc[random_index]
+            random_rows.append(random_row)
+    
+    merged_df = pd.concat(random_rows, axis=1).T.reset_index(drop=True)
+    return merged_df
 
 # Example usage:
-msg_file_path = "path_to_your_msg_file.msg"
-is_response = is_response_to_email(msg_file_path)
+# Create sample DataFrames
+df1 = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
+df2 = pd.DataFrame({'A': [7, 8, 9], 'B': [10, 11, 12]})
+df3 = pd.DataFrame({'A': [13, 14, 15], 'B': [16, 17, 18]})
 
-if is_response:
-    print("The MSG file is a response or reply to an email.")
-else:
-    print("The MSG file is not a response or reply to an email.")
+# List of DataFrames
+dataframes = [df1, df2, df3]
+
+# Call the function to merge random rows
+result = merge_random_rows(dataframes)
+
+print(result)
