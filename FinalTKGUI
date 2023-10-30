@@ -1,1 +1,90 @@
+import tkinter as tk
+from tkinter import ttk
+import os
+
+selected_folder = "Folder1"  # Initialize with a default folder
+
+def populate_tree(tree, parent, node):
+    if os.path.isdir(node):
+        items = os.listdir(node)
+        for item in items:
+            item_path = os.path.join(node, item)
+            if os.path.isdir(item_path):
+                folder_id = tree.insert(parent, "end", text=item, values=("Folder",), open=False)
+                populate_tree(tree, folder_id, item_path)
+            else:
+                tree.insert(parent, "end", text=item, values=("File",))
+
+def on_select(event):
+    item = tree.focus()
+    item_text = tree.item(item, "text")
+    item_type = tree.item(item, "values")[0]
+    print(f"Selected Item: {item_text}, Type: {item_type}")
+
+def on_double_click(event):
+    item = tree.selection()[0]  # Get the selected item
+    item_text = tree.item(item, "text")
+    full_path = get_item_path(tree, item)
+    print(f"Selected Item: {item_text}, Full Path: {full_path}")
+
+def get_item_path(tree, item):
+    item_path = tree.item(item, "text")
+    parent_item = tree.parent(item)
+
+    while parent_item:
+        parent_text = tree.item(parent_item, "text")
+        item_path = os.path.join(parent_text, item_path)
+        parent_item = tree.parent(parent_item)
+
+    return item_path
+
+def on_folder_select(event):
+    global selected_folder
+    selected_folder = listbox.get(listbox.curselection()[0])
+    update_tree(selected_folder)
+
+def update_tree(folder):
+    tree.delete(*tree.get_children())  # Clear the treeview
+    start_directory = os.path.join("/path/to/your/base/directory", folder)
+    populate_tree(tree, "", start_directory)
+
+def check_selected_folder():
+    return selected_folder  # Function to check the selected folder
+
+root = tk.Tk()
+root.title("File Explorer")
+
+# Listbox with three different folders to select
+listbox = tk.Listbox(root)
+listbox.pack(side=tk.LEFT)
+listbox.insert(1, "Folder1")
+listbox.insert(2, "Folder2")
+listbox.insert(3, "Folder3")
+
+# Treeview widget
+tree = ttk.Treeview(root, columns=("Type"))
+tree.heading("#1", text="Type")
+tree.pack(fill="both", expand=True)
+
+root.geometry("400x400")
+
+# Initial folder selection
+initial_folder = "Folder1"
+listbox.select_set(0)
+update_tree(initial_folder)
+
+# Bind functions to handle item selection, double-click, and folder selection
+tree.bind("<<TreeviewSelect>>", on_select)
+tree.bind("<Double-1>", on_double_click)
+listbox.bind("<<ListboxSelect>>", on_folder_select)
+
+# Example: Checking the selected folder from another function
+def check_selected_folder_button():
+    selected = check_selected_folder()
+    print(f"Selected Folder: {selected}")
+
+check_button = tk.Button(root, text="Check Selected Folder", command=check_selected_folder_button)
+check_button.pack()
+
+root.mainloop()
 
