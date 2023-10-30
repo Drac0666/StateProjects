@@ -1,3 +1,18 @@
+def display_dataframe_in_treeview(df, treeview):
+    # Clear the Treeview
+    for item in treeview.get_children():
+        treeview.delete(item)
+
+    # Insert columns based on DataFrame columns
+    treeview["columns"] = list(df.columns)
+    for column in df.columns:
+        treeview.heading(column, text=column)
+        treeview.column(column, width=100)  # Adjust the column width as needed
+
+    # Insert rows from the DataFrame
+    for row in df.itertuples(index=False):
+        treeview.insert("", "end", values=row)
+
 import pandas as pd
 import random
 
