@@ -1,3 +1,26 @@
+import win32com.client
+
+def print_outlook_item_properties(item):
+    """Prints all Outlook item properties.
+
+    Args:
+        item: The Outlook item to print the properties of.
+    """
+
+    for prop in item.GetProperties():
+        print(f'{prop}: {item.GetInspector.GetActiveObject().GetProperty(prop)}')
+
+if __name__ == '__main__':
+    # Get the Outlook application object
+    outlook = win32com.client.Dispatch('Outlook.Application')
+
+    # Get the current Outlook item
+    item = outlook.ActiveInspector.CurrentItem
+
+    # Print the item properties
+    print_outlook_item_properties(item)
+
+
 import os
 import win32com.client
 
