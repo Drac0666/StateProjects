@@ -1,3 +1,7 @@
+def add_strings_to_treeview(treeview, strings):
+    for string in strings:
+        treeview.insert("", "end", text=string)
+
 import pandas as pd
 import datetime
 import calendar
