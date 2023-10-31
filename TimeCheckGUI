@@ -1,19 +1,25 @@
-from datetime import datetime
+import re
 
-def extract_year_and_month(date_string):
-    try:
-        date = datetime.strptime(date_string, "%m/%d/%Y")
-        year = date.strftime("%Y")
-        month = date.strftime("%m").lstrip("0")
-        return year, month
-    except ValueError:
-        return None, None
+def extract_hh_mm(file_name):
+    # Define a regex pattern to match "<HH>_<MM>" in the file name
+    pattern = r'_(\d+)_(\d+)_'
 
-date_string = "09/14/2023"
-year, month = extract_year_and_month(date_string)
+    # Use re.search to find the HH and MM values in the file name
+    match = re.search(pattern, file_name)
 
-if year is not None and month is not None:
-    print("Year:", year)
-    print("Month:", month)
+    if match:
+        hh = match.group(1)
+        mm = match.group(2)
+        hh_mm = f"{hh}.{mm}"
+        return hh_mm
+    else:
+        return None
+
+# Example usage
+file_name = "SomeRandomText_12_34_restoffile"
+hh_mm = extract_hh_mm(file_name)
+
+if hh_mm:
+    print(f"Extracted HH.MM: {hh_mm}")
 else:
-    print("Invalid date format.")
+    print("Pattern not found in the file name.")
