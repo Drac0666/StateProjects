@@ -9,14 +9,14 @@ def extract_hh_mm(file_name):
 
     if match:
         hh = match.group(1)
-        mm = match.group(2)
+        mm = match.group(2).zfill(2)
         hh_mm = f"{hh}.{mm}"
         return hh_mm
     else:
         return None
 
 # Example usage
-file_name = "SomeRandomText_12_34_restoffile"
+file_name = "SomeRandomText_9_5_restoffile"
 hh_mm = extract_hh_mm(file_name)
 
 if hh_mm:
