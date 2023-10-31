@@ -1,23 +1,97 @@
-import win32gui
-import win32con
-import time
+import tkinter as tk
+import tkinter.font as tkFont
 
-def switch_to_excel_with_title(title):
-    # Find all open windows
-    windows = []
-    win32gui.EnumWindows(lambda hwnd, param: windows.append((hwnd, win32gui.GetWindowText(hwnd))), None)
+class App:
+    def __init__(self, root):
+        #setting title
+        root.title("undefined")
+        #setting window size
+        width=600
+        height=500
+        screenwidth = root.winfo_screenwidth()
+        screenheight = root.winfo_screenheight()
+        alignstr = '%dx%d+%d+%d' % (width, height, (screenwidth - width) / 2, (screenheight - height) / 2)
+        root.geometry(alignstr)
+        root.resizable(width=False, height=False)
 
-    for hwnd, window_title in windows:
-        if "Microsoft Excel" in window_title and title in window_title:
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            win32gui.SetForegroundWindow(hwnd)
-            return True
+        GLabel_52=tk.Label(root)
+        ft = tkFont.Font(family='Times',size=10)
+        GLabel_52["font"] = ft
+        GLabel_52["fg"] = "#333333"
+        GLabel_52["justify"] = "center"
+        GLabel_52["text"] = "label"
+        GLabel_52.place(x=10,y=20,width=70,height=25)
 
-    return False
+        GLineEdit_460=tk.Entry(root)
+        GLineEdit_460["borderwidth"] = "1px"
+        ft = tkFont.Font(family='Times',size=10)
+        GLineEdit_460["font"] = ft
+        GLineEdit_460["fg"] = "#333333"
+        GLineEdit_460["justify"] = "center"
+        GLineEdit_460["text"] = "Entry"
+        GLineEdit_460.place(x=80,y=20,width=70,height=25)
 
-# Example usage: Switch to Excel with a specific title
-title_to_find = "Your Workbook - Microsoft Excel"
-if switch_to_excel_with_title(title_to_find):
-    print(f"Switched to Excel with title '{title_to_find}'")
-else:
-    print(f"No Excel window found with title '{title_to_find}'")
+        GLabel_339=tk.Label(root)
+        ft = tkFont.Font(family='Times',size=10)
+        GLabel_339["font"] = ft
+        GLabel_339["fg"] = "#333333"
+        GLabel_339["justify"] = "center"
+        GLabel_339["text"] = "label"
+        GLabel_339.place(x=170,y=20,width=70,height=25)
+
+        GLineEdit_861=tk.Entry(root)
+        GLineEdit_861["borderwidth"] = "1px"
+        ft = tkFont.Font(family='Times',size=10)
+        GLineEdit_861["font"] = ft
+        GLineEdit_861["fg"] = "#333333"
+        GLineEdit_861["justify"] = "center"
+        GLineEdit_861["text"] = "Entry"
+        GLineEdit_861.place(x=250,y=20,width=70,height=25)
+
+        GButton_819=tk.Button(root)
+        GButton_819["bg"] = "#e9e9ed"
+        ft = tkFont.Font(family='Times',size=10)
+        GButton_819["font"] = ft
+        GButton_819["fg"] = "#000000"
+        GButton_819["justify"] = "center"
+        GButton_819["text"] = "Button"
+        GButton_819.place(x=340,y=20,width=70,height=25)
+        GButton_819["command"] = self.GButton_819_command
+
+        GButton_269=tk.Button(root)
+        GButton_269["bg"] = "#e9e9ed"
+        ft = tkFont.Font(family='Times',size=10)
+        GButton_269["font"] = ft
+        GButton_269["fg"] = "#000000"
+        GButton_269["justify"] = "center"
+        GButton_269["text"] = "Button"
+        GButton_269.place(x=440,y=20,width=70,height=25)
+        GButton_269["command"] = self.GButton_269_command
+
+        GListBox_595=tk.Listbox(root)
+        GListBox_595["borderwidth"] = "1px"
+        ft = tkFont.Font(family='Times',size=10)
+        GListBox_595["font"] = ft
+        GListBox_595["fg"] = "#333333"
+        GListBox_595["justify"] = "center"
+        GListBox_595.place(x=30,y=70,width=80,height=25)
+
+        GListBox_691=tk.Listbox(root)
+        GListBox_691["borderwidth"] = "1px"
+        ft = tkFont.Font(family='Times',size=10)
+        GListBox_691["font"] = ft
+        GListBox_691["fg"] = "#333333"
+        GListBox_691["justify"] = "center"
+        GListBox_691.place(x=150,y=70,width=80,height=25)
+
+    def GButton_819_command(self):
+        print("command")
+
+
+    def GButton_269_command(self):
+        print("command")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
