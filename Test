@@ -1,122 +1,42 @@
-def on_search(self, event):
-    self.browser.SetPage("")
-    path = self.date_input.GetValue()
-    folder_path = self.folder_input.GetValue()
-    found_emails = self.search_outlook_emails(path, folder_path)
+def nonzero_indices(arr):
+    return [i for i, x in enumerate(arr) if x != 0]
 
-    html = "<html><body>"
-    for email in found_emails:
-        match = re.search(r'Subject: (.+),', email)
-        if match:
-            email_subject = match.group(1)
-            # Encode the email subject as a URL
-            encoded_subject = quote(email_subject)
-            html += f"<a href=\"{encoded_subject}\">{email_subject}</a><br>"
-    html += "</body></html>"
-
-    self.browser.SetPage(html.encode("utf-8"), "")
+# Example usage:
+my_list = [0, 1, 0, 2, 0, 3]
+result = nonzero_indices(my_list)
+print(result)  # Output will be [1, 3, 5]
 
 
-from urllib.parse import quote
+import numpy as np
 
-# ...
+def nonzero_indices(arr):
+    return np.nonzero(arr)[0]
 
-# Inside the on_search method, when creating the HTML links:
-encoded_subject = quote(email_subject)
-html += f"<a href=\"{encoded_subject}\">{email_subject}</a><br>"
+# Example usage:
+my_array = np.array([0, 1, 0, 2, 0, 3])
+result = nonzero_indices(my_array)
+print(result)  # Output will be [1 3 5]
 
-import wx
-import win32com.client
-import re
-import wx.html2 as webview
 
-class OutlookEmailSearchFrame(wx.Frame):
-    def __init__(self):
-        super().__init__(None, title="Search Outlook Emails", size=(800, 600))
+def index_of_max_value(arr):
+    if len(arr) == 0:
+        return None
+    return arr.index(max(arr))
 
-        self.panel = wx.Panel(self)
-        self.vbox = wx.BoxSizer(wx.VERTICAL)
+# Example usage:
+my_list = [10, 5, 15, 20, 8]
+result = index_of_max_value(my_list)
+print(result)  # Output will be 3 (index of the maximum value, which is 20)
 
-        self.label_date = wx.StaticText(self.panel, label='Enter a date (e.g., "01/01/2023"):')
-        self.date_input = wx.TextCtrl(self.panel)
-        
-        self.label_folder = wx.StaticText(self.panel, label='Enter the full path to Outlook folder hierarchy:')
-        self.folder_input = wx.TextCtrl(self.panel)
-        
-        self.search_button = wx.Button(self.panel, label='Search Outlook Emails')
 
-        self.browser = webview.WebView.New(self.panel)
-        self.browser.Bind(webview.EVT_WEBVIEW_NAVIGATING, self.on_link_click)
+import numpy as np
 
-        self.vbox.Add(self.label_date, 0, wx.ALL | wx.EXPAND, 5)
-        self.vbox.Add(self.date_input, 0, wx.ALL | wx.EXPAND, 5)
-        
-        self.vbox.Add(self.label_folder, 0, wx.ALL | wx.EXPAND, 5)
-        self.vbox.Add(self.folder_input, 0, wx.ALL | wx.EXPAND, 5)
+def index_of_max_value(arr):
+    if arr.size == 0:
+        return None
+    return arr.argmax()
 
-        self.vbox.Add(self.search_button, 0, wx.ALL | wx.EXPAND, 5)
-        self.vbox.Add(self.browser, 1, wx.ALL | wx.EXPAND, 5)
-
-        self.panel.SetSizer(self.vbox)
-
-        self.search_button.Bind(wx.EVT_BUTTON, self.on_search)
-
-    def open_outlook_email(self, email_subject):
-        try:
-            outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
-            inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
-
-            for email in inbox.Items:
-                if re.search(email_subject, email.Subject, re.I):
-                    email.Display()
-                    break
-        except Exception as e:
-            print(f"Error: {e}")
-
-    def search_outlook_emails(self, path, folder_path):
-        found_emails = []
-        try:
-            outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
-            inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
-            
-            # Get the folder based on the provided folder_path
-            folder = inbox
-            for folder_name in folder_path.split("\\"):
-                folder = folder.Folders[folder_name]
-
-            emails = folder.Items
-            emails.Restrict(f"[ReceivedTime] >= '{path}'")
-
-            for email in emails:
-                found_emails.append(f"Subject: {email.Subject}, Received Time: {email.ReceivedTime}")
-
-            return found_emails
-        except Exception as e:
-            print(f"Error: {e}")
-            return []
-
-    def on_search(self, event):
-        self.browser.SetPage("")
-        path = self.date_input.GetValue()
-        folder_path = self.folder_input.GetValue()
-        found_emails = self.search_outlook_emails(path, folder_path)
-
-        html = "<html><body>"
-        for email in found_emails:
-            match = re.search(r'Subject: (.+),', email)
-            if match:
-                email_subject = match.group(1)
-                html += f"<a href=\"{email_subject}\">{email_subject}</a><br>"
-        html += "</body></html>"
-
-        self.browser.SetPage(html.encode("utf-8"), "")
-
-    def on_link_click(self, event):
-        url = event.GetURL()
-        self.open_outlook_email(url)
-
-if __name__ == '__main__':
-    app = wx.App()
-    frame = OutlookEmailSearchFrame()
-    frame.Show()
-    app.MainLoop()
+# Example usage:
+my_array = np.array([10, 5, 15, 20, 8])
+result = index_of_max_value(my_array)
+print(result)  # Output will be 3 (index of the maximum value, which is 20)
