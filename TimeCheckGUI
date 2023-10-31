@@ -1,55 +1,19 @@
-def add_strings_to_treeview(treeview, strings):
-    for string in strings:
-        treeview.insert("", "end", text=string)
+from datetime import datetime
 
-import pandas as pd
-import datetime
-import calendar
+def extract_year_and_month(date_string):
+    try:
+        date = datetime.strptime(date_string, "%m/%d/%Y")
+        year = date.strftime("%Y")
+        month = date.strftime("%m").lstrip("0")
+        return year, month
+    except ValueError:
+        return None, None
 
-def generate_business_days_for_month(month):
-    # Get the current year
-    current_year = datetime.datetime.now().year
+date_string = "09/14/2023"
+year, month = extract_year_and_month(date_string)
 
-    # Calculate the last day of the specified month
-    last_day = calendar.monthrange(current_year, month)[1]
-
-    # Create a date range for the specified month in the current year
-    start_date = f"{current_year}-{month}-01"
-    end_date = f"{current_year}-{month}-{last_day}"
-    business_days = pd.bdate_range(start_date, end_date)
-
-    return business_days
-
-# Example usage:
-month = 3  # Replace with the desired month
-business_days = generate_business_days_for_month(month)
-
-print("Business days for the specified month:")
-for day in business_days:
-    print(day)
-####################
-import pandas as pd
-import datetime
-import calendar
-
-def generate_business_days_for_month(month):
-    # Get the current year
-    current_year = datetime.datetime.now().year
-
-    # Calculate the last day of the specified month
-    last_day = calendar.monthrange(current_year, month)[1]
-
-    # Create a date range for the specified month in the current year
-    start_date = f"{current_year}-{month}-01"
-    end_date = f"{current_year}-{month}-{last_day}"
-    business_days = pd.bdate_range(start_date, end_date)
-
-    return business_days
-
-# Example usage:
-month = 3  # Replace with the desired month
-business_days = generate_business_days_for_month(month)
-
-print("Business days for the specified month:")
-for day in business_days:
-    print(day)
+if year is not None and month is not None:
+    print("Year:", year)
+    print("Month:", month)
+else:
+    print("Invalid date format.")
