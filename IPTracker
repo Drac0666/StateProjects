@@ -1,53 +1,30 @@
 import os
 from datetime import datetime, timedelta
+from collections import defaultdict
 
-# Define the base directory to start searching
-base_dir = '/path/to/your/directory'
+def find_closest_to_month_end_files(main_folder):
+    closest_files = []
+    for root, _, files in os.walk(main_folder):
+        date_files = defaultdict(list)
+        for filename in files:
+            try:
+                # Extract the date from the filename
+                file_date = datetime.strptime(filename[-12:-4], "%Y%m%d")
+                # Group files by their year and month
+                key = (file_date.year, file_date.month)
+                date_files[key].append((filename, os.path.join(root, filename)))
+            except ValueError:
+                pass  # Skip files that don't match the expected format
 
-# Function to calculate the last business day of a given month
-def last_business_day(year, month):
-    last_day = datetime(year, month, 1) + timedelta(days=calendar.monthrange(year, month)[1] - 1)
-    
-    while last_day.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
-        last_day -= timedelta(days=1)
+        for key, files_in_month in date_files.items():
+            # Find the file closest to the end of the month
+            last_day_of_month = (datetime(key[0], key[1], 1) + timedelta(days=31)).replace(day=1) - timedelta(days=1)
+            closest_file = min(files_in_month, key=lambda x: abs(x[0]))
+            closest_files.append(closest_file)
 
-    return last_day.strftime('%Y%m%d')
+    return closest_files
 
-# Function to search for files with a date in the name
-def find_files_with_date(base_dir):
-    for root, dirs, files in os.walk(base_dir):
-        closest_file = None
-        closest_difference = None
-
-        for file in files:
-            if 'date' in file.lower():  # You can adjust the condition as needed
-                # Extract the date from the file name (assuming format YYYYMMDD)
-                file_name = os.path.splitext(file)[0]
-
-                try:
-                    file_date = datetime.strptime(file_name, '%Y%m%d')
-                    year, month, day = file_date.year, file_date.month, file_date.day
-                except ValueError:
-                    continue  # Skip files with invalid date formats
-
-                last_day = last_business_day(year, month)
-
-                if file_name == last_day:
-                    file_path = os.path.join(root, file)
-                    print(f'Found file with the last business day: {file_path}')
-                    return  # Exit the function if an exact match is found
-
-                # Calculate the difference between the last day and the date in the file name
-                date_in_filename = datetime(year, month, day)
-                difference = abs((date_in_filename - datetime.strptime(last_day, '%Y%m%d')).days)
-
-                # Update closest file if a closer date is found
-                if closest_difference is None or difference < closest_difference:
-                    closest_file = os.path.join(root, file)
-                    closest_difference = difference
-
-        if closest_file is not None:
-            print(f'Closest file to the last business day: {closest_file}')
-
-# Call the function to start the search
-find_files_with_date(base_dir)
+main_folder = "/path/to/your/main/folder"
+closest_files = find_closest_to_month_end_files(main_folder)
+for filename, full_path in closest_files:
+    print(f"Closest to month end: {filename} at {full_path}")
