@@ -1,4 +1,25 @@
 import os
+
+def get_all_subdirectories(folder_path):
+    all_subdirectories = []
+
+    for root, dirs, files in os.walk(folder_path):
+        for directory in dirs:
+            subdirectory_path = os.path.join(root, directory)
+            all_subdirectories.append(subdirectory_path)
+
+    return all_subdirectories
+
+# Example usage:
+folder_path = '/path/to/your/folder'
+subdirectories = get_all_subdirectories(folder_path)
+
+for subdirectory in subdirectories:
+    print(subdirectory)
+
+
+
+import os
 from datetime import datetime, timedelta
 import calendar
 
