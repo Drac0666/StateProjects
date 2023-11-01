@@ -1,0 +1,51 @@
+import os
+import calendar
+from datetime import date, timedelta
+
+# Define the base directory to start searching
+base_dir = '/path/to/your/directory'
+
+# Function to calculate the last business day of a given month
+def last_business_day(year, month):
+    last_day = calendar.monthrange(year, month)[1]
+    last_date = date(year, month, last_day)
+
+    while last_date.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
+        last_date -= timedelta(days=1)
+
+    return last_date
+
+# Function to search for files with date in the name
+def find_files_with_date(base_dir):
+    for root, dirs, files in os.walk(base_dir):
+        closest_file = None
+        closest_difference = None
+
+        for file in files:
+            if 'date' in file.lower():  # You can adjust the condition as needed
+                # Extract year and month from the file name (assuming format YYYYMM)
+                file_name = os.path.splitext(file)[0]
+                year = int(file_name[:4])
+                month = int(file_name[4:6])
+
+                last_day = last_business_day(year, month)
+
+                if int(file_name[-2:]) == last_day.day:
+                    file_path = os.path.join(root, file)
+                    print(f'Found file with the last business day: {file_path}')
+                    return  # Exit the function if an exact match is found
+
+                # Calculate the difference between the last day and the date in the file name
+                date_in_filename = date(year, month, int(file_name[-2:]))
+                difference = abs((last_day - date_in_filename).days)
+
+                # Update closest file if a closer date is found
+                if closest_difference is None or difference < closest_difference:
+                    closest_file = os.path.join(root, file)
+                    closest_difference = difference
+
+        if closest_file is not None:
+            print(f'Closest file to the last business day: {closest_file}')
+
+# Call the function to start the search
+find_files_with_date(base_dir)
