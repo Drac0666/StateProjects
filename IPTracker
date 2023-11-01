@@ -1,21 +1,19 @@
 import os
-import calendar
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 # Define the base directory to start searching
 base_dir = '/path/to/your/directory'
 
 # Function to calculate the last business day of a given month
 def last_business_day(year, month):
-    last_day = calendar.monthrange(year, month)[1]
-    last_date = date(year, month, last_day)
+    last_day = datetime(year, month, 1) + timedelta(days=calendar.monthrange(year, month)[1] - 1)
+    
+    while last_day.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
+        last_day -= timedelta(days=1)
 
-    while last_date.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
-        last_date -= timedelta(days=1)
+    return last_day.strftime('%Y%m%d')
 
-    return last_date
-
-# Function to search for files with date in the name
+# Function to search for files with a date in the name
 def find_files_with_date(base_dir):
     for root, dirs, files in os.walk(base_dir):
         closest_file = None
@@ -23,21 +21,25 @@ def find_files_with_date(base_dir):
 
         for file in files:
             if 'date' in file.lower():  # You can adjust the condition as needed
-                # Extract year and month from the file name (assuming format YYYYMM)
+                # Extract the date from the file name (assuming format YYYYMMDD)
                 file_name = os.path.splitext(file)[0]
-                year = int(file_name[:4])
-                month = int(file_name[4:6])
+
+                try:
+                    file_date = datetime.strptime(file_name, '%Y%m%d')
+                    year, month, day = file_date.year, file_date.month, file_date.day
+                except ValueError:
+                    continue  # Skip files with invalid date formats
 
                 last_day = last_business_day(year, month)
 
-                if int(file_name[-2:]) == last_day.day:
+                if file_name == last_day:
                     file_path = os.path.join(root, file)
                     print(f'Found file with the last business day: {file_path}')
                     return  # Exit the function if an exact match is found
 
                 # Calculate the difference between the last day and the date in the file name
-                date_in_filename = date(year, month, int(file_name[-2:]))
-                difference = abs((last_day - date_in_filename).days)
+                date_in_filename = datetime(year, month, day)
+                difference = abs((date_in_filename - datetime.strptime(last_day, '%Y%m%d')).days)
 
                 # Update closest file if a closer date is found
                 if closest_difference is None or difference < closest_difference:
