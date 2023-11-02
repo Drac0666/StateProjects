@@ -1,49 +1,32 @@
-import PySimpleGUI as sg
-import os
-import win32com.client
+import pandas as pd
+from pandas.tseries.offsets import BMonthEnd, BDay, MonthEnd, MonthBegin
 
-def search_outlook_emails(path):
-    found_emails = []
-    try:
-        outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
-        inbox = outlook.GetDefaultFolder(6)  # 6 represents the Inbox folder
+def get_last_8_quarter_end_business_days(current_date):
+    # Initialize an empty list to store the quarter-end business days
+    quarter_end_business_days = []
 
-        # Search for emails in the specified path
-        emails = inbox.Items
-        emails.Restrict(f"[ReceivedTime] >= '{path}'")
+    for _ in range(8):
+        # Calculate the last day of the current quarter
+        current_quarter_end = current_date - pd.offsets.QuarterEnd(1)
 
-        for email in emails:
-            found_emails.append(f"Subject: {email.Subject}, Received Time: {email.ReceivedTime}")
+        # Adjust the date to the previous business day
+        current_quarter_end = is_last_business_day_of_month(current_quarter_end)
+        #current_quarter_end -= BDay(1)
 
-        return found_emails
-    except Exception as e:
-        sg.popup_error(f"Error: {e}")
-        return []
+        # Append the date to the list
+        quarter_end_business_days.append(current_quarter_end)
 
-def main():
-    sg.theme("SystemDefaultForReal")
+        # Move to the previous quarter
+        current_date -= pd.DateOffset(months=3)
 
-    layout = [
-        [sg.Text('Enter a date (e.g., "01/01/2023"):')],
-        [sg.InputText(key='date_input')],
-        [sg.Button('Search Outlook Emails'), sg.Button('Exit')],
-        [sg.Output(size=(40, 10))]  # Output element to display found emails
-    ]
+    return quarter_end_business_days
 
-    window = sg.Window('Search Outlook Emails', layout)
+    
+import pandas as pd
 
-    while True:
-        event, values = window.read()
 
-        if event in (sg.WIN_CLOSED, 'Exit'):
-            break
-        elif event == 'Search Outlook Emails':
-            path = values['date_input']
-            found_emails = search_outlook_emails(path)
-            for email in found_emails:
-                sg.Print(email)  # Display each email in the Output element
+def is_last_business_day_of_month(date):
+    # Find the last day of the month for the given date
+    last_day_of_month = date + MonthEnd(0) - MonthBegin() +BMonthEnd()
 
-    window.close()
-
-if __name__ == '__main__':
-    main()
+    return last_day_of_month
