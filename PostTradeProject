@@ -1,3 +1,12 @@
+def update_asset_class(asset_class, sub_asset_class):
+    if asset_class == 'XXX':
+        return sub_asset_class
+    else:
+        return asset_class
+
+# Apply the custom function to update values in the 'Asset Class' column
+df['Asset Class'] = df.apply(lambda row: update_asset_class(row['Asset Class'], row['Sub-Asset Class']), axis=1)
+
 import pandas as pd
 from pandas.tseries.offsets import BMonthEnd, BDay, MonthEnd, MonthBegin
 
