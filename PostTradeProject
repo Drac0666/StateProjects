@@ -1,3 +1,30 @@
+import pandas as pd
+
+# Sample DataFrames for each month
+df_jan = pd.DataFrame({'Date': ['2023-01-01', '2023-01-02', '2023-01-03'],
+                       'Asset Class': ['Equity', 'Fixed Income', 'Equity'],
+                       'Exposure': [100, 200, 150]})
+
+df_feb = pd.DataFrame({'Date': ['2023-02-01', '2023-02-02', '2023-02-03'],
+                       'Asset Class': ['Fixed Income', 'Equity', 'Fixed Income'],
+                       'Exposure': [300, 250, 180]})
+# Concatenate the DataFrames for each month
+frames = [df_jan, df_feb]
+
+# Concatenate them into one DataFrame
+df_combined = pd.concat(frames, ignore_index=True)
+
+# Create a pivot table
+pivot_table = pd.pivot_table(df_combined, values='Exposure',
+                             index=['Date'],
+                             columns=['Asset Class'],
+                             aggfunc='sum',
+                             fill_value=0)
+
+
+
+
+
 def update_asset_class(asset_class, sub_asset_class):
     if asset_class == 'XXX':
         return sub_asset_class
