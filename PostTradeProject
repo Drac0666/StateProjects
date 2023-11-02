@@ -7,3 +7,6 @@ pivot_table = pd.pivot_table(df_combined, values='Exposure',
                              columns=['Asset Class'],
                              aggfunc=exposure_in_millions,
                              fill_value=0)
+
+for date in quarter_end_dates:
+    print(date.strftime('%Y-%m-%d'))
