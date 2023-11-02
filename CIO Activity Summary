@@ -1,0 +1,64 @@
+import pandas as pd
+
+def generate_portfolio_summary_sentence(dataframe):
+    purchase_dict = {}
+    sale_dict = {}
+    
+    for _, row in dataframe.iterrows():
+        asset_class = row["Asset Class"]
+        num_securities = row["Nr of Securities"]
+        transaction_type = row["Transaction Type"]
+        value = row["Value"]
+        
+        if transaction_type == "Purchase":
+            if asset_class in purchase_dict:
+                purchase_dict[asset_class]["Value"] += value
+                purchase_dict[asset_class]["Nr of Securities"] += num_securities
+            else:
+                purchase_dict[asset_class] = {"Value": value, "Nr of Securities": num_securities}
+        elif transaction_type == "Sale":
+            if asset_class in sale_dict:
+                sale_dict[asset_class]["Value"] += value
+                sale_dict[asset_class]["Nr of Securities"] += num_securities
+            else:
+                sale_dict[asset_class] = {"Value": value, "Nr of Securities": num_securities}
+
+    purchase_sentences = []
+    for asset_class, data in purchase_dict.items():
+        purchase_value = data["Value"]
+        num_securities_purchased = data["Nr of Securities"]
+        securities_label = "security" if num_securities_purchased == 1 else "securities"
+        purchase_sentences.append(f"{num_securities_purchased} {asset_class} {securities_label}, {purchase_value}mn EUR")
+
+    sale_sentences = []
+    for asset_class, data in sale_dict.items():
+        sale_value = data["Value"]
+        num_securities_sold = data["Nr of Securities"]
+        securities_label = "security" if num_securities_sold == 1 else "securities"
+        sale_sentences.append(f"{num_securities_sold} {asset_class} {securities_label}, {sale_value}mn EUR")
+
+    purchase_summary_sentence = ", ".join(purchase_sentences)
+    sale_summary_sentence = ", ".join(sale_sentences)
+    
+    total_purchase_value = sum(data["Value"] for data in purchase_dict.values())
+    total_sale_value = sum(data["Value"] for data in sale_dict.values())
+    total_purchase_sentence = f"Total Purchases: {total_purchase_value}mn EUR"
+    total_sale_sentence = f"Total Sales: {total_sale_value}mn EUR"
+    
+    return purchase_summary_sentence, sale_summary_sentence, total_purchase_sentence, total_sale_sentence
+
+# Example usage:
+data = {
+    "Asset Class": ["Equity", "Fixed Income", "Equity", "CLO"],
+    "Nr of Securities": [1, 10, 5, 7],
+    "Transaction Type": ["Purchase", "Sale", "Purchase", "Sale"],
+    "Value": [25, 50, 30, 35]
+}
+
+df = pd.DataFrame(data)
+
+purchase_summary, sale_summary, total_purchase, total_sale = generate_portfolio_summary_sentence(df)
+print("This month portfolio activity - Purchases:", purchase_summary)
+print("This month portfolio activity - Sales:", sale_summary)
+print(total_purchase)
+print(total_sale)
