@@ -1,68 +1,9 @@
-import pandas as pd
+def exposure_in_millions(x):
+    return x.sum() / 1_000_000
 
-# Sample DataFrames for each month
-df_jan = pd.DataFrame({'Date': ['2023-01-01', '2023-01-02', '2023-01-03'],
-                       'Asset Class': ['Equity', 'Fixed Income', 'Equity'],
-                       'Exposure': [100, 200, 150]})
-
-df_feb = pd.DataFrame({'Date': ['2023-02-01', '2023-02-02', '2023-02-03'],
-                       'Asset Class': ['Fixed Income', 'Equity', 'Fixed Income'],
-                       'Exposure': [300, 250, 180]})
-# Concatenate the DataFrames for each month
-frames = [df_jan, df_feb]
-
-# Concatenate them into one DataFrame
-df_combined = pd.concat(frames, ignore_index=True)
-
-# Create a pivot table
+# Create a pivot table with the custom aggregation function
 pivot_table = pd.pivot_table(df_combined, values='Exposure',
                              index=['Date'],
                              columns=['Asset Class'],
-                             aggfunc='sum',
+                             aggfunc=exposure_in_millions,
                              fill_value=0)
-
-
-
-
-
-def update_asset_class(asset_class, sub_asset_class):
-    if asset_class == 'XXX':
-        return sub_asset_class
-    else:
-        return asset_class
-
-# Apply the custom function to update values in the 'Asset Class' column
-df['Asset Class'] = df.apply(lambda row: update_asset_class(row['Asset Class'], row['Sub-Asset Class']), axis=1)
-
-import pandas as pd
-from pandas.tseries.offsets import BMonthEnd, BDay, MonthEnd, MonthBegin
-
-def get_last_8_quarter_end_business_days(current_date):
-    # Initialize an empty list to store the quarter-end business days
-    quarter_end_business_days = []
-
-    for _ in range(8):
-        # Calculate the last day of the current quarter
-        current_quarter_end = current_date - pd.offsets.QuarterEnd(1)
-
-        # Adjust the date to the previous business day
-        current_quarter_end = is_last_business_day_of_month(current_quarter_end)
-        #current_quarter_end -= BDay(1)
-
-        # Append the date to the list
-        quarter_end_business_days.append(current_quarter_end)
-
-        # Move to the previous quarter
-        current_date -= pd.DateOffset(months=3)
-
-    return quarter_end_business_days
-
-    
-import pandas as pd
-
-
-def is_last_business_day_of_month(date):
-    # Find the last day of the month for the given date
-    last_day_of_month = date + MonthEnd(0) - MonthBegin() +BMonthEnd()
-
-    return last_day_of_month
