@@ -1,0 +1,1 @@
+=IFERROR(MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0), "Not Found")
