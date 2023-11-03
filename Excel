@@ -1,1 +1,2 @@
 =IFERROR(MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0), "Not Found")
+=IFERROR(INDEX(INDIRECT("'"&$A1&"-Cstats'!"&$A3&":"&$A3), MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0)), "Not Found")
