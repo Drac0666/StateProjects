@@ -1,2 +1,41 @@
 =IFERROR(MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0), "Not Found")
 =IFERROR(INDEX(INDIRECT("'"&$A1&"-Cstats'!"&$A3&":"&$A3), MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0)), "Not Found")
+
+
+import pandas as pd
+
+def match_excel_index_position(dataframe, search_values):
+    """
+    Find the position (row number) in a Pandas DataFrame where the first value from a list is found in the index.
+
+    Args:
+        dataframe (pd.DataFrame): The DataFrame to search.
+        search_values (list): A list of values to search for in the DataFrame's index.
+
+    Returns:
+        int: The position (row number) where the first value is found. -1 if none of the values are found.
+    """
+    for value in search_values:
+        if value in dataframe.index:
+            return dataframe.index.get_loc(value)
+    return -1
+
+# Example usage:
+data = {'Name': ['Alice', 'Bob', 'Charlie', 'David'],
+        'Age': [25, 30, 22, 35]}
+df = pd.DataFrame(data)
+
+df.set_index('Name', inplace=True)  # Set the 'Name' column as the index
+
+search_names = ['3Eve', 'B3ob', 'Alice', 'Charlie']
+result = match_excel_index_position(df, search_names)
+
+if result != -1:
+    print(f"Position of the first found value in the index: {result}")
+else:
+    print("None of the search values were found in the DataFrame's index.")
+
+
+    
+
+value = df.iat[0, 0]
