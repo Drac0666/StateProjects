@@ -1,5 +1,23 @@
 import pandas as pd
 
+# Create a sample DataFrame
+data = {
+    'Column1': ['2023-11-06', '2023-11-07', '2023-11-08'],
+    'Column2': ['14:30:00', '09:45:00', '12:15:00']
+}
+df = pd.DataFrame(data)
+
+# Convert all elements of the first row to datetime format
+first_row = df.iloc[0]
+first_row = pd.to_datetime(first_row, format='%Y-%m-%d %H:%M:%S')
+
+# Print the result
+print(first_row)
+
+
+
+import pandas as pd
+
 # Sample DataFrame
 data = {
     'Date': ['2023-01-01', '2023-01-02', '2023-01-03'],
