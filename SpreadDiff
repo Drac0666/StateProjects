@@ -23,3 +23,30 @@ result_df = calculate_spread(df, columns_to_calculate_spread)
 
 print(result_df)
 
+
+import pandas as pd
+
+# Create a sample DataFrame with date columns
+data = {'Date': ['2023-11-01', '2023-11-15', '2023-11-30', '2023-12-05', '2023-12-20'],
+        'Value': [10, 20, 30, 40, 50]}
+
+df = pd.DataFrame(data)
+
+# Convert the 'Date' column to datetime
+df['Date'] = pd.to_datetime(df['Date'])
+
+# Find the maximum date in the DataFrame
+max_date = df['Date'].max()
+
+# Calculate one week and one month before the maximum date
+one_week_ago = max_date - pd.DateOffset(weeks=1)
+one_month_ago = max_date - pd.DateOffset(months=1)
+
+# Format the dates in "YYYY-MM-DD" format
+formatted_one_week_ago = one_week_ago.strftime('%Y-%m-%d')
+formatted_one_month_ago = one_month_ago.strftime('%Y-%m-%d')
+
+# Print the formatted dates
+print(f"One week before the maximum date: {formatted_one_week_ago}")
+print(f"One month before the maximum date: {formatted_one_month_ago}")
+
