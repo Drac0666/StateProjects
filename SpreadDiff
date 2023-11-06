@@ -1,1 +1,25 @@
+import pandas as pd
+
+# Sample DataFrame
+data = {
+    'Date': ['2023-01-01', '2023-01-02', '2023-01-03'],
+    '5y Germany': [1.5, 1.6, 1.7],
+    'AAPL': [150, 155, 152],
+    'GOOGL': [2800, 2820, 2780]
+}
+
+df = pd.DataFrame(data)
+
+def calculate_spread(df, columns):
+    # Iterate through the list of columns
+    for column in columns:
+        if column != '5y Germany':
+            new_column_name = f"{column}_Spread"
+            df[new_column_name] = df[column] - df['5y Germany']
+    return df
+
+columns_to_calculate_spread = ['AAPL', 'GOOGL']
+result_df = calculate_spread(df, columns_to_calculate_spread)
+
+print(result_df)
 
