@@ -3,7 +3,12 @@ import pandas as pd
 def excel_to_dict_of_dataframes(file_path):
     try:
         xls = pd.ExcelFile(file_path)
-        sheet_dict = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
+        sheet_dict = {}
+        
+        for sheet_name in xls.sheet_names:
+            skip_rows = 7 if sheet_name == xls.sheet_names[0] else 17
+            sheet_dict[sheet_name] = xls.parse(sheet_name, skiprows=skip_rows)
+        
         return sheet_dict
     except Exception as e:
         print(f"An error occurred: {e}")
