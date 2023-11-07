@@ -1,3 +1,29 @@
+# Sample dictionary
+data_dict = {
+    'DATE_MM': '2023-11-01|2023-11-02|2023-11-03|2023-11-04|2023-11-05|2023-11-06|2023-11-07|2023-11-08|2023-11-09|2023-11-10',
+    'CPR': 'CPR1|CPR2||CPR4|NA||||CPR8||'
+}
+
+# Split the values by '|' to get lists of dates and CPR values
+date_mm_values = data_dict['DATE_MM'].split('|')
+cpr_values = data_dict['CPR'].split('|')
+
+# Create a mapping between dates and CPR values, skipping empty and "NA" values
+date_cpr_mapping = {}
+for date, cpr in zip(date_mm_values, cpr_values):
+    if cpr and cpr != "NA":
+        date_cpr_mapping[date] = cpr
+
+# Example: Get CPR value for a specific date
+desired_date = '2023-11-04'
+if desired_date in date_cpr_mapping:
+    cpr_value = date_cpr_mapping[desired_date]
+    print(f"For date {desired_date}, the CPR value is {cpr_value}")
+else:
+    print(f"No CPR value found for date {desired_date}")
+
+
+
 
 counts_df.index = counts_df.index.astype(str).str.replace(r'[\[\]()]', '').str.replace(', ', '-').str.split(',').str[0]
 import pandas as pd
