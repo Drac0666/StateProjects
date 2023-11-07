@@ -1,25 +1,33 @@
 import pandas as pd
+import numpy as np
 
-def excel_to_dict_of_dataframes(file_path):
-    try:
-        xls = pd.ExcelFile(file_path)
-        sheet_dict = {}
-        
-        for sheet_name in xls.sheet_names:
-            skip_rows = 7 if sheet_name == xls.sheet_names[0] else 17
-            sheet_dict[sheet_name] = xls.parse(sheet_name, skiprows=skip_rows)
-        
-        return sheet_dict
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+# Sample data (replace this with your actual data)
+data = {
+    'column1': np.random.randint(1, 101, 100),  # Generating random data for column1
+    'column2': np.random.randint(1, 101, 100)  # Generating random data for column2
+}
 
-# Example usage:
-excel_file_path = 'your_excel_file.xlsx'
-dataframes_dict = excel_to_dict_of_dataframes(excel_file_path)
+df = pd.DataFrame(data)
 
-# Access individual dataframes by sheet name
-if dataframes_dict:
-    for sheet_name, df in dataframes_dict.items():
-        print(f"Sheet Name: {sheet_name}")
-        print(df)  # df is the dataframe for the current sheet
+# Combine data from both columns
+combined_data = pd.concat([df['column1'], df['column2']])
+
+# Specify the number of bins
+num_bins = 10
+
+# Calculate bin edges based on the combined data
+min_val = combined_data.min()
+max_val = combined_data.max()
+bin_width = (max_val - min_val) / num_bins
+bin_edges = [min_val + i * bin_width for i in range(num_bins + 1)]
+
+# Apply pd.cut to both columns using the same bin edges
+df['bin_range_column1'] = pd.cut(df['column1'], bins=bin_edges)
+df['bin_range_column2'] = pd.cut(df['column2'], bins=bin_edges)
+
+# Display the DataFrame with assigned ranges for both columns
+print(df)
+
+count_column1 = df['bin_range_column1'].value_counts()
+count_column2 = df['bin_range_column2'].value_counts()
+counts_df = pd.DataFrame({'Count_Column1': count_column1, 'Count_Column2': count_column2}).fillna(0)
