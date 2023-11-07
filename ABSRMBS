@@ -1,3 +1,5 @@
+
+counts_df.index = counts_df.index.astype(str).str.replace(r'[\[\]()]', '').str.replace(', ', '-').str.split(',').str[0]
 import pandas as pd
 import numpy as np
 
