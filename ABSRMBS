@@ -1,0 +1,20 @@
+import pandas as pd
+
+def excel_to_dict_of_dataframes(file_path):
+    try:
+        xls = pd.ExcelFile(file_path)
+        sheet_dict = {sheet_name: xls.parse(sheet_name) for sheet_name in xls.sheet_names}
+        return sheet_dict
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+# Example usage:
+excel_file_path = 'your_excel_file.xlsx'
+dataframes_dict = excel_to_dict_of_dataframes(excel_file_path)
+
+# Access individual dataframes by sheet name
+if dataframes_dict:
+    for sheet_name, df in dataframes_dict.items():
+        print(f"Sheet Name: {sheet_name}")
+        print(df)  # df is the dataframe for the current sheet
