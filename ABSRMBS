@@ -1,3 +1,44 @@
+# Sample dictionary with multiple keys
+data_dict = {
+    'DATE_MM': '2023-11-01|2023-11-02|2023-11-03|2023-11-04|2023-11-05|2023-11-06|2023-11-07|2023-11-08|2023-11-09|2023-11-10',
+    'CPR': 'CPR1|CPR2||CPR4|NA||||CPR8||',
+    'CDR': 'CDR1||CDR3|CDR4|CDR5|||||CDR9|CDR10',
+    'Severity': 'Low|Medium|High|Low|Medium|||||High|Low'
+}
+
+def process_keys_to_mapping(data, keys):
+    mapping = {}
+    dates = data['DATE_MM'].split('|')
+    for date in dates:
+        values = {}
+        for key in keys:
+            key_values = data[key].split('|')
+            value = key_values[dates.index(date)]
+            if value and value != "NA":
+                values[key] = value
+        if values:
+            mapping[date] = values
+    return mapping
+
+keys_to_process = ['CPR', 'CDR', 'Severity']
+date_values_mapping = process_keys_to_mapping(data_dict, keys_to_process)
+
+# Printing the resulting mapping
+for date, values in date_values_mapping.items():
+    print(f"Date: {date}, Values: {values}")
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Sample dictionary
 data_dict = {
     'DATE_MM': '2023-11-01|2023-11-02|2023-11-03|2023-11-04|2023-11-05|2023-11-06|2023-11-07|2023-11-08|2023-11-09|2023-11-10',
