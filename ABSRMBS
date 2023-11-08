@@ -1,3 +1,5 @@
+and not pd.isna(df.loc[date_index, column_to_calculate])]
+
 import pandas as pd
 
 # Sample dictionary of dataframes with unique constant values in column 'A' and date index
