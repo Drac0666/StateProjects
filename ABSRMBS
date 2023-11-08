@@ -1,3 +1,42 @@
+import pandas as pd
+
+def find_first_keys_values(dictionary, **key_lists):
+    results = {}
+    for key_list_name, keys in key_lists.items():
+        for key in keys:
+            if key in dictionary:
+                if key in results:
+                    results[key][key_list_name] = dictionary[key]
+                else:
+                    results[key] = {key_list_name: dictionary[key]}
+                break  # Stop searching in this list of keys if a match is found
+    return results
+
+# Example usage:
+my_dict = {
+    "apple": 3,
+    "banana": 5,
+    "cherry": 2,
+    "date": 1
+}
+
+keys_list1 = ["cherry", "grape", "apple"]
+keys_list2 = ["banana", "kiwi", "date"]
+keys_list3 = ["mango", "lemon", "apple"]
+
+results = find_first_keys_values(my_dict, key_list1=keys_list1, key_list2=keys_list2, key_list3=keys_list3)
+
+if results:
+    df = pd.DataFrame(results).T.fillna('Not Found')
+    print(df)
+else:
+    print("None of the keys were found in the dictionary.")
+
+
+/////////////###################
+
+
+
 # Sample dictionary with multiple keys
 data_dict = {
     'DATE_MM': '2023-11-01|2023-11-02|2023-11-03|2023-11-04|2023-11-05|2023-11-06|2023-11-07|2023-11-08|2023-11-09|2023-11-10',
