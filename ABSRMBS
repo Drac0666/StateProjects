@@ -1,3 +1,36 @@
+import pandas as pd
+
+# Sample dictionary of dataframes with unique constant values in column 'A'
+dataframes = {
+    'df1': pd.DataFrame({'A': ['Test'], 'Value': [10]}),
+    'df2': pd.DataFrame({'A': ['Kurwa'], 'Value': [20]}),
+    'df3': pd.DataFrame({'A': ['Test'], 'Value': [30]})
+}
+
+# Create a dictionary to categorize dataframes
+categorized_dataframes = {}
+
+# Specify the column to use for categorization
+categorize_by_column = 'A'
+
+# Iterate through dataframes and categorize
+for df_name, df in dataframes.items():
+    category = df[categorize_by_column].iloc[0]
+    category_lower = category.lower()  # Convert category to lowercase
+    if category_lower not in categorized_dataframes:
+        categorized_dataframes[category_lower] = {}
+    categorized_dataframes[category_lower][df_name] = df
+
+# Print categorized dataframes
+for category, df_dict in categorized_dataframes.items():
+    print(f'Category: {category}')
+    for df_name, df in df_dict.items():
+        print(f'{df_name}:\n{df}\n')
+
+
+
+
+
 # Sample dictionary with keys containing "-Cstats" suffix
 my_dict = {
     'key1-Cstats': 10,
