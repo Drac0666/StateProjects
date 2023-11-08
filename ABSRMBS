@@ -1,3 +1,17 @@
+# Sample dictionary with keys containing "-Cstats" suffix
+my_dict = {
+    'key1-Cstats': 10,
+    'key2-Cstats': 20,
+    'key3-Cstats': 30
+}
+
+# Remove the "-Cstats" suffix from keys
+updated_dict = {key.replace('-Cstats', ''): value for key, value in my_dict.items()}
+
+print(updated_dict)
+
+
+
 import pandas as pd
 
 def find_first_keys_in_second_dict(my_dict, **key_lists):
