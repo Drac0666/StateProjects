@@ -1,5 +1,54 @@
 import pandas as pd
 
+# Sample dictionary of dataframes with unique constant values in column 'A' and date index
+dataframes = {
+    'df1': pd.DataFrame({'A': ['Test'], 'Value': [10, 20, 30,50]}, index=['01 22', '02 22', '03 22','04 22']),
+    'df2': pd.DataFrame({'A': ['Kurwa'], 'Value': [40, 50, 60]}, index=['01 22', '02 22', '03 22']),
+    'df3': pd.DataFrame({'A': ['Test'], 'Value': [70, 80]}, index=['01 22', '02 22']),
+    'df4': pd.DataFrame({'A': ['Kurwa'], 'Value': [100, 110, 120]}, index=['01 22', '02 22', '03 22']),
+}
+
+# Create a dictionary to categorize dataframes
+categorized_dataframes = {}
+
+# Specify the column to use for categorization
+categorize_by_column = 'A'
+
+# Specify the category for which you want to calculate the means
+category_to_calculate = 'test'
+
+# Initialize a dictionary to store means for each index
+means_by_index = {}
+
+# Iterate through dataframes and categorize
+for df_name, df in dataframes.items():
+    category = df[categorize_by_column].iloc[0]
+    category_lower = category.lower()  # Convert category to lowercase
+    if category_lower not in categorized_dataframes:
+        categorized_dataframes[category_lower] = []
+    categorized_dataframes[category_lower].append(df)
+
+# Calculate the mean for each available index within the specified category
+if category_to_calculate in categorized_dataframes:
+    category_dataframes = categorized_dataframes[category_to_calculate]
+    
+    # Get the unique date indices from the dataframes
+    date_indices = set()
+    for df in category_dataframes:
+        date_indices.update(df.index)
+    
+    # Calculate means for each unique date index
+    for date_index in date_indices:
+        values = [df.loc[date_index, 'Value'] for df in category_dataframes if date_index in df.index]
+        mean_value = sum(values) / len(values)
+        means_by_index[date_index] = mean_value
+
+# Print the list of means for each available date index
+for date_index, mean in means_by_index.items():
+    print(f"Mean value for date index '{date_index}': {mean}")
+==============/////////////=================//////////////
+import pandas as pd
+
 # Sample dictionary of dataframes with unique constant values in column 'A'
 dataframes = {
     'df1': pd.DataFrame({'A': ['Test'], 'Value': [10]}),
