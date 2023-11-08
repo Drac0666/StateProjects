@@ -1,36 +1,38 @@
 import pandas as pd
 
-def find_first_keys_values(dictionary, **key_lists):
+def find_first_keys_in_second_dict(my_dict, **key_lists):
     results = {}
-    for key_list_name, keys in key_lists.items():
-        for key in keys:
-            if key in dictionary:
-                if key in results:
-                    results[key][key_list_name] = dictionary[key]
-                else:
-                    results[key] = {key_list_name: dictionary[key]}
-                break  # Stop searching in this list of keys if a match is found
+    for identifier, value_list in my_dict.items():
+        second_dict = value_list[1] if len(value_list) > 1 else {}
+        for key_list_name, keys in key_lists.items():
+            for key in keys:
+                if key in second_dict:
+                    if identifier in results:
+                        results[identifier][key_list_name] = second_dict[key]
+                    else:
+                        results[identifier] = {key_list_name: second_dict[key]}
+                    break  # Stop searching in this list of keys if a match is found
     return results
 
 # Example usage:
 my_dict = {
-    "apple": 3,
-    "banana": 5,
-    "cherry": 2,
-    "date": 1
+    "ID1": [{}, {"cherry": 2, "apple": 3}],
+    "ID2": [{}, {"banana": 5, "date": 1}],
+    "ID3": [{}, {"mango": 8, "lemon": 6}],
 }
 
 keys_list1 = ["cherry", "grape", "apple"]
 keys_list2 = ["banana", "kiwi", "date"]
 keys_list3 = ["mango", "lemon", "apple"]
 
-results = find_first_keys_values(my_dict, key_list1=keys_list1, key_list2=keys_list2, key_list3=keys_list3)
+results = find_first_keys_in_second_dict(my_dict, key_list1=keys_list1, key_list2=keys_list2, key_list3=keys_list3)
 
 if results:
     df = pd.DataFrame(results).T.fillna('Not Found')
     print(df)
 else:
-    print("None of the keys were found in the dictionary.")
+    print("None of the keys were found in the dictionaries.")
+
 
 
 /////////////###################
