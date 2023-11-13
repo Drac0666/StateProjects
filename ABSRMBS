@@ -1,3 +1,31 @@
+from datetime import datetime, timedelta
+import pandas as pd
+
+def generate_month_range(start_month, end_month):
+    # Parse the input months as datetime objects
+    start_date = pd.to_datetime(start_month, format='%b %y')
+    end_date = pd.to_datetime(end_month, format='%b %y')
+
+    # Initialize the result list
+    month_range = [start_date.strftime('%b %y')]
+
+    # Generate months in the range
+    while start_date < end_date:
+        # Add one month to the current date
+        start_date += pd.DateOffset(months=1)
+        month_range.append(start_date.strftime('%b %y'))
+
+    return month_range
+
+# Example usage
+start_month = "Jan 22"
+end_month = "Apr 22"
+result = generate_month_range(start_month, end_month)
+print(result)
+
+
+
+
 import pandas as pd
 
 # Sample DataFrame with missing columns
