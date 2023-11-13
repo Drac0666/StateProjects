@@ -1,3 +1,5 @@
+=INDIRECT("'" & A2 & "'!A1")
+
 from datetime import datetime, timedelta
 import pandas as pd
 
