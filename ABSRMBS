@@ -1,3 +1,32 @@
+import pandas as pd
+
+# Sample DataFrame
+data = {'Sub-Asset Class': ['Auto ABS', 'Auto ABS', 'Corporate Bonds', 'Corporate Bonds', 'Corporate Bonds'],
+        'Par Value': [1000, 4000, 500, 300, 200]}
+
+df = pd.DataFrame(data, index=pd.to_datetime(['2023-11-01', '2023-11-02', '2023-11-03', '2023-11-04', '2023-11-05']))
+
+# Define the specific date you want to filter by
+specific_date = '2023-11-03'
+
+# Filter the DataFrame for the specific date
+filtered_df = df[df.index == specific_date]
+
+# Group by "Sub-Asset Class" and calculate count and sum
+grouped = filtered_df.groupby('Sub-Asset Class').agg({'Par Value': ['count', 'sum']})
+
+# Create the desired output text
+output_text = []
+for sub_asset_class, (count, total_par_value) in grouped.iterrows():
+    output_text.append(f'{count} {sub_asset_class} with Par Value of {total_par_value}')
+
+# Join the output texts
+result = ', '.join(output_text)
+
+print(f"Summary for {specific_date}: {result}")
+
+
+
 
 import pandas as pd
 
