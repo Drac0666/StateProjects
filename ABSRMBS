@@ -1,3 +1,11 @@
+def calculate_relative_change(series):
+    return series.pct_change() * 100  # Convert to percentage
+
+# Iterate through columns and add "_Diff" columns
+for column in df.columns:
+    new_column_name = f'{column}_Diff'
+    df[new_column_name] = calculate_relative_change(df[column])
+
 and not pd.isna(df.loc[date_index, column_to_calculate])]
 
 import pandas as pd
