@@ -6,6 +6,11 @@ def calculate_relative_change(series):
     pct_change = np.where(np.isinf(pct_change), 0, pct_change)  # Replace inf with 0
     return pct_change
 
+def calculate_logrelative_change(series):
+    log_returns = np.log(series / series.shift(1))  # Calculate log-return
+    log_returns.fillna(0, inplace=True)  # Replace NaN (for the first row) with 0
+    return log_returns
+
 
 # Sample DataFrame
 data = {'A': [10, 15, 20, 25],
