@@ -1,6 +1,53 @@
 def calculate_relative_change(series):
     return series.pct_change() * 100  # Convert to percentage
 
+import pandas as pd
+
+# Sample DataFrame
+data = {'A': [10, 15, 20, 25],
+        'B': [5, 10, 30, 40],
+        'C': [50, 70, 90, 110]}
+df = pd.DataFrame(data)
+
+# Function to calculate relative change
+def calculate_relative_change(series):
+    return series.pct_change() * 100  # Convert to percentage
+
+# Categorize changes and assign letters
+def categorize_changes(change):
+    if change >= 80:
+        return 'E'
+    elif change >= 60:
+        return 'D'
+    elif change >= 40:
+        return 'C'
+    elif change >= 20:
+        return 'B'
+    elif change >= 0:
+        return 'A'
+    elif change >= -20:
+        return 'F'
+    elif change >= -40:
+        return 'G'
+    elif change >= -60:
+        return 'H'
+    elif change >= -80:
+        return 'I'
+    else:
+        return 'J'
+
+# Iterate through columns and add "_Diff" and "_Category" columns
+for column in df.columns:
+    new_column_name = f'{column}_Diff'
+    df[new_column_name] = calculate_relative_change(df[column])
+    
+    category_column_name = f'{column}_Category'
+    df[category_column_name] = df[new_column_name].apply(categorize_changes)
+
+# Display the modified DataFrame
+print(df)
+
+
 # Iterate through columns and add "_Diff" columns
 for column in df.columns:
     new_column_name = f'{column}_Diff'
