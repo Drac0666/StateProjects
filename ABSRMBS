@@ -1,4 +1,52 @@
 import pandas as pd
+import numpy as np
+
+# Sample DataFrame with missing columns
+data = {'Jan 22': [1, 2, 3],
+        'Apr 22': [4, 5, 6],
+        'Apr 23': [7, 8, 9]}
+
+df = pd.DataFrame(data)
+
+# Function to fill gaps and replicate data with inferred reporting frequency
+def fill_and_replicate(df):
+    columns = df.columns
+    new_columns = [columns[0]]
+    reporting_frequency = None
+
+    # Infer reporting frequency based on time differences
+    for i in range(1, len(columns)):
+        current_date = pd.to_datetime(columns[i], format='%b %y')
+        prev_date = pd.to_datetime(columns[i-1], format='%b %y')
+        diff = (current_date - prev_date).days
+        if reporting_frequency is None:
+            reporting_frequency = diff
+        elif diff != reporting_frequency:
+            reporting_frequency = 1  # Use 1 as a default for unknown reporting frequencies
+            break
+
+    for i in range(1, len(columns)):
+        current_date = pd.to_datetime(columns[i], format='%b %y')
+        prev_date = pd.to_datetime(columns[i-1], format='%b %y')
+        diff = (current_date - prev_date).days
+
+        for j in range(1, diff // reporting_frequency):
+            new_date = prev_date + pd.DateOffset(days=j * reporting_frequency)
+            new_columns.append(new_date.strftime('%b %y'))
+
+        new_columns.append(columns[i])
+
+    df = df[new_columns]
+
+    return df
+
+# Call the function to fill and replicate the DataFrame
+df = fill_and_replicate(df)
+
+# Display the modified DataFrame
+print(df)
+
+==================================import pandas as pd
 
 def calculate_relative_change(series):
     pct_change = series.pct_change() * 100  # Convert to percentage
