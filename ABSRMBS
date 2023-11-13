@@ -1,5 +1,12 @@
 import pandas as pd
 
+def calculate_relative_change(series):
+    pct_change = series.pct_change() * 100  # Convert to percentage
+    pct_change[0] = 0  # Set the first value to 0
+    pct_change = np.where(np.isinf(pct_change), 0, pct_change)  # Replace inf with 0
+    return pct_change
+
+
 # Sample DataFrame
 data = {'A': [10, 15, 20, 25],
         'B': [5, 10, 30, 40],
