@@ -49,6 +49,7 @@ for column in df.columns:
 # Display the modified DataFrame
 print(df)
 
+
 # Iterate through columns and add "_Diff" and "_Category" columns
 for column in df.columns:
     new_column_name = f'{column}_Diff'
