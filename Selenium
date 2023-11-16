@@ -11,8 +11,12 @@ isin_column = df['ISIN']
 # Specify the starting row to write in the Excel file
 start_row = 6
 
-# Open the Excel file for writing
-with pd.ExcelWriter(excel_file_path, engine='openpyxl', mode='a') as writer:
+# Open the Excel file for writing with the existing content
+with pd.ExcelWriter("BulkUpload.xlsx", engine='openpyxl') as writer:
+    # Write the existing content from "Bulk.xlsx"
+    writer.book = load_workbook(excel_file_path)
+    writer.sheets = {ws.title: ws for ws in writer.book.worksheets}
+
     # Write the 'ISIN' column to the specified rows
     for row_index, isin_value in enumerate(isin_column, start=start_row):
         sheet_name = "Sheet1"  # Modify this if your sheet has a different name
@@ -21,3 +25,5 @@ with pd.ExcelWriter(excel_file_path, engine='openpyxl', mode='a') as writer:
     # Write the constant values in the last two rows
     writer.sheets[sheet_name].cell(row=row_index + 1, column=1, value="OK")
     writer.sheets[sheet_name].cell(row=row_index + 2, column=1, value="done")
+
+print("File saved as BulkUpload.xlsx")
