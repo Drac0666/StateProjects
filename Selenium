@@ -1,4 +1,43 @@
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
+
+# Create a new instance of the Chrome driver (you can use other drivers like Firefox as well)
+driver = webdriver.Chrome()
+
+# Open a website with a button that reveals options
+driver.get("https://www.example.com")
+
+# Find and click the button to reveal the options
+button = driver.find_element(By.ID, "your_button_id")
+button.click()
+
+# Wait for the dropdown options to be visible (adjust the timeout as needed)
+wait = WebDriverWait(driver, 10)
+dropdown_element = wait.until(EC.visibility_of_element_located((By.ID, "your_dropdown_id")))
+
+# Create a Select object for the dropdown
+select = Select(dropdown_element)
+
+# Select an option by visible text
+select.select_by_visible_text("Option 1")
+
+# Alternatively, you can select an option by value or index:
+# select.select_by_value("option_value")
+# select.select_by_index(0)
+
+# Close the browser window
+driver.quit()
+
+
+
+
+
+
+
+from selenium import webdriver
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.by import By
 
