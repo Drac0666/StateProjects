@@ -1,4 +1,31 @@
 from selenium import webdriver
+import time
+
+# Set the path to your browser driver (e.g., chromedriver.exe)
+driver_path = '/path/to/chromedriver'
+
+# Create a new instance of the Chrome driver
+driver = webdriver.Chrome(executable_path=driver_path)
+
+# Open the webpage with the download button
+driver.get("https://example.com")
+
+# Find and click the download button
+download_button = driver.find_element_by_id("download-button")  # Replace with the actual ID or other identifier
+download_button.click()
+
+# Wait for the download to complete (you might need to adjust the time)
+time.sleep(5)
+
+# Close the browser window
+driver.quit()
+
+
+
+
+
+
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
