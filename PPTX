@@ -1,1 +1,27 @@
+import openpyxl
+from openpyxl.drawing.image import Image
+
+# Path to your Excel file
+excel_file_path = 'path/to/your/excel/file.xlsx'
+
+# Create a new workbook object
+workbook = openpyxl.load_workbook(excel_file_path)
+
+# Specify the sheet and chart name
+sheet_name = 'Sheet1'
+chart_name = 'Chart 1'  # Adjust to match the name of your chart
+
+# Get the chart object
+chart = workbook[sheet_name].charts[chart_name]
+
+# Assuming your chart is in cell A1 (adjust accordingly)
+chart_img_path = 'chart_image.png'
+chart_img_size = (600, 400)  # Adjust the size as needed
+
+# Save the chart as an image
+chart_img = Image(chart.render())
+chart_img.save(chart_img_path)
+
+# Close the workbook
+workbook.close()
 
