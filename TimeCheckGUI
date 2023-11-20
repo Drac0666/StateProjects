@@ -9,13 +9,14 @@ df = pd.DataFrame(data)
 grouped_df = df.groupby('CollateralType')['Securities'].agg(list).reset_index()
 
 # Creating a DataFrame with 'Securities' as columns and 'CollateralType' as index
-pivot_df = grouped_df.pivot(index=None, columns='CollateralType', values='Securities')
+pivot_df = grouped_df.pivot_table(index=None, columns='CollateralType', values='Securities', aggfunc=lambda x: ', '.join(x))
 
 # Writing the DataFrame to an Excel file
 excel_filename = 'output.xlsx'
 pivot_df.to_excel(excel_filename, index=False)
 
 print(f"DataFrame has been exported to {excel_filename}.")
+
 
 
 
