@@ -1,22 +1,27 @@
 import pandas as pd
 
-# Sample DataFrame creation
-data = {'CollateralType': ['Type1', 'Type1', 'Type2', 'Type2', 'Type3'],
-        'Securities': ['SecA', 'SecB', 'SecC', 'SecD', 'SecE']}
+# Sample DataFrame
+data = {'CollateralType': ['Type1', 'Type2', 'Type1'],
+        'Security': [['A', 'B'], ['C', 'D'], ['E', 'F', 'G']]}
+
 df = pd.DataFrame(data)
 
-# Grouping by 'CollateralType' and aggregating 'Securities' into a list
-grouped_df = df.groupby('CollateralType')['Securities'].agg(list).reset_index()
+# Create a dictionary to store lists of strings for each CollateralType
+collateral_dict = {}
 
-# Creating a DataFrame with 'Securities' as columns and 'CollateralType' as index
-pivot_df = grouped_df.pivot_table(index=None, columns='CollateralType', values='Securities', aggfunc=lambda x: ', '.join(x))
+# Iterate over rows in the original DataFrame
+for index, row in df.iterrows():
+    collateral_type = row['CollateralType']
+    security_values = row['Security']
 
-# Writing the DataFrame to an Excel file
-excel_filename = 'output.xlsx'
-pivot_df.to_excel(excel_filename, index=False)
+    # If CollateralType is not already a key in the dictionary, add it
+    if collateral_type not in collateral_dict:
+        collateral_dict[collateral_type] = []
 
-print(f"DataFrame has been exported to {excel_filename}.")
-
+    # Extend the list of strings for the current CollateralType
+    collateral_dict[collateral_type].extend(security_values)
+    
+df = pd.DataFrame(dict([(key, pd.Series(value)) for key, value in collateral_dict.items()]))
 
 
 
