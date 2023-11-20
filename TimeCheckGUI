@@ -1,8 +1,5 @@
 import pandas as pd
 
-# Assuming you have a DataFrame named 'df' with a 'CollateralType' column
-# and a 'Securities' column
-
 # Sample DataFrame creation
 data = {'CollateralType': ['Type1', 'Type1', 'Type2', 'Type2', 'Type3'],
         'Securities': ['SecA', 'SecB', 'SecC', 'SecD', 'SecE']}
@@ -11,8 +8,15 @@ df = pd.DataFrame(data)
 # Grouping by 'CollateralType' and aggregating 'Securities' into a list
 grouped_df = df.groupby('CollateralType')['Securities'].agg(list).reset_index()
 
-# Displaying the grouped DataFrame
-print(grouped_df)
+# Creating a DataFrame with 'Securities' as columns and 'CollateralType' as index
+pivot_df = grouped_df.pivot(index='CollateralType', columns=None, values='Securities')
+
+# Writing the DataFrame to an Excel file
+excel_filename = 'output.xlsx'
+pivot_df.to_excel(excel_filename)
+
+print(f"DataFrame has been exported to {excel_filename}.")
+
 
 
 
