@@ -1,29 +1,19 @@
 import pandas as pd
 
-# Assuming DF1 is your original DataFrame
-# Replace the following with your actual DataFrame or load it from a file, etc.
-DF1 = pd.DataFrame({
-    'Security': ['Sec1', 'Sec2', 'Sec3', 'Sec4', 'Sec5'],
-    'CollateralType': ['Type1', 'Type2', 'Type1', 'Type2', 'Type3']
-})
+# Assuming you have a DataFrame named 'df' with a 'CollateralType' column
+# and a 'Securities' column
 
-# Get unique values from 'CollateralType' column in DF1
-unique_collateral_types = DF1['CollateralType'].unique()
+# Sample DataFrame creation
+data = {'CollateralType': ['Type1', 'Type1', 'Type2', 'Type2', 'Type3'],
+        'Securities': ['SecA', 'SecB', 'SecC', 'SecD', 'SecE']}
+df = pd.DataFrame(data)
 
-# Create an empty DataFrame DF2
-DF2 = pd.DataFrame(index=DF1['Security'])
+# Grouping by 'CollateralType' and aggregating 'Securities' into a list
+grouped_df = df.groupby('CollateralType')['Securities'].agg(list).reset_index()
 
-# Add columns to DF2 based on unique CollateralTypes
-for collateral_type in unique_collateral_types:
-    matching_securities = DF1.loc[DF1['CollateralType'] == collateral_type, 'Security']
-    DF2[collateral_type] = matching_securities.values
+# Displaying the grouped DataFrame
+print(grouped_df)
 
-# Fill NaN values with an appropriate placeholder or method
-# For example, you can replace NaN with an empty string
-DF2 = DF2.fillna('')
-
-# Print the resulting DataFrame
-print(DF2)
 
 
 
