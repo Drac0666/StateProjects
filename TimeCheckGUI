@@ -1,3 +1,26 @@
+import os
+import re
+
+def find_matching_files(directory):
+    pattern = re.compile(r"\d+-MDQT_Bulk_Data_Report_\d{8}\d+\.xlsx")
+    
+    matching_files = [file for file in os.listdir(directory) if pattern.match(file)]
+    
+    return matching_files
+
+# Example usage:
+directory = "/path/to/your/files"
+
+matching_files = find_matching_files(directory)
+
+if matching_files:
+    print("Matching files found:")
+    for file in matching_files:
+        print(file)
+else:
+    print("No matching files found.")
+
+
 import pandas as pd
 
 # Sample DataFrame
