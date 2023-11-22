@@ -1,3 +1,26 @@
+import pycountry
+
+def get_country_name(country_code):
+    try:
+        country = pycountry.countries.get(alpha_2=country_code)
+        if country:
+            return country.name
+        else:
+            return "Country not found"
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+# Example usage:
+country_code = "US"
+country_name = get_country_name(country_code)
+
+if country_name:
+    print(f"The full name of {country_code} is {country_name}")
+else:
+    print(f"Unable to find the country name for {country_code}")
+
+
 import os
 import re
 
