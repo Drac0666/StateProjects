@@ -1,3 +1,14 @@
+I require access to Moody's in order to effectively perform my work, particularly in the following key areas:
+
+    CECL Quarterly Inputs - EMEA Consumer ABS Class:
+    Updating information from Moody's Published Index is essential for obtaining a comprehensive overview of the EMEA Consumer ABS sector. This includes critical data on defaults, delinquencies, prepayments, and other relevant metrics.
+
+    Presale Reports for Model Execution:
+    Presale reports are necessary to complete essential fields for model execution, as requested by the CMA team on a regular basis.
+
+Moody's access is invaluable to me as it provides crucial knowledge, reports, analyses, and market insights. This information is vital for effective portfolio monitoring and surveillance, enabling me to make informed decisions in my role.
+
+
 import pycountry
 
 def get_country_name(country_code):
