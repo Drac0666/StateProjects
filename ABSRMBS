@@ -1,3 +1,44 @@
+import os
+import requests
+
+def download_ecb_assets(url, folder_path, file_name):
+    # Ensure the folder exists
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    # Combine the folder path and file name to get the full file path
+    file_path = os.path.join(folder_path, file_name)
+
+    # Make the request to download the ECB assets data
+    response = requests.get(url)
+
+    # Check if the request was successful (status code 200)
+    if response.status_code == 200:
+        # Write the content to the file
+        with open(file_path, 'wb') as file:
+            file.write(response.content)
+        print(f"File downloaded successfully to {file_path}")
+    else:
+        print(f"Failed to download file. Status code: {response.status_code}")
+
+# Example usage:
+ecb_assets_url = "https://www.ecb.europa.eu/paym/coll/assets/html/dla/ea_MID/ea_csv_231218.csv"
+download_folder = "path/to/your/folder"
+ecb_assets_file_name = "ecb_assets.csv"
+
+download_ecb_assets(ecb_assets_url, download_folder, ecb_assets_file_name)
+
+
+
+
+
+
+
+
+
+
+
+
 import pandas as pd
 
 # Sample DataFrame
