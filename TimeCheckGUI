@@ -1,7 +1,5 @@
-import pandas as pd
-
-# Read DataFrame from clipboard
-df = pd.read_clipboard()
+# Remove commas and convert "PRINCIPAL_BAL_EMEA" to numeric
+df['PRINCIPAL_BAL_EMEA'] = pd.to_numeric(df['PRINCIPAL_BAL_EMEA'].replace(',', '', regex=True), errors='coerce')
 
 # Filter rows based on condition
 filtered_df = df[df['SRC_COUNTERPARTY_NAME'].str.contains('CBF|CLR', case=False, na=False)]
