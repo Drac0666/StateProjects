@@ -1,0 +1,23 @@
+import os
+
+def create_folder_if_not_exists(folder_path):
+    """
+    Check if a folder exists at the specified path.
+    If not, create the folder.
+
+    Parameters:
+    - folder_path (str): The path of the folder to check/create.
+    """
+    if not os.path.exists(folder_path):
+        try:
+            os.makedirs(folder_path)
+            print(f"Folder created at: {folder_path}")
+        except OSError as e:
+            print(f"Error creating folder at {folder_path}: {e}")
+    else:
+        print(f"Folder already exists at: {folder_path}")
+
+# Example usage:
+folder_path_to_check = '/path/to/your/folder'
+
+create_folder_if_not_exists(folder_path_to_check)
