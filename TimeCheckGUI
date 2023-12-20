@@ -1,3 +1,19 @@
+import pandas as pd
+
+# Read DataFrame from clipboard
+df = pd.read_clipboard()
+
+# Filter rows based on condition
+filtered_df = df[df['SRC_COUNTERPARTY_NAME'].str.contains('CBF|CLR', case=False, na=False)]
+
+# Calculate the sum of "PRINCIPAL_BAL_EMEA"
+sum_principal_bal_emea = filtered_df['PRINCIPAL_BAL_EMEA'].sum()
+
+# Print the result
+print("Sum of PRINCIPAL_BAL_EMEA for rows with 'CBF' or 'CLR':", sum_principal_bal_emea)
+
+
+
 I require access to Moody's in order to effectively perform my work, particularly in the following key areas:
 
     CECL Quarterly Inputs - EMEA Consumer ABS Class:
