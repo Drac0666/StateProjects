@@ -1,12 +1,3 @@
-# Your list of strings
-string_list = ["apple, red", "banana, yellow", "grape, purple"]
-
-# Remove everything after the comma in each string
-result_list = [s.split(',')[0].strip() for s in string_list]
-
-# Display the result
-print(result_list)
-
 import openpyxl
 
 def create_sheets_from_column_a(file_path):
@@ -16,17 +7,18 @@ def create_sheets_from_column_a(file_path):
     # Select the active sheet (assuming data is in the first sheet)
     sheet = workbook.active
     
-    # Get the values in column "A" (starting from the second row)
-    column_a_values = [cell.value for cell in sheet['A'][1:]]
+    # Get the values in columns A, B, and C (starting from the second row)
+    data_to_copy = [(cell.value, sheet.cell(row=cell.row, column=2).value, sheet.cell(row=cell.row, column=3).value)
+                    for cell in sheet['A'][1:]]
     
     # Iterate through non-empty values in column "A" and create sheets
-    for value in column_a_values:
-        if value is not None:
+    for values in data_to_copy:
+        if values[0] is not None:
             # Create a new sheet with the name based on the cell value
-            new_sheet = workbook.create_sheet(title=str(value))
+            new_sheet = workbook.create_sheet(title=str(values[0]))
             
-            # You can copy data from the original sheet to the new sheet if needed
-            # Example: new_sheet['A1'] = sheet['A1'].value
+            # Copy values from columns A, B, and C to the new sheet
+            new_sheet.append(values)
             
     # Save the modified workbook
     workbook.save(file_path)
@@ -34,6 +26,5 @@ def create_sheets_from_column_a(file_path):
 # Specify the path to your Excel file
 excel_file_path = "path/to/your/file.xlsx"
 
-# Call the function to create sheets
+# Call the function to create sheets and copy values
 create_sheets_from_column_a(excel_file_path)
-
