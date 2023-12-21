@@ -1,42 +1,8 @@
-def nonzero_indices(arr):
-    return [i for i, x in enumerate(arr) if x != 0]
+# Your list of strings
+string_list = ["apple, red", "banana, yellow", "grape, purple"]
 
-# Example usage:
-my_list = [0, 1, 0, 2, 0, 3]
-result = nonzero_indices(my_list)
-print(result)  # Output will be [1, 3, 5]
+# Remove everything after the comma in each string
+result_list = [s.split(',')[0].strip() for s in string_list]
 
-
-import numpy as np
-
-def nonzero_indices(arr):
-    return np.nonzero(arr)[0]
-
-# Example usage:
-my_array = np.array([0, 1, 0, 2, 0, 3])
-result = nonzero_indices(my_array)
-print(result)  # Output will be [1 3 5]
-
-
-def index_of_max_value(arr):
-    if len(arr) == 0:
-        return None
-    return arr.index(max(arr))
-
-# Example usage:
-my_list = [10, 5, 15, 20, 8]
-result = index_of_max_value(my_list)
-print(result)  # Output will be 3 (index of the maximum value, which is 20)
-
-
-import numpy as np
-
-def index_of_max_value(arr):
-    if arr.size == 0:
-        return None
-    return arr.argmax()
-
-# Example usage:
-my_array = np.array([10, 5, 15, 20, 8])
-result = index_of_max_value(my_array)
-print(result)  # Output will be 3 (index of the maximum value, which is 20)
+# Display the result
+print(result_list)
