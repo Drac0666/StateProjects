@@ -9,12 +9,16 @@ current_path = os.path.join(os.getcwd(), current_file_name)
 new_path = os.path.join(os.getcwd(), new_file_name)
 
 try:
-    # Rename the file
-    os.rename(current_path, new_path)
-    print(f"File '{current_file_name}' has been renamed to '{new_file_name}'.")
-except FileNotFoundError:
-    print(f"File '{current_file_name}' not found.")
-except FileExistsError:
-    print(f"File '{new_file_name}' already exists.")
+    # Rename the first file
+    os.rename(current_path1, new_path1)
+    print(f"File '{current_file_name1}' has been renamed to '{new_file_name1}'.")
+
+    # Rename the second file
+    os.rename(current_path2, new_path2)
+    print(f"File '{current_file_name2}' has been renamed to '{new_file_name2}'.")
+except FileNotFoundError as e:
+    print(f"File not found: {e}")
+except FileExistsError as e:
+    print(f"New file name already exists: {e}")
 except Exception as e:
     print(f"An error occurred: {e}")
