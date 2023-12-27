@@ -1,0 +1,20 @@
+import os
+
+# Specify the current and new file names
+current_file_name = "maciek123"
+new_file_name = "maciek123456"
+
+# Construct the full paths for the current and new file names
+current_path = os.path.join(os.getcwd(), current_file_name)
+new_path = os.path.join(os.getcwd(), new_file_name)
+
+try:
+    # Rename the file
+    os.rename(current_path, new_path)
+    print(f"File '{current_file_name}' has been renamed to '{new_file_name}'.")
+except FileNotFoundError:
+    print(f"File '{current_file_name}' not found.")
+except FileExistsError:
+    print(f"File '{new_file_name}' already exists.")
+except Exception as e:
+    print(f"An error occurred: {e}")
