@@ -1,24 +1,49 @@
-import os
+import pandas as pd
 
-# Specify the current and new file names
-current_file_name = "maciek123"
-new_file_name = "maciek123456"
+def check_relationship_and_save_missing(DF1, DF2):
+    """
+    Check if all elements from the "Security" column of DF1 exist in the "Instrument_ID" column of DF2,
+    and vice versa. Save the missing values to an Excel file named "MissingIP.xlsx".
 
-# Construct the full paths for the current and new file names
-current_path = os.path.join(os.getcwd(), current_file_name)
-new_path = os.path.join(os.getcwd(), new_file_name)
+    Parameters:
+    - DF1: First DataFrame
+    - DF2: Second DataFrame
 
-try:
-    # Rename the first file
-    os.rename(current_path1, new_path1)
-    print(f"File '{current_file_name1}' has been renamed to '{new_file_name1}'.")
+    Returns:
+    - True if all elements from DF1["Security"] are in DF2["Instrument_ID"] and vice versa, False otherwise.
+    """
 
-    # Rename the second file
-    os.rename(current_path2, new_path2)
-    print(f"File '{current_file_name2}' has been renamed to '{new_file_name2}'.")
-except FileNotFoundError as e:
-    print(f"File not found: {e}")
-except FileExistsError as e:
-    print(f"New file name already exists: {e}")
-except Exception as e:
-    print(f"An error occurred: {e}")
+    # Extract unique values from "Security" column of DF1
+    security_values_df1 = set(DF1["Security"])
+
+    # Extract unique values from "Instrument_ID" column of DF2
+    instrument_id_values_df2 = set(DF2["Instrument_ID"])
+
+    # Check if all elements from DF1["Security"] are in DF2["Instrument_ID"]
+    relationship_df1_to_df2 = security_values_df1.issubset(instrument_id_values_df2)
+
+    # Check if all elements from DF2["Instrument_ID"] are in DF1["Security"]
+    relationship_df2_to_df1 = instrument_id_values_df2.issubset(security_values_df1)
+
+    # Create DataFrames with missing values
+    missing_df1_to_df2 = pd.DataFrame(list(security_values_df1 - instrument_id_values_df2), columns=["Missing_Security_in_DF2"])
+    missing_df2_to_df1 = pd.DataFrame(list(instrument_id_values_df2 - security_values_df1), columns=["Missing_Instrument_ID_in_DF1"])
+
+    # Save missing values to Excel
+    missing_df1_to_df2.to_excel("MissingIP.xlsx", sheet_name="Missing_Security_in_DF2", index=False)
+    missing_df2_to_df1.to_excel("MissingIP.xlsx", sheet_name="Missing_Instrument_ID_in_DF1", index=False, mode='a')
+
+    # Return the overall relationship result
+    return relationship_df1_to_df2 and relationship_df2_to_df1
+
+# Example usage:
+# Assuming DF1 and DF2 are your DataFrames
+# Replace 'your_dataframe1.csv' and 'your_dataframe2.csv' with the actual file or data sources you have
+DF1 = pd.read_csv('your_dataframe1.csv')
+DF2 = pd.read_csv('your_dataframe2.csv')
+
+# Check the relationship and save missing values
+relationship_result = check_relationship_and_save_missing(DF1, DF2)
+
+# Print the overall relationship result
+print("All elements from DF1[\"Security\"] exist in DF2[\"Instrument_ID\"] and vice versa:", relationship_result)
