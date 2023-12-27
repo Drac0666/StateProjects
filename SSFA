@@ -30,6 +30,7 @@ def check_relationship_and_save_missing(DF1, DF2):
     missing_df2_to_df1 = pd.DataFrame(list(instrument_id_values_df2 - security_values_df1), columns=["Missing_Instrument_ID_in_DF1"])
 
     # Save missing values to Excel
+     with pd.ExcelWriter(excel_file_path, engine='xlsxwriter') as writer:
     missing_df1_to_df2.to_excel("MissingIP.xlsx", sheet_name="Missing_Security_in_DF2", index=False)
     missing_df2_to_df1.to_excel("MissingIP.xlsx", sheet_name="Missing_Instrument_ID_in_DF1", index=False, mode='a')
 
