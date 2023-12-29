@@ -1,4 +1,28 @@
 import pyautogui
+import keyboard
+
+def print_mouse_position():
+    try:
+        while True:
+            # Get the current mouse position
+            x, y = pyautogui.position()
+
+            # Print the current mouse position
+            print(f"Mouse Position - X: {x}, Y: {y}")
+
+            # Wait for a short interval to avoid high CPU usage
+            pyautogui.sleep(0.1)
+
+    except KeyboardInterrupt:
+        print("Script interrupted by user (Ctrl+C)")
+
+if __name__ == "__main__":
+    print("Press Ctrl+C to stop the script.")
+    print_mouse_position()
+
+
+
+import pyautogui
 from PIL import ImageGrab
 import io
 
