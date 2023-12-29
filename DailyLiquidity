@@ -1,3 +1,27 @@
+import pyautogui
+from PIL import ImageGrab
+import io
+
+def screenshot_to_clipboard(x, y, width, height):
+    # Capture the screen image
+    screen = ImageGrab.grab(bbox=(x, y, x + width, y + height))
+
+    # Convert the image to bytes
+    image_bytes = io.BytesIO()
+    screen.save(image_bytes, format='PNG')
+    image_bytes.seek(0)
+
+    # Copy the image bytes to the clipboard
+    pyautogui.copy(image_bytes.read())
+
+# Specify the coordinates and dimensions of the region to capture
+x, y, width, height = 100, 100, 300, 200
+
+# Take a screenshot of the specified region and copy it to the clipboard
+screenshot_to_clipboard(x, y, width, height)
+
+
+
 import os
 import shutil
 import re
