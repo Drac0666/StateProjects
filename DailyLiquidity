@@ -1,3 +1,12 @@
+from PIL import ImageGrab, Image
+
+# Open the image file
+img = Image.open('image.png')
+
+# Copy the image to the clipboard
+img.convert('RGB').toclipboard()
+
+
 import pyautogui
 import win32clipboard
 from PIL import ImageGrab
