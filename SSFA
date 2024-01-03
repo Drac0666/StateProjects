@@ -1,5 +1,23 @@
 import pandas as pd
 
+# Sample DataFrames
+df1 = pd.DataFrame({'Instrument_ID': [1, 2, 3, 4],
+                    'Data_1': ['A', 'B', 'C', 'D']})
+
+df2 = pd.DataFrame({'PARENT_CUSIP': ['Cusip1', 'Cusip2', 'Cusip3', 'Cusip4'],
+                    'BIII': [10, 20, 30, 40]})
+
+# Merge DataFrames based on PARENT_CUSIP
+result_df = pd.merge(df1, df2, left_on='Instrument_ID', right_on='PARENT_CUSIP', how='left')
+
+# Drop the redundant column
+result_df.drop('PARENT_CUSIP', axis=1, inplace=True)
+
+print(result_df)
+
+
+import pandas as pd
+
 def extract_nonzero_rows(workbook_path, sheet_name, columns_list):
     """
     Extract rows from a specified sheet in a workbook where values in specified columns are different than 0.
