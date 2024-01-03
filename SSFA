@@ -1,5 +1,37 @@
 import pandas as pd
 
+def extract_nonzero_rows(workbook_path, sheet_name, columns_list):
+    """
+    Extract rows from a specified sheet in a workbook where values in specified columns are different than 0.
+
+    Parameters:
+    - workbook_path (str): Path to the Excel workbook.
+    - sheet_name (str): Name of the sheet in the workbook.
+    - columns_list (list): List of column names to check for non-zero values.
+
+    Returns:
+    - pd.DataFrame: DataFrame containing rows where values in specified columns are non-zero.
+    """
+
+    # Read the specified sheet from the workbook
+    df = pd.read_excel(workbook_path, sheet_name)
+
+    # Filter rows where values in specified columns are different than 0
+    non_zero_rows = df[(df[columns_list] != 0).any(axis=1)]
+
+    return non_zero_rows
+
+# Example usage:
+workbook_path = 'path/to/your/workbook.xlsx'
+sheet_name = 'Sheet1'
+columns_to_check = ['Column1', 'Column2', 'Column3']
+
+result_df = extract_nonzero_rows(workbook_path, sheet_name, columns_to_check)
+print(result_df)
+
+
+import pandas as pd
+
 def check_relationship_and_save_missing(DF1, DF2):
     """
     Check if all elements from the "Security" column of DF1 exist in the "Instrument_ID" column of DF2,
