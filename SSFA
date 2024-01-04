@@ -1,5 +1,42 @@
 import pandas as pd
 
+# Sample data
+data1 = {'ISIN': ['ISIN1', 'ISIN2', 'ISIN3', 'ISIN4', 'ISIN5', 'ISIN6'],
+         'Column1_df1': [1, 2, 3, 4, 5, 6],
+         'Column2_df1': [10, 20, 30, 40, 50, 60]}
+
+data2 = {'ISIN': ['ISIN1', 'ISIN3', 'ISIN5', 'ISIN7', 'ISIN9'],
+         'Column1_df2': [100, 300, 500, 700, 900],
+         'Column2_df2': [1000, 3000, 5000, 7000, 9000]}
+
+df1 = pd.DataFrame(data1)
+df2 = pd.DataFrame(data2)
+
+# Columns to update
+columns_to_update = ['Column1_df1', 'Column2_df1']
+
+# Iterate through rows of df1
+for index, row in df1.iterrows():
+    isin = row['ISIN']
+    
+    # Check if ISIN is present in df2
+    if isin in df2['ISIN'].values:
+        # Update specified columns in df1 with values from df2
+        for column in columns_to_update:
+            df1.at[index, column] = df2.loc[df2['ISIN'] == isin, column + '_df2'].values[0]
+
+# Drop unnecessary columns from df2
+df2 = df2.drop(columns=[col + '_df2' for col in columns_to_update])
+
+# Resulting dataframe with updated values
+print(df1)
+
+
+
+
+
+import pandas as pd
+
 # Sample DataFrames
 df1 = pd.DataFrame({'Instrument_ID': [1, 2, 3, 4],
                     'Data_1': ['A', 'B', 'C', 'D']})
