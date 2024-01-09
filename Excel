@@ -1,3 +1,19 @@
+import win32com.client
+
+def open_excel_file(file_path):
+    excel_app = win32com.client.Dispatch("Excel.Application")
+    excel_app.Visible = True  # Optional: Set to True if you want to make Excel visible
+
+    workbook = excel_app.Workbooks.Open(file_path)
+
+if __name__ == "__main__":
+    # Replace the placeholder with the path to your Excel file
+    excel_file_path = r'C:\path\to\your\file.xlsx'
+
+    open_excel_file(excel_file_path)
+
+
+
 =IFERROR(MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0), "Not Found")
 =IFERROR(INDEX(INDIRECT("'"&$A1&"-Cstats'!"&$A3&":"&$A3), MATCH($A2, INDIRECT("'"&$A1&"-Cstats'!A1:A10"), 0)), "Not Found")
 
