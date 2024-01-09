@@ -1,5 +1,27 @@
 import wx
 
+app = wx.App(False)
+frame = wx.Frame(None, title="Button Enable After 60 Seconds", size=(200, 100))
+
+button = wx.Button(frame, label="Click Me", style=wx.BU_EXACTFIT)
+button.Disable()  # Initially disable the button
+
+timer = wx.Timer(frame)
+frame.Bind(wx.EVT_TIMER, lambda event: button.Enable(), timer)
+timer.Start(60000)  # 60 seconds interval
+
+sizer = wx.BoxSizer(wx.VERTICAL)
+sizer.Add(button, 0, wx.EXPAND | wx.ALL, 10)
+
+frame.SetSizer(sizer)
+frame.Show()
+
+app.MainLoop()
+
+
+
+import wx
+
 def on_text_change(event):
     new_text = event.GetString()
     print(f"Text changed: {new_text}")
