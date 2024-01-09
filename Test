@@ -4,11 +4,26 @@ def on_text_change(event):
     new_text = event.GetString()
     print(f"Text changed: {new_text}")
 
+def on_char(event):
+    key = event.GetKeyCode()
+
+    # Allow digits, backspace, and delete
+    if key < wx.WXK_SPACE or key == wx.WXK_BACK or key == wx.WXK_DELETE:
+        event.Skip()
+        return
+
+    # Allow only numeric input
+    if not chr(key).isdigit():
+        return
+
+    event.Skip()
+
 app = wx.App(False)
-frame = wx.Frame(None, title="TextCtrl Change Event Example", size=(300, 100))
+frame = wx.Frame(None, title="Numeric TextCtrl Example", size=(300, 100))
 
 text_ctrl = wx.TextCtrl(frame, style=wx.TE_PROCESS_ENTER)
 frame.Bind(wx.EVT_TEXT, on_text_change, text_ctrl)
+frame.Bind(wx.EVT_CHAR, on_char, text_ctrl)
 
 sizer = wx.BoxSizer(wx.VERTICAL)
 sizer.Add(text_ctrl, 0, wx.EXPAND | wx.ALL, 10)
