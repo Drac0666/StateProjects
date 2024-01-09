@@ -1,3 +1,26 @@
+import wx
+
+def on_text_change(event):
+    new_text = event.GetString()
+    print(f"Text changed: {new_text}")
+
+app = wx.App(False)
+frame = wx.Frame(None, title="TextCtrl Change Event Example", size=(300, 100))
+
+text_ctrl = wx.TextCtrl(frame, style=wx.TE_PROCESS_ENTER)
+frame.Bind(wx.EVT_TEXT, on_text_change, text_ctrl)
+
+sizer = wx.BoxSizer(wx.VERTICAL)
+sizer.Add(text_ctrl, 0, wx.EXPAND | wx.ALL, 10)
+
+frame.SetSizer(sizer)
+frame.Show()
+
+app.MainLoop()
+
+
+
+
 import openpyxl
 
 def create_sheets_from_column_a(file_path):
