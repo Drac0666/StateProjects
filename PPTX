@@ -1,3 +1,47 @@
+from msg2pdf import MsgReader
+from xhtml2pdf import pisa
+import os
+
+def convert_msg_to_pdf(msg_file_path, pdf_output_path):
+    try:
+        # Create a MsgReader instance
+        msg_reader = MsgReader(msg_file_path)
+
+        # Get email body as HTML
+        body_html = msg_reader.body
+
+        # Save HTML to a temporary file
+        temp_html_path = 'temp_email.html'
+        with open(temp_html_path, 'w', encoding='utf-8') as html_file:
+            html_file.write(body_html)
+
+        # Convert HTML to PDF using xhtml2pdf
+        with open(temp_html_path, 'rb') as source_html:
+            with open(pdf_output_path, 'wb') as output_pdf:
+                pisa.CreatePDF(source_html, dest=output_pdf)
+
+        print(f"Converted {msg_file_path} to {pdf_output_path}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+    finally:
+        # Remove temporary HTML file
+        if os.path.exists(temp_html_path):
+            os.remove(temp_html_path)
+
+# Example usage
+# Replace 'path_to_your_email.msg' with the actual path to your .msg file
+msg_file_path = 'path_to_your_email.msg'
+pdf_output_path = 'output.pdf'
+
+convert_msg_to_pdf(msg_file_path, pdf_output_path)
+
+
+
+
+
+
 import openpyxl
 from openpyxl.drawing.image import Image
 
