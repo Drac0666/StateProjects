@@ -17,7 +17,14 @@ any_non_zero_std_within_group = (grouped_std != 0).any(axis=1)
 # Filter the groups where any standard deviation is different from 0
 groups_with_non_zero_std = any_non_zero_std_within_group[any_non_zero_std_within_group].index
 
-print(groups_with_non_zero_std)
+# Create a new DataFrame containing only the selected groups in grouped_std
+result_grouped_std = grouped_std[grouped_std.index.isin(groups_with_non_zero_std)].copy()
+
+# Exclude groups where all standard deviations are "NaN"
+result_grouped_std = result_grouped_std.dropna(how='all')
+
+print(result_grouped_std)
+
 
 
 
