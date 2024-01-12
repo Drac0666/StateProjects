@@ -1,5 +1,31 @@
 import pandas as pd
 
+# Assuming df is your DataFrame
+# Sample DataFrame for illustration purposes
+data = {'cusip': ['ABC123', 'ABC123', 'DEF456', 'DEF456'],
+        'KG': [10, 15, 5, 8],
+        'AG': [20, 25, 10, 15]}
+
+df = pd.DataFrame(data)
+
+# Group by 'cusip' and check if any standard deviation is different from 0
+grouped_std = df.groupby('cusip').agg({'KG': 'std', 'AG': 'std'})
+
+# Check if any standard deviation is different from 0 within each group
+any_non_zero_std_within_group = (grouped_std != 0).any(axis=1)
+
+# Filter the groups where any standard deviation is different from 0
+groups_with_non_zero_std = any_non_zero_std_within_group[any_non_zero_std_within_group].index
+
+print(groups_with_non_zero_std)
+
+
+
+
+
+
+import pandas as pd
+
 # Sample data
 data1 = {'ISIN': ['ISIN1', 'ISIN2', 'ISIN3', 'ISIN4', 'ISIN5', 'ISIN6'],
          'Column1_df1': [1, 2, 3, 4, 5, 6],
