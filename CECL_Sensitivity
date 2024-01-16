@@ -1,6 +1,6 @@
 import pandas as pd
 from itertools import product
-
+x
 # Example DataFrame
 data = {'CUSIP': ['CUSIP1', 'CUSIP2', 'CUSIP3'],
         'SCENARIONAME': ['CECLDOWNSIDE'] * 3,
