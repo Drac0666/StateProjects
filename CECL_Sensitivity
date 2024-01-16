@@ -1,29 +1,34 @@
 import pandas as pd
 from itertools import product
 
-# Example DataFrame with more types
+# Example DataFrame with string values
 data = {'CUSIP': ['CUSIP1', 'CUSIP2', 'CUSIP3'],
         'SCENARIONAME': ['CECLDOWNSIDE'] * 3,
-        'VALUES': [100, 200, 300],
-        'TYPE': ['lgd', 'cpr', 'cdr', 'other1', 'other2']}
+        'VALUES': ['10 15 25', '30 45 20 10', '5 8 12 15 20'],
+        'TYPE': ['lgd', 'cpr', 'cdr']}
 df = pd.DataFrame(data)
 
 # Function to apply stress scenario
 def apply_stress(df, stress_type, stress_factor):
     df_copy = df.copy()
     mask = df_copy['TYPE'] == stress_type
-    df_copy.loc[mask, 'VALUES'] *= (1 + stress_factor)
+    values_column = df_copy.loc[mask, 'VALUES']
+    
+    # Convert string to list of floats, multiply, and convert back to string
+    updated_values = ' '.join([str(float(val) * (1 + stress_factor)) for val in values_column.iloc[0].split()])
+    df_copy.loc[mask, 'VALUES'] = updated_values
+    
     return df_copy
 
 # Generate all possible combinations of stress scenarios
-stress_combinations = list(product([0, 0.1, 0.2], repeat=3))  # Stress only applies to "lgd," "cpr," and "cdr"
+stress_combinations = list(product([0, 0.1, 0.2], repeat=len(df['TYPE'])))
 
 # Apply stress scenarios for each combination
 all_scenarios = []
 for combination in stress_combinations:
     scenario = df.copy()
     scenario_name = '_'.join(['CECLDOWNSIDE'] + [str(factor) for factor in combination])
-    for stress_type, stress_factor in zip(["lgd", "cpr", "cdr"], combination):
+    for stress_type, stress_factor in zip(df['TYPE'], combination):
         scenario = apply_stress(scenario, stress_type, stress_factor)
     scenario['SCENARIONAME'] = scenario_name
     all_scenarios.append(scenario)
@@ -39,4 +44,3 @@ for i, scenario in enumerate(combined_scenarios.itertuples(), 1):
     print(f"Scenario {i}:")
     print(scenario)
     print()
-
