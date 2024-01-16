@@ -1,0 +1,36 @@
+import pandas as pd
+from itertools import product
+
+# Example DataFrame
+data = {'values': [100, 200, 300], 'type': ['lgd', 'cpr', 'cdr']}
+df = pd.DataFrame(data)
+
+# Function to apply stress scenario
+def apply_stress(df, stress_type, stress_factor):
+    df_copy = df.copy()
+    mask = df_copy['type'] == stress_type
+    df_copy.loc[mask, 'values'] *= (1 + stress_factor)
+    return df_copy
+
+# Generate all possible combinations of stress scenarios
+stress_combinations = list(product([0, 0.1, 0.2], repeat=len(df['type'])))
+
+# Apply stress scenarios for each combination
+all_scenarios = []
+for combination in stress_combinations:
+    scenario = df.copy()
+    for stress_type, stress_factor in zip(df['type'], combination):
+        scenario = apply_stress(scenario, stress_type, stress_factor)
+    all_scenarios.append(scenario)
+
+# Combine all scenarios into a single DataFrame
+combined_scenarios = pd.concat(all_scenarios, ignore_index=True)
+
+# Display the results
+print("Original DataFrame:")
+print(df)
+print("\nAll Possible Stress Scenarios:")
+for i, scenario in enumerate(combined_scenarios):
+    print(f"Scenario {i + 1}:")
+    print(scenario)
+    print()
