@@ -1,11 +1,11 @@
 import pandas as pd
 from itertools import product
-x
-# Example DataFrame
+
+# Example DataFrame with more types
 data = {'CUSIP': ['CUSIP1', 'CUSIP2', 'CUSIP3'],
         'SCENARIONAME': ['CECLDOWNSIDE'] * 3,
         'VALUES': [100, 200, 300],
-        'TYPE': ['lgd', 'cpr', 'cdr']}
+        'TYPE': ['lgd', 'cpr', 'cdr', 'other1', 'other2']}
 df = pd.DataFrame(data)
 
 # Function to apply stress scenario
@@ -16,14 +16,14 @@ def apply_stress(df, stress_type, stress_factor):
     return df_copy
 
 # Generate all possible combinations of stress scenarios
-stress_combinations = list(product([0, 0.1, 0.2], repeat=len(df['TYPE'])))
+stress_combinations = list(product([0, 0.1, 0.2], repeat=3))  # Stress only applies to "lgd," "cpr," and "cdr"
 
 # Apply stress scenarios for each combination
 all_scenarios = []
 for combination in stress_combinations:
     scenario = df.copy()
     scenario_name = '_'.join(['CECLDOWNSIDE'] + [str(factor) for factor in combination])
-    for stress_type, stress_factor in zip(df['TYPE'], combination):
+    for stress_type, stress_factor in zip(["lgd", "cpr", "cdr"], combination):
         scenario = apply_stress(scenario, stress_type, stress_factor)
     scenario['SCENARIONAME'] = scenario_name
     all_scenarios.append(scenario)
@@ -39,3 +39,4 @@ for i, scenario in enumerate(combined_scenarios.itertuples(), 1):
     print(f"Scenario {i}:")
     print(scenario)
     print()
+
