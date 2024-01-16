@@ -1,4 +1,21 @@
 import pandas as pd
+
+# Create a DataFrame with 27 columns and all values 0
+df = pd.DataFrame(np.zeros((5, 27)), columns=list(range(27)))
+
+# Define the list of values and the dictionary mapping
+values = [1, 2, 3, 4, 5]
+mapping = {col: value for col, value in zip(df.columns, values)}
+
+# Update the DataFrame with the values from the dictionary
+df.iloc[:, :] = mapping
+
+print(df)
+
+
+
+
+import pandas as pd
 import numpy as np
 from itertools import product
 
