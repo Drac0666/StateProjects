@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from itertools import product
 
 # Example DataFrame with string values
@@ -14,8 +15,11 @@ def apply_stress(df, stress_type, stress_factor):
     mask = df_copy['TYPE'] == stress_type
     values_column = df_copy.loc[mask, 'VALUES']
     
-    # Convert string to list of floats, multiply, and convert back to string
-    updated_values = ' '.join([str(float(val) * (1 + stress_factor)) for val in values_column.iloc[0].split()])
+    # Convert string to array, multiply, and convert back to string
+    values_array = np.fromstring(values_column.iloc[0], sep=' ')
+    updated_values_array = values_array * (1 + stress_factor)
+    updated_values = np.array2string(updated_values_array, separator=' ')[1:-1]
+    
     df_copy.loc[mask, 'VALUES'] = updated_values
     
     return df_copy
