@@ -1,0 +1,20 @@
+from pptx import Presentation
+
+def update_hyperlinks(presentation_path, new_link):
+    presentation = Presentation(presentation_path)
+
+    for slide in presentation.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        if run.hyperlink is not None:
+                            run.hyperlink.address = new_link
+
+    presentation.save("updated_presentation.pptx")
+
+# Replace "your_presentation.pptx" with the path to your PowerPoint file
+presentation_path = "your_presentation.pptx"
+new_link = "https://www.newlink.com"
+
+update_hyperlinks(presentation_path, new_link)
