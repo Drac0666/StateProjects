@@ -1,52 +1,39 @@
-from tkinterhtml import HtmlFrame
-
-class HTMLDocumentViewer:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("HTML Document Viewer")
-
-        # Create HtmlFrame widget for displaying HTML content
-        self.html_frame = HtmlFrame(root, horizontal_scrollbar="auto")
-        self.html_frame.pack(expand=True, fill="both")
-
-        # Load HTML content
-        html_content = "<h1>Hello, HTML Document!</h1>"
-        self.html_frame.set_content(html_content)
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = HTMLDocumentViewer(root)
-    root.mainloop()
-
-
 import tkinter as tk
-from tkinterhtml import HtmlFrame
+from tkinter import ttk
+import pandas as pd
 
-class HTMLFileViewer:
-    def __init__(self, root):
+class DataFrameViewerApp:
+    def __init__(self, root, dataframe):
         self.root = root
-        self.root.title("HTML File Viewer")
+        self.root.title("DataFrame Viewer")
 
-        # Create HtmlFrame widget for displaying HTML content
-        self.html_frame = HtmlFrame(root, horizontal_scrollbar="auto")
-        self.html_frame.pack(expand=True, fill="both")
+        self.tree = ttk.Treeview(root)
+        self.tree["columns"] = list(dataframe.columns)
+        self.tree["show"] = "headings"
 
-        # Load local HTML file
-        file_path = "path/to/your/file.html"
-        self.load_html_file(file_path)
+        for col in dataframe.columns:
+            self.tree.heading(col, text=col)
 
-    def load_html_file(self, file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                html_content = file.read()
-                self.html_frame.set_content(html_content, file=file_path)
-        except FileNotFoundError:
-            print(f"File not found: {file_path}")
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        for index, row in dataframe.iterrows():
+            self.tree.insert("", "end", values=list(row))
 
-if __name__ == "__main__":
+        self.tree.pack(expand=True, fill=tk.BOTH)
+
+def main():
+    # Create a sample Pandas DataFrame
+    data = {'Name': ['John', 'Alice', 'Bob'],
+            'Age': [25, 30, 22],
+            'City': ['New York', 'San Francisco', 'Los Angeles']}
+    df = pd.DataFrame(data)
+
+    # Create Tkinter root window
     root = tk.Tk()
-    app = HTMLFileViewer(root)
+
+    # Create DataFrameViewerApp instance
+    app = DataFrameViewerApp(root, df)
+
+    # Start the Tkinter event loop
     root.mainloop()
 
+if __name__ == "__main__":
+    main()
