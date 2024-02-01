@@ -1,0 +1,19 @@
+from tkinterhtml import HtmlFrame
+
+class HTMLDocumentViewer:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("HTML Document Viewer")
+
+        # Create HtmlFrame widget for displaying HTML content
+        self.html_frame = HtmlFrame(root, horizontal_scrollbar="auto")
+        self.html_frame.pack(expand=True, fill="both")
+
+        # Load HTML content
+        html_content = "<h1>Hello, HTML Document!</h1>"
+        self.html_frame.set_content(html_content)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = HTMLDocumentViewer(root)
+    root.mainloop()
