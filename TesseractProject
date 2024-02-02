@@ -55,3 +55,56 @@ def preprocess_image(image_path):
 # Replace 'your_image_path.png' with the path to your image file
 image_path = 'your_image_path.png'
 preprocess_image(image_path)
+
+
+import cv2
+import numpy as np
+from PIL import Image
+import pytesseract
+
+# Path to the Tesseract executable (change this if necessary)
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+def preprocess_and_ocr(image_path, invert_colors=False, denoise=False, adaptive_threshold=False, dilation_erosion=False):
+    try:
+        # Open the image file using OpenCV
+        image = cv2.imread(image_path)
+
+        # Convert the image to grayscale
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Invert colors if specified
+        if invert_colors:
+            gray_image = cv2.bitwise_not(gray_image)
+
+        # Denoise if specified
+        if denoise:
+            gray_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
+
+        # Apply adaptive thresholding if specified
+        if adaptive_threshold:
+            gray_image = cv2.adaptiveThreshold(gray_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 4)
+
+        # Dilation and Erosion if specified
+        if dilation_erosion:
+            kernel = np.ones((3, 3), np.uint8)
+            gray_image = cv2.dilate(gray_image, kernel, iterations=1)
+            gray_image = cv2.erode(gray_image, kernel, iterations=1)
+
+        # Use pytesseract to do OCR on the preprocessed image
+        text = pytesseract.image_to_string(Image.fromarray(gray_image))
+
+        # Print the extracted text
+        print("Extracted Text:")
+        print(text)
+
+        # Display the preprocessed image
+        Image.fromarray(gray_image).show()
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Example usage:
+image_path = 'your_image_path.png'
+preprocess_and_ocr(image_path, invert_colors=True, denoise=True, adaptive_threshold=True, dilation_erosion=True)
+
