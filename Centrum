@@ -1,12 +1,12 @@
 import customtkinter as ctk
 import psutil
 
-ctk.set_appearance_mode("dark")  # Set your preferred theme: 'dark' or 'light'
+ctk.set_appearance_mode("dark")  
 ctk.set_default_color_theme("blue")  
 
 def kill_process(process_name):
     for proc in psutil.process_iter():
-        if proc.name().lower() == process_name.lower():
+        if process_name.lower() in proc.name().lower():  # "Like" search
             proc.kill()
 
 root = ctk.CTk()
