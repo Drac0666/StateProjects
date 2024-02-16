@@ -1,26 +1,38 @@
-import customtkinter as ctk
-import psutil
+import customtkinter
+import psutil  # You'll need to install this: pip install psutil
 
-ctk.set_appearance_mode("dark")  
-ctk.set_default_color_theme("blue")  
+# Constants for process names
+PROCESS_NAMES = ["Intex", "EXCEL", "POWERPNT", "WINWORD"]
 
 def kill_process(process_name):
     for proc in psutil.process_iter():
-        if process_name.lower() in proc.name().lower():  # "Like" search
+        if proc.name().lower() == process_name.lower():
             proc.kill()
 
-root = ctk.CTk()
+def create_kill_button(container, process_name):
+    button = customtkinter.CTkButton(
+        container, text=f"Kill {process_name}", command=lambda: kill_process(process_name)
+    )
+    button.pack(side="left", padx=5)
+
+# --- CustomTkinter setup ---
+customtkinter.set_appearance_mode("dark") 
+customtkinter.set_default_color_theme("blue") 
+
+root = customtkinter.CTk()
 root.title("Process Killer")
-root.geometry("300x200") 
+root.geometry("400x120") 
 
-btn_intex = ctk.CTkButton(root, text="Kill Intex", command=lambda: kill_process("intex"))
-btn_powerpoint = ctk.CTkButton(root, text="Kill PowerPoint", command=lambda: kill_process("powerpnt"))
-btn_excel = ctk.CTkButton(root, text="Kill Excel", command=lambda: kill_process("excel"))
-btn_word = ctk.CTkButton(root, text="Kill Word", command=lambda: kill_process("winword"))
+# Create rows
+row1 = customtkinter.CTkFrame(root)
+row1.pack(pady=10)
+row2 = customtkinter.CTkFrame(root)
+row2.pack(pady=10)
 
-btn_intex.pack(pady=10) 
-btn_powerpoint.pack(pady=10)
-btn_excel.pack(pady=10)
-btn_word.pack(pady=10)
+# Add buttons to each row
+create_kill_button(row1, PROCESS_NAMES[0])
+create_kill_button(row1, PROCESS_NAMES[1])
+create_kill_button(row2, PROCESS_NAMES[2])
+create_kill_button(row2, PROCESS_NAMES[3])
 
 root.mainloop()
