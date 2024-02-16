@@ -1,44 +1,26 @@
-import customtkinter as tk
-from customtkinter import messagebox
-import subprocess
+import customtkinter as ctk
+import psutil
 
-class ProcessKillerApp:
-    def __init__(self, master):
-        self.master = master
-        master.title("Process Killer")
+ctk.set_appearance_mode("dark")  # Set your preferred theme: 'dark' or 'light'
+ctk.set_default_color_theme("blue")  
 
-        # Create buttons
-        self.ie_button = tk.Button(master, text="Kill Internet Explorer", command=self.kill_ie)
-        self.powerpoint_button = tk.Button(master, text="Kill PowerPoint", command=self.kill_powerpoint)
-        self.excel_button = tk.Button(master, text="Kill Excel", command=self.kill_excel)
-        self.word_button = tk.Button(master, text="Kill Word", command=self.kill_word)
+def kill_process(process_name):
+    for proc in psutil.process_iter():
+        if proc.name().lower() == process_name.lower():
+            proc.kill()
 
-        # Arrange buttons on the GUI
-        self.ie_button.pack(pady=10)
-        self.powerpoint_button.pack(pady=10)
-        self.excel_button.pack(pady=10)
-        self.word_button.pack(pady=10)
+root = ctk.CTk()
+root.title("Process Killer")
+root.geometry("300x200") 
 
-    def kill_process(self, process_name):
-        try:
-            subprocess.run(["taskkill", "/f", "/im", process_name], check=True)
-            messagebox.showinfo("Success", f"{process_name} process killed successfully.")
-        except subprocess.CalledProcessError:
-            messagebox.showerror("Error", f"Failed to kill {process_name} process.")
+btn_intex = ctk.CTkButton(root, text="Kill Intex", command=lambda: kill_process("intex"))
+btn_powerpoint = ctk.CTkButton(root, text="Kill PowerPoint", command=lambda: kill_process("powerpnt"))
+btn_excel = ctk.CTkButton(root, text="Kill Excel", command=lambda: kill_process("excel"))
+btn_word = ctk.CTkButton(root, text="Kill Word", command=lambda: kill_process("winword"))
 
-    def kill_ie(self):
-        self.kill_process("iexplore.exe")
+btn_intex.pack(pady=10) 
+btn_powerpoint.pack(pady=10)
+btn_excel.pack(pady=10)
+btn_word.pack(pady=10)
 
-    def kill_powerpoint(self):
-        self.kill_process("POWERPNT.EXE")
-
-    def kill_excel(self):
-        self.kill_process("EXCEL.EXE")
-
-    def kill_word(self):
-        self.kill_process("WINWORD.EXE")
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = ProcessKillerApp(root)
-    root.mainloop()
+root.mainloop()
