@@ -1,18 +1,29 @@
 import customtkinter
-import psutil  # You'll need to install this: pip install psutil
+import psutil 
 
-# Constants for process names
+# --- Constants ---
 PROCESS_NAMES = ["Intex", "EXCEL", "POWERPNT", "WINWORD"]
 
+# --- Placeholder functions ---
+def custom_function1():
+    # Your custom code here
+    pass
+
+def custom_function2():
+    # Your custom code here
+    pass
+
+# ... Add custom_function3 to custom_function8
+
+# --- Process killing function ---
 def kill_process(process_name):
     for proc in psutil.process_iter():
         if proc.name().lower() == process_name.lower():
             proc.kill()
 
-def create_kill_button(container, process_name):
-    button = customtkinter.CTkButton(
-        container, text=f"Kill {process_name}", command=lambda: kill_process(process_name)
-    )
+# --- Create button with command ---
+def create_button(container, text, command):
+    button = customtkinter.CTkButton(container, text=text, command=command)
     button.pack(side="left", padx=5)
 
 # --- CustomTkinter setup ---
@@ -20,19 +31,30 @@ customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue") 
 
 root = customtkinter.CTk()
-root.title("Process Killer")
-root.geometry("400x120") 
+root.title("Process Killer & Custom Actions")
+root.geometry("600x200")  # Increased width for more buttons
 
 # Create rows
 row1 = customtkinter.CTkFrame(root)
 row1.pack(pady=10)
 row2 = customtkinter.CTkFrame(root)
 row2.pack(pady=10)
+row3 = customtkinter.CTkFrame(root)
+row3.pack(pady=10)
 
-# Add buttons to each row
-create_kill_button(row1, PROCESS_NAMES[0])
-create_kill_button(row1, PROCESS_NAMES[1])
-create_kill_button(row2, PROCESS_NAMES[2])
-create_kill_button(row2, PROCESS_NAMES[3])
+# Process killer buttons (Row 1)
+for process_name in PROCESS_NAMES:
+    create_button(row1, f"Kill {process_name}", lambda p=process_name: kill_process(p))
+
+# Custom function buttons (Row 2 & 3)
+create_button(row2, "Custom 1", custom_function1)
+create_button(row2, "Custom 2", custom_function2)
+create_button(row2, "Custom 3", custom_function3)
+create_button(row2, "Custom 4", custom_function4)
+
+create_button(row3, "Custom 5", custom_function5)
+create_button(row3, "Custom 6", custom_function6)
+create_button(row3, "Custom 7", custom_function7)
+create_button(row3, "Custom 8", custom_function8)
 
 root.mainloop()
