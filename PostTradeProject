@@ -1,3 +1,23 @@
+import re
+from openpyxl import load_workbook
+
+def update_excel_report(file_path, report_date):
+    """
+    Opens the specified Excel file and updates cell B4 with the given report date.
+
+    Args:
+        file_path (str): The path to the Excel file.
+        report_date (str): The date in YYYYMMDD format to update the cell with.
+    """
+
+    workbook = load_workbook(file_path)
+    worksheet = workbook.active  # Assuming the active sheet has the cell
+
+    worksheet['B4'] = report_date
+
+    workbook.save(file_path)  # Overwrite the original file 
+
+
 import os
 import re
 
