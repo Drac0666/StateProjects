@@ -1,3 +1,49 @@
+import os
+import re
+
+def find_most_recent_portfolio_report(folder_path):
+    """
+    Looks for files matching the pattern "PortfolioReport_YYYYMMDD" in a specified folder,
+    finds the most recent one, and returns the date from the filename.
+
+    Args:
+        folder_path (str): The path to the folder to search within.
+
+    Returns:
+        str: The date in YYYYMMDD format if a matching file is found, otherwise None.
+    """
+
+    pattern = re.compile(r"PortfolioReport_(\d{8})")  # Regex pattern
+
+    most_recent_file = None
+    most_recent_date = None
+
+    for filename in os.listdir(folder_path):
+        match = pattern.search(filename)
+        if match:
+            file_date = match.group(1)  # Extract date from filename
+
+            # Compare dates (more recent dates are 'greater')
+            if most_recent_date is None or file_date > most_recent_date:
+                most_recent_file = filename
+                most_recent_date = file_date
+
+    return most_recent_date
+
+# Example usage
+folder_to_search = "/path/to/your/folder"
+report_date = find_most_recent_portfolio_report(folder_to_search)
+
+if report_date:
+    print("Most recent Portfolio Report date:", report_date)
+else:
+    print("No Portfolio Report files found.")
+
+
+
+
+
+
 def exposure_in_millions(x):
     return x.sum() / 1_000_000
 
