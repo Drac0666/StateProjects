@@ -1,3 +1,14 @@
+
+import win32com.client
+
+def update_xlsm_win32com(file_path, report_date):
+    excel = win32com.client.Dispatch("Excel.Application")
+    workbook = excel.Workbooks.Open(file_path)
+    worksheet = workbook.Worksheets("Main")
+    worksheet.Cells(3, 2).Value = report_date  # Update B3
+    workbook.Save()
+    excel.Quit()
+
 import re
 from openpyxl import load_workbook
 
