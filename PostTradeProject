@@ -1,3 +1,14 @@
+import win32com.client
+from datetime import datetime
+
+# ... your other functions ...
+
+def update_xlsm_win32com(file_path, report_date):
+    # ... (code to open the workbook)
+
+    worksheet.Cells(3, 2).Value = datetime.strptime(report_date, '%Y%m%d').strftime('%m/%d/%Y')
+
+    # ... (rest of your code to save and close the workbook) 
 
 import win32com.client
 
