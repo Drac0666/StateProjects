@@ -1,29 +1,48 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import calendar
 
 # ... (Your code for reading and preparing data)
 
-# Plot
-plt.figure(figsize=(12, 6)) 
-df_pivoted.plot(kind='bar')
+# Basic formatting before exporting
+def format_excel(df):
+    df = df.reset_index()  # Include index columns if needed
+    df.columns = df.columns.str.title()  # Capitalize column names
 
-# Customize plot elements 
-plt.xticks(range(len(month_names)), month_names) 
-plt.xlabel('Maturity Month')
-plt.ylabel('Par Value (2024)')
-plt.title('Par Value by Maturity Month, Sub-Asset Class, and Designation (2024)')
+    # Some optional number formatting
+    for col in df.select_dtypes(include='number'): 
+        df[col] = df[col].apply(lambda x: f'{x:,.2f}')
 
-# Format y-axis in millions
-plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x / 1e6:.1f}M'))
+    return df
 
-plt.tight_layout()
+# Export to Excel 
+writer = pd.ExcelWriter('maturity_analysis.xlsx')
+format_excel(df_grouped).to_excel(writer, sheet_name='Analysis', index=False) 
+writer.save()
 
-# Move legend outside the plot
-plt.legend(title='Sub-Asset Class / Designation', bbox_to_anchor=(1.05, 1), loc='upper left') 
 
-# Save as JPG
-plt.savefig('maturity_plot.jpg', dpi=300) 
+import pandas as pd
+import xlsxwriter
 
-plt.show()  
+# ... (Your code for reading and preparing data)
+
+# Export to Excel with some formatting
+writer = pd.ExcelWriter('maturity_analysis.xlsx', engine='xlsxwriter')
+df_grouped.to_excel(writer, sheet_name='Analysis', index=False)
+
+# Access the workbook and worksheet objects
+workbook = writer.book
+worksheet = writer.sheets['Analysis']
+
+# Add header formatting
+header_format = workbook.add_format({'bold': True, 'bg_color': '#f0f0f0'})
+for col_num, value in enumerate(df_grouped.columns.values):
+    worksheet.write(0, col_num, value, header_format)
+
+# Add number formatting
+number_format = workbook.add_format({'num_format': '#,##0.00'})
+for row in range(1, len(df_grouped) + 1):
+    for col in range(len(df_grouped.columns)):
+        cell = worksheet.cell(row, col)  # Cell object
+        if isinstance(cell.value, (int, float)):  # Check if it's a number
+            worksheet.write(row, col, cell.value, number_format) 
+
+writer.save()
