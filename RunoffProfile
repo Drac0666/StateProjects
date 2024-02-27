@@ -10,18 +10,22 @@ df['Maturity'] = pd.to_datetime(df['Maturity'])
 # Filter for maturity in 2024
 df_2024 = df[df['Maturity'].dt.year == 2024]
 
-# Group data for the bar plot
-df_grouped = df_2024.groupby('Sub-Asset Class')['Par value'].sum()
+# Group data, including maturity month
+df_grouped = df_2024.groupby(['Sub-Asset Class', df_2024['Maturity'].dt.month])['Par value'].sum()
 
-# Create bar plot
-plt.figure(figsize=(10, 6)) 
-plt.bar(df_grouped.index, df_grouped.values)
+# Unstack to create multi-level columns 
+df_unstacked = df_grouped.unstack()
+
+# Plot
+plt.figure(figsize=(12, 6)) 
+df_unstacked.plot(kind='bar')
 
 # Customize plot
 plt.xlabel('Sub-Asset Class')
-plt.ylabel('Par Value (2024)')  # Specify Par Value for 2024
-plt.title('Par Value by Sub-Asset Class (Maturing in 2024)')
+plt.ylabel('Par Value (2024)')
+plt.title('Par Value by Sub-Asset Class and Maturity Month (2024)')
 plt.xticks(rotation=45, ha='right')
 plt.tight_layout()
+plt.legend(title='Maturity Month', bbox_to_anchor=(1.05, 1), loc='upper left')
 
 plt.show()
