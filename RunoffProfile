@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import calendar
 
 # Read DataFrame from clipboard
 df = pd.read_clipboard()
@@ -12,20 +13,22 @@ df_2024 = df[df['Maturity'].dt.year == 2024]
 
 # Group data, including maturity month
 df_grouped = df_2024.groupby(['Sub-Asset Class', df_2024['Maturity'].dt.month])['Par value'].sum()
+df_pivoted = df_grouped.unstack(fill_value=0)
 
-# Unstack to pivot Sub-Asset Class into columns
-df_pivoted = df_grouped.unstack(fill_value=0)  # Fill missing values with 0
+# Get abbreviated month names
+month_names = [calendar.month_abbr[month] for month in range(1, 13)] 
 
-# Plot
+# Update x-axis tick labels
 plt.figure(figsize=(12, 6)) 
 df_pivoted.plot(kind='bar')
+plt.xticks(range(len(month_names)), month_names) 
 
-# Customize plot
+# Customize plot (other labels remain the same)
 plt.xlabel('Maturity Month')
 plt.ylabel('Par Value (2024)')
 plt.title('Par Value by Maturity Month (2024)')
-plt.xticks(rotation=0)  # No x-axis label rotation needed
 plt.tight_layout()
 plt.legend(title='Sub-Asset Class') 
 
 plt.show()
+
