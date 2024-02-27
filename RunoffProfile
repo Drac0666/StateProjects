@@ -1,39 +1,29 @@
 import pandas as pd
-import xlsxwriter
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import calendar
 
 # ... (Your code for reading and preparing data)
 
-# Export to Excel with enhanced formatting
-writer = pd.ExcelWriter('maturity_analysis.xlsx', engine='xlsxwriter')
-df_grouped.to_excel(writer, sheet_name='Analysis', index=True)  
+# Use a more distinct color palette
+cmap = plt.cm.get_cmap('tab20') # Or choose a different colormap
 
-# Access the workbook and worksheet objects
-workbook = writer.book
-worksheet = writer.sheets['Analysis']
+# Plot - Select colors based on Sub-Asset Class or Designation 
+if 'Designation' in df_pivoted.columns:  # Color by Designation
+    designations = df_grouped.index.get_level_values('Designation').unique()
+    colors = cmap(range(len(designations)))
 
-# ------  Creative Header Formatting ------
-header_format = workbook.add_format({
-    'bold': True,
-    'font_color': 'white',
-    'bg_color': '#294F7D',    
-    'align': 'center',         
-    'border': 1               
-})
+    for i, designation in enumerate(designations):
+        bars = df_pivoted[designation]
+        bars.plot(kind='bar', color=colors[i])
 
-# Iterate over header names (MultiIndex)
-for col_num, value in enumerate(df_grouped.columns):
-    level_names = " ".join(str(level) for level in value) # Create combined name
-    worksheet.write(0, col_num, level_names, header_format)
+else:  # Color by Sub-Asset Class
+    sub_asset_classes = df_grouped.index.get_level_values('Sub-Asset Class').unique()
+    colors = cmap(range(len(sub_asset_classes))) 
 
-# ------  Improved Number Formatting ------
-number_format = workbook.add_format({
-    'num_format': '#,##0_);[Red]_(#,##0)',  
-    'align': 'right'                        
-})
+    for i, sub_asset_class in enumerate(sub_asset_classes):
+        bars = df_pivoted[sub_asset_class]
+        bars.plot(kind='bar', color=colors[i])
 
-# Apply number formatting iteratively
-for row in range(1, len(df_grouped) + 1):
-    for col in range(len(df_grouped.columns)):
-        worksheet.write(row, col, df_grouped.iloc[row - 1, col], number_format) 
 
-writer.save()
+# ... (Rest of the code: customization, legend, saving)
