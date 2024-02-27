@@ -2,32 +2,28 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
-# Assuming df1 and df2 are your dataframes
-# Let's say "Sub-Asset Class" is the common column
-
 # Sample data creation (replace this with your actual data)
-data1 = {'Sub-Asset Class': ['A', 'B', 'C', 'D', 'E'],
-         'Value1': [10, 15, 20, 25, 30]}
-data2 = {'Sub-Asset Class': ['C', 'D', 'E', 'F', 'G'],
-         'Value2': [5, 10, 15, 20, 25]}
-df1 = pd.DataFrame(data1)
-df2 = pd.DataFrame(data2)
+data = {'Sub-Asset Class': ['A', 'B', 'C', 'A', 'B', 'C', 'A', 'B', 'C'],
+        'Designation': ['X', 'X', 'Y', 'X', 'Y', 'Y', 'X', 'Y', 'Y'],
+        'Value': [10, 15, 20, 25, 30, 35, 40, 45, 50]}
 
-# Combine unique values from both dataframes
-unique_values = pd.concat([df1['Sub-Asset Class'], df2['Sub-Asset Class']]).unique()
+df = pd.DataFrame(data)
+
+# Combine unique values from both groupby levels
+unique_values = pd.MultiIndex.from_frame(df.groupby(['Sub-Asset Class', 'Designation']).size().reset_index()).tolist()
 
 # Create a colormap
 cmap = ListedColormap(plt.cm.get_cmap('tab10').colors[:len(unique_values)])
 
-# Create a mapping of colors for each unique value using the colormap
+# Create a mapping of colors for each unique combination using the colormap
 color_mapping = dict(zip(unique_values, cmap.colors))
 
-# Plotting for df1
-df1.plot(x='Sub-Asset Class', y='Value1', kind='bar', color=df1['Sub-Asset Class'].map(color_mapping))
-plt.title('Plot for DataFrame 1')
-plt.show()
+# Group by and plot
+grouped = df.groupby(['Sub-Asset Class', 'Designation'])
+for name, group in grouped:
+    color = color_mapping[name]
+    group.plot(x='Sub-Asset Class', y='Value', kind='bar', color=color, label=name)
 
-# Plotting for df2
-df2.plot(x='Sub-Asset Class', y='Value2', kind='bar', color=df2['Sub-Asset Class'].map(color_mapping))
-plt.title('Plot for DataFrame 2')
+plt.title('Grouped Plot')
+plt.legend(title=('Sub-Asset Class', 'Designation'))
 plt.show()
