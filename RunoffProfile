@@ -4,37 +4,14 @@ import matplotlib.pyplot as plt
 # Read DataFrame from clipboard
 df = pd.read_clipboard()
 
-# Convert 'Maturity' to datetime format (assuming string data)
-df['Maturity'] = pd.to_datetime(df['Maturity'])
-
-# Filter for maturity in 2024
-df_filtered = df[df['Maturity'].dt.year == 2024]
-
-# Plot par value over maturity
-plt.figure(figsize=(10,6))  
-plt.plot(df_filtered['Maturity'], df_filtered['par_value'])
-
-# Customize plot appearance
-plt.xlabel('Maturity')
-plt.ylabel('Par Value')
-plt.title('Par Value over Maturity (2024)')
-plt.grid(True)
-
-plt.show()
-
-
-
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Read DataFrame from clipboard
-df = pd.read_clipboard()
-
 # Convert 'Maturity' to datetime format (if necessary)
 df['Maturity'] = pd.to_datetime(df['Maturity'])
 
+# Filter for maturity in 2024
+df_2024 = df[df['Maturity'].dt.year == 2024]
+
 # Group data for the bar plot
-df_grouped = df.groupby('Sub-Asset Class')['Par value'].sum()
+df_grouped = df_2024.groupby('Sub-Asset Class')['Par value'].sum()
 
 # Create bar plot
 plt.figure(figsize=(10, 6)) 
@@ -42,11 +19,9 @@ plt.bar(df_grouped.index, df_grouped.values)
 
 # Customize plot
 plt.xlabel('Sub-Asset Class')
-plt.ylabel('Par Value')
-plt.title('Par Value by Sub-Asset Class')
-plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for readability
-plt.tight_layout()  # Adjust layout to prevent labels from overlapping
+plt.ylabel('Par Value (2024)')  # Specify Par Value for 2024
+plt.title('Par Value by Sub-Asset Class (Maturing in 2024)')
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
 
 plt.show()
-
-
