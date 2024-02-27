@@ -23,21 +23,14 @@ month_names = [calendar.month_abbr[month] for month in maturity_months]
 # Plot
 plt.figure(figsize=(12, 6)) 
 
-# **** Section A: Text Annotations for Designation ****
-for p in plt.patches:
-    text = df_pivoted.loc[p.get_x() + p.get_width() / 2, p.get_y()][0]  # Assuming first value in Designation
-    plt.annotate(text, (p.get_x() + p.get_width() / 2, p.get_height()),
-                 ha='center', va='bottom')
-
-# **** Section B: Color-Coding for Designation ****
-designations = df_grouped.index.get_level_values('Designation').unique()
-colors = plt.cm.get_cmap('tab10', len(designations))  
-
-for i, designation in enumerate(designations):
-    bars = df_pivoted[designation]
-    bars.plot(kind='bar', color=colors(i))
-
-plt.legend(designations, title='Designation')  # Used in Section B
+# Text Annotations for Designation 
+for container in plt.gca().containers:
+    bars = plt.bar(container.get_children())
+    for bar in bars:
+        x = bar.get_x() + bar.get_width()/2
+        y = bar.get_height()
+        text = df_pivoted.loc[x][0]  # Assuming the first 'Designation' 
+        plt.annotate(text, (x, y), ha='center', va='bottom')
 
 # Customize plot elements 
 plt.xticks(range(len(month_names)), month_names) 
