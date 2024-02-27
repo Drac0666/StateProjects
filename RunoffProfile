@@ -15,20 +15,29 @@ worksheet = writer.sheets['Analysis']
 header_format = workbook.add_format({
     'bold': True,
     'font_color': 'white',
-    'bg_color': '#294F7D',    # Dark Blue
-    'align': 'center',         # Center alignment
-    'border': 1                # Add a subtle border
+    'bg_color': '#294F7D',    
+    'align': 'center',         
+    'border': 1               
 })
 
-# Iterate over header names (as before) 
-# ...  (Code to iterate over names remains the same)
+# Iterate over header names and apply formatting
+if isinstance(df_grouped.index, pd.MultiIndex):
+    levels = df_grouped.index.names
+else:
+    levels = [df_grouped.name]  
+
+for col_num, level in enumerate(levels):
+    worksheet.write(0, col_num, level, header_format)
 
 # ------  Improved Number Formatting ------
 number_format = workbook.add_format({
-    'num_format': '#,##0_);[Red]_(#,##0)',  # Accounting style with red for negatives
-    'align': 'right'                          # Right-align numbers
+    'num_format': '#,##0_);[Red]_(#,##0)',  
+    'align': 'right'                        
 })
 
-# ... (Code to apply number formatting remains the same)
+# Apply number formatting (revised)
+for row in range(1, len(df_grouped) + 1):
+    for col in range(len(df_grouped.columns)):
+        worksheet.write(row, col, df_grouped.iloc[row - 1, col], number_format) 
 
 writer.save()
