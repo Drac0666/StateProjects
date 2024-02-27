@@ -4,26 +4,23 @@ from matplotlib.colors import ListedColormap
 
 # Sample data creation (replace this with your actual data)
 data = {'Sub-Asset Class': ['A', 'B', 'C', 'A', 'B', 'C', 'A', 'B', 'C'],
-        'Designation': ['X', 'X', 'Y', 'X', 'Y', 'Y', 'X', 'Y', 'Y'],
+        'Designation': ['X', 'X', 'X', 'Y', 'Y', 'Y', 'Z', 'Z', 'Z'],
         'Value': [10, 15, 20, 25, 30, 35, 40, 45, 50]}
-
 df = pd.DataFrame(data)
 
-# Combine unique values from both groupby levels
-unique_values = pd.MultiIndex.from_frame(df.groupby(['Sub-Asset Class', 'Designation']).size().reset_index()).tolist()
+# Two-level groupby
+grouped = df.groupby(['Sub-Asset Class', 'Designation']).sum()
+
+# Combine unique values from both levels of groupby
+unique_values = grouped.index.unique().to_list()
 
 # Create a colormap
 cmap = ListedColormap(plt.cm.get_cmap('tab10').colors[:len(unique_values)])
 
-# Create a mapping of colors for each unique combination using the colormap
+# Create a mapping of colors for each unique value using the colormap
 color_mapping = dict(zip(unique_values, cmap.colors))
 
-# Group by and plot
-grouped = df.groupby(['Sub-Asset Class', 'Designation'])
-for name, group in grouped:
-    color = color_mapping[name]
-    group.plot(x='Sub-Asset Class', y='Value', kind='bar', color=color, label=name)
-
+# Plotting
+grouped.plot(kind='bar', color=grouped.index.map(color_mapping))
 plt.title('Grouped Plot')
-plt.legend(title=('Sub-Asset Class', 'Designation'))
 plt.show()
