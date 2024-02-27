@@ -13,19 +13,19 @@ df_2024 = df[df['Maturity'].dt.year == 2024]
 # Group data, including maturity month
 df_grouped = df_2024.groupby(['Sub-Asset Class', df_2024['Maturity'].dt.month])['Par value'].sum()
 
-# Unstack to create multi-level columns 
-df_unstacked = df_grouped.unstack()
+# Unstack to pivot Sub-Asset Class into columns
+df_pivoted = df_grouped.unstack(fill_value=0)  # Fill missing values with 0
 
 # Plot
 plt.figure(figsize=(12, 6)) 
-df_unstacked.plot(kind='bar')
+df_pivoted.plot(kind='bar')
 
 # Customize plot
-plt.xlabel('Sub-Asset Class')
+plt.xlabel('Maturity Month')
 plt.ylabel('Par Value (2024)')
-plt.title('Par Value by Sub-Asset Class and Maturity Month (2024)')
-plt.xticks(rotation=45, ha='right')
+plt.title('Par Value by Maturity Month (2024)')
+plt.xticks(rotation=0)  # No x-axis label rotation needed
 plt.tight_layout()
-plt.legend(title='Maturity Month', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.legend(title='Sub-Asset Class') 
 
 plt.show()
