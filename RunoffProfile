@@ -1,26 +1,51 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
+import matplotlib.ticker as ticker
+import calendar
 
-# Sample data creation (replace this with your actual data)
-data = {'Sub-Asset Class': ['A', 'B', 'C', 'A', 'B', 'C', 'A', 'B', 'C'],
-        'Designation': ['X', 'X', 'X', 'Y', 'Y', 'Y', 'Z', 'Z', 'Z'],
-        'Value': [10, 15, 20, 25, 30, 35, 40, 45, 50]}
-df = pd.DataFrame(data)
+# Read DataFrame from clipboard
+df = pd.read_clipboard()
 
-# Two-level groupby
-grouped = df.groupby(['Sub-Asset Class', 'Designation']).sum()
+# Convert 'Maturity' to datetime format (if necessary)
+df['Maturity'] = pd.to_datetime(df['Maturity'])
 
-# Combine unique values from both levels of groupby
-unique_values = grouped.index.to_list()
+# Filter for maturity in 2024
+df_2024 = df[df['Maturity'].dt.year == 2024]
 
-# Create a colormap
-cmap = ListedColormap(plt.cm.get_cmap('tab10').colors[:len(unique_values)])
+# Two-level Groupby (Sub-Asset Class, then Designation)
+df_grouped = df_2024.groupby(['Sub-Asset Class', 'Designation', df_2024['Maturity'].dt.month])['Par value'].sum()
+df_pivoted = df_grouped.unstack(fill_value=0)
 
-# Create a mapping of colors for each unique combination using the colormap
-color_mapping = dict(zip(unique_values, cmap.colors))
+# Customize for Specific Maturity Months
+maturity_months = df_pivoted.index.to_list() 
+month_names = [calendar.month_abbr[month] for month in maturity_months]
 
-# Plotting
-grouped.plot(kind='bar', color=grouped.index.map(color_mapping))
-plt.title('Grouped Plot')
-plt.show()
+# Color palette for all combinations
+cmap = plt.cm.get_cmap('tab20')
+all_combinations = list(df_grouped.index.unique())
+colors = cmap(range(len(all_combinations)))
+
+# Plot
+plt.figure(figsize=(12, 6))
+
+# Iterate over groups and plot
+for i, (sub_asset_class, designation) in enumerate(all_combinations):
+    bars = df_pivoted.loc[sub_asset_class, designation]
+    bars.plot(kind='bar', color=colors[i])
+
+# Customize plot elements 
+plt.xticks(range(len(month_names)), month_names) 
+plt.xlabel('Maturity Month')
+plt.ylabel('Par Value (2024)')
+plt.title('Par Value by Maturity Month, Sub-Asset Class, and Designation (2024)')
+
+# Format y-axis in millions
+plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x / 1e6:.1f}M'))
+
+plt.tight_layout()
+plt.legend(title='Sub-Asset Class / Designation', bbox_to_anchor=(1.05, 1), loc='upper left') 
+
+# Save as JPG
+plt.savefig('maturity_plot.jpg', dpi=300, bbox_inches='tight') 
+
+plt.show()  
