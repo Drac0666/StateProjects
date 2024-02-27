@@ -1,58 +1,33 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import calendar
+from matplotlib.colors import ListedColormap
 
-# Read DataFrame from clipboard
-df = pd.read_clipboard()
+# Assuming df1 and df2 are your dataframes
+# Let's say "Sub-Asset Class" is the common column
 
-# Convert 'Maturity' to datetime format (if necessary)
-df['Maturity'] = pd.to_datetime(df['Maturity'])
+# Sample data creation (replace this with your actual data)
+data1 = {'Sub-Asset Class': ['A', 'B', 'C', 'D', 'E'],
+         'Value1': [10, 15, 20, 25, 30]}
+data2 = {'Sub-Asset Class': ['C', 'D', 'E', 'F', 'G'],
+         'Value2': [5, 10, 15, 20, 25]}
+df1 = pd.DataFrame(data1)
+df2 = pd.DataFrame(data2)
 
-# Filter for maturity in 2024
-df_2024 = df[df['Maturity'].dt.year == 2024]
+# Combine unique values from both dataframes
+unique_values = pd.concat([df1['Sub-Asset Class'], df2['Sub-Asset Class']]).unique()
 
-# Group data (including Designation if you want to color by Designation)
-df_grouped = df_2024.groupby(['Sub-Asset Class', df_2024['Maturity'].dt.month, 'Designation'])['Par value'].sum()
-df_pivoted = df_grouped.unstack(['Sub-Asset Class', 'Designation'], fill_value=0) 
+# Create a colormap
+cmap = ListedColormap(plt.cm.get_cmap('tab10').colors[:len(unique_values)])
 
-# Customize for Specific Maturity Months
-maturity_months = df_pivoted.index.to_list() 
-month_names = [calendar.month_abbr[month] for month in maturity_months]
+# Create a mapping of colors for each unique value using the colormap
+color_mapping = dict(zip(unique_values, cmap.colors))
 
-# Use a more distinct color palette
-cmap = plt.cm.get_cmap('tab20') 
+# Plotting for df1
+df1.plot(x='Sub-Asset Class', y='Value1', kind='bar', color=df1['Sub-Asset Class'].map(color_mapping))
+plt.title('Plot for DataFrame 1')
+plt.show()
 
-# Plot - Select colors based on Sub-Asset Class or Designation 
-if 'Designation' in df_pivoted.columns:  # Color by Designation
-    designations = df_grouped.index.get_level_values('Designation').unique()
-    colors = cmap(range(len(designations)))
-
-    for i, designation in enumerate(designations):
-        bars = df_pivoted[designation]
-        bars.plot(kind='bar', color=colors[i])
-
-else:  # Color by Sub-Asset Class
-    sub_asset_classes = df_grouped.index.get_level_values('Sub-Asset Class').unique()
-    colors = cmap(range(len(sub_asset_classes))) 
-
-    for i, sub_asset_class in enumerate(sub_asset_classes):
-        bars = df_pivoted[sub_asset_class]
-        bars.plot(kind='bar', color=colors[i])
-
-# Customize plot elements 
-plt.xticks(range(len(month_names)), month_names) 
-plt.xlabel('Maturity Month')
-plt.ylabel('Par Value (2024)')
-plt.title('Par Value by Maturity Month, Sub-Asset Class, and Designation (2024)')
-
-# Format y-axis in millions
-plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x / 1e6:.1f}M'))
-
-plt.tight_layout()
-plt.legend(title='Sub-Asset Class / Designation', bbox_to_anchor=(1.05, 1), loc='upper left') 
-
-# Save as JPG
-plt.savefig('maturity_plot.jpg', dpi=300, bbox_inches='tight') 
-
-plt.show()  
+# Plotting for df2
+df2.plot(x='Sub-Asset Class', y='Value2', kind='bar', color=df2['Sub-Asset Class'].map(color_mapping))
+plt.title('Plot for DataFrame 2')
+plt.show()
