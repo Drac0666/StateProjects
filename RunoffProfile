@@ -1,34 +1,3 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import calendar
-
-# Read DataFrame from clipboard
-df = pd.read_clipboard()
-
-# Convert 'Maturity' to datetime format (if necessary)
-df['Maturity'] = pd.to_datetime(df['Maturity'])
-
-# Filter for maturity in 2024
-df_2024 = df[df['Maturity'].dt.year == 2024]
-
-# Group data, including maturity month
-df_grouped = df_2024.groupby(['Sub-Asset Class', df_2024['Maturity'].dt.month])['Par value'].sum()
-df_pivoted = df_grouped.unstack(fill_value=0)
-
-# Get abbreviated month names
-month_names = [calendar.month_abbr[month] for month in range(1, 13)] 
-
-# Update x-axis tick labels
-plt.figure(figsize=(12, 6)) 
-df_pivoted.plot(kind='bar')
-plt.xticks(range(len(month_names)), month_names) 
-
-# Customize plot (other labels remain the same)
-plt.xlabel('Maturity Month')
-plt.ylabel('Par Value (2024)')
-plt.title('Par Value by Maturity Month (2024)')
-plt.tight_layout()
-plt.legend(title='Sub-Asset Class') 
-
-plt.show()
-
+# Customize for Specific Maturity Months
+maturity_months = df_pivoted.index.to_list()  # Get the actual maturity months present 
+month_names = [calendar.month_abbr[month] for month in maturity_months]
