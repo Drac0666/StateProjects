@@ -22,3 +22,31 @@ plt.grid(True)
 
 plt.show()
 
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Read DataFrame from clipboard
+df = pd.read_clipboard()
+
+# Convert 'Maturity' to datetime format (if necessary)
+df['Maturity'] = pd.to_datetime(df['Maturity'])
+
+# Group data for the bar plot
+df_grouped = df.groupby('Sub-Asset Class')['Par value'].sum()
+
+# Create bar plot
+plt.figure(figsize=(10, 6)) 
+plt.bar(df_grouped.index, df_grouped.values)
+
+# Customize plot
+plt.xlabel('Sub-Asset Class')
+plt.ylabel('Par Value')
+plt.title('Par Value by Sub-Asset Class')
+plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for readability
+plt.tight_layout()  # Adjust layout to prevent labels from overlapping
+
+plt.show()
+
+
