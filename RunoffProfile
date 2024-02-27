@@ -20,14 +20,10 @@ header_format = workbook.add_format({
     'border': 1               
 })
 
-# Iterate over header names and apply formatting
-if isinstance(df_grouped.index, pd.MultiIndex):
-    levels = df_grouped.index.names
-else:
-    levels = [df_grouped.name]  
-
-for col_num, level in enumerate(levels):
-    worksheet.write(0, col_num, level, header_format)
+# Iterate over header names (MultiIndex)
+for col_num, value in enumerate(df_grouped.columns):
+    level_names = " ".join(str(level) for level in value) # Create combined name
+    worksheet.write(0, col_num, level_names, header_format)
 
 # ------  Improved Number Formatting ------
 number_format = workbook.add_format({
@@ -35,7 +31,7 @@ number_format = workbook.add_format({
     'align': 'right'                        
 })
 
-# Apply number formatting (revised)
+# Apply number formatting iteratively
 for row in range(1, len(df_grouped) + 1):
     for col in range(len(df_grouped.columns)):
         worksheet.write(row, col, df_grouped.iloc[row - 1, col], number_format) 
