@@ -1,51 +1,39 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
+# Example DataFrame creation
+data = {'City': ['CityA', 'CityB', 'CityC', 'CityD'],
+        'Value': [10, 20, 15, 25]}
+df = pd.DataFrame(data)
+
+# List of unique identifiers
+identifiers = ['CityA', 'CityB', 'CityC', 'CityD']
+
+# Define a custom colormap
+custom_colormap = ListedColormap(['red', 'green', 'blue', 'purple'])
+
+# Create a dictionary to map identifiers to colormap indices
+identifier_to_color = {identifier: custom_colormap(i / len(identifiers)) for i, identifier in enumerate(identifiers)}
+
+# Add a new column to the DataFrame with the corresponding colors
+df['Color'] = df['City'].map(identifier_to_color)
+
+# Plot the DataFrame using Matplotlib
+ax = df.plot(kind='bar', x='City', y='Value', color=df['Color'])
+
+# Show the plot
+plt.show()
+
+import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import calendar
 
-# Read DataFrame from clipboard
-df = pd.read_clipboard()
+my_strings = ['string1', 'string2', 'string3', ...] # Your list of strings
+cmap = plt.cm.get_cmap('tab10')  # Example colormap
+num_colors = len(my_strings)  
+color_indices = range(0, num_colors)  
 
-# Convert 'Maturity' to datetime format (if necessary)
-df['Maturity'] = pd.to_datetime(df['Maturity'])
+# Create the mapping dictionary
+color_dict = dict(zip(my_strings, cmap(color_indices))) 
 
-# Filter for maturity in 2024
-df_2024 = df[df['Maturity'].dt.year == 2024]
 
-# Two-level Groupby (Sub-Asset Class, then Designation)
-df_grouped = df_2024.groupby(['Sub-Asset Class', 'Designation', df_2024['Maturity'].dt.month])['Par value'].sum()
-df_pivoted = df_grouped.unstack(fill_value=0)
-
-# Customize for Specific Maturity Months
-maturity_months = df_pivoted.index.to_list() 
-month_names = [calendar.month_abbr[month] for month in maturity_months]
-
-# Color palette for all combinations
-cmap = plt.cm.get_cmap('tab20')
-all_combinations = list(df_grouped.index.unique())
-colors = cmap(range(len(all_combinations)))
-
-# Plot
-plt.figure(figsize=(12, 6))
-
-# Iterate over groups and plot
-for i, (sub_asset_class, designation) in enumerate(all_combinations):
-    bars = df_pivoted.loc[sub_asset_class, designation]
-    bars.plot(kind='bar', color=colors[i])
-
-# Customize plot elements 
-plt.xticks(range(len(month_names)), month_names) 
-plt.xlabel('Maturity Month')
-plt.ylabel('Par Value (2024)')
-plt.title('Par Value by Maturity Month, Sub-Asset Class, and Designation (2024)')
-
-# Format y-axis in millions
-plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{x / 1e6:.1f}M'))
-
-plt.tight_layout()
-plt.legend(title='Sub-Asset Class / Designation', bbox_to_anchor=(1.05, 1), loc='upper left') 
-
-# Save as JPG
-plt.savefig('maturity_plot.jpg', dpi=300, bbox_inches='tight') 
-
-plt.show()  
