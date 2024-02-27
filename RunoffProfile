@@ -1,32 +1,11 @@
 import pandas as pd
-
-# ... (Your code for reading and preparing data)
-
-# Basic formatting before exporting
-def format_excel(df):
-    df = df.reset_index()  # Include index columns if needed
-    df.columns = df.columns.str.title()  # Capitalize column names
-
-    # Some optional number formatting
-    for col in df.select_dtypes(include='number'): 
-        df[col] = df[col].apply(lambda x: f'{x:,.2f}')
-
-    return df
-
-# Export to Excel 
-writer = pd.ExcelWriter('maturity_analysis.xlsx')
-format_excel(df_grouped).to_excel(writer, sheet_name='Analysis', index=False) 
-writer.save()
-
-
-import pandas as pd
 import xlsxwriter
 
 # ... (Your code for reading and preparing data)
 
 # Export to Excel with some formatting
 writer = pd.ExcelWriter('maturity_analysis.xlsx', engine='xlsxwriter')
-df_grouped.to_excel(writer, sheet_name='Analysis', index=False)
+df_grouped.to_excel(writer, sheet_name='Analysis', index=True)  # Include index
 
 # Access the workbook and worksheet objects
 workbook = writer.book
@@ -34,15 +13,14 @@ worksheet = writer.sheets['Analysis']
 
 # Add header formatting
 header_format = workbook.add_format({'bold': True, 'bg_color': '#f0f0f0'})
-for col_num, value in enumerate(df_grouped.columns.values):
-    worksheet.write(0, col_num, value, header_format)
 
-# Add number formatting
-number_format = workbook.add_format({'num_format': '#,##0.00'})
-for row in range(1, len(df_grouped) + 1):
-    for col in range(len(df_grouped.columns)):
-        cell = worksheet.cell(row, col)  # Cell object
-        if isinstance(cell.value, (int, float)):  # Check if it's a number
-            worksheet.write(row, col, cell.value, number_format) 
+# Iterate over column names or index levels
+if isinstance(df_grouped.index, pd.MultiIndex):
+    levels = df_grouped.index.names
+else:
+    levels = [df_grouped.name]  # Single index
 
-writer.save()
+for col_num, level in enumerate(levels):
+    worksheet.write(0, col_num, level, header_format)
+
+# ... (Rest of the number formatting code remains the same)
