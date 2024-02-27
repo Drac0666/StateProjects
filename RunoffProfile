@@ -12,12 +12,12 @@ df = pd.DataFrame(data)
 grouped = df.groupby(['Sub-Asset Class', 'Designation']).sum()
 
 # Combine unique values from both levels of groupby
-unique_values = grouped.index.unique().to_list()
+unique_values = grouped.index.to_list()
 
 # Create a colormap
 cmap = ListedColormap(plt.cm.get_cmap('tab10').colors[:len(unique_values)])
 
-# Create a mapping of colors for each unique value using the colormap
+# Create a mapping of colors for each unique combination using the colormap
 color_mapping = dict(zip(unique_values, cmap.colors))
 
 # Plotting
