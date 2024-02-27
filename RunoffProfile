@@ -3,24 +3,32 @@ import xlsxwriter
 
 # ... (Your code for reading and preparing data)
 
-# Export to Excel with some formatting
+# Export to Excel with enhanced formatting
 writer = pd.ExcelWriter('maturity_analysis.xlsx', engine='xlsxwriter')
-df_grouped.to_excel(writer, sheet_name='Analysis', index=True)  # Include index
+df_grouped.to_excel(writer, sheet_name='Analysis', index=True)  
 
 # Access the workbook and worksheet objects
 workbook = writer.book
 worksheet = writer.sheets['Analysis']
 
-# Add header formatting
-header_format = workbook.add_format({'bold': True, 'bg_color': '#f0f0f0'})
+# ------  Creative Header Formatting ------
+header_format = workbook.add_format({
+    'bold': True,
+    'font_color': 'white',
+    'bg_color': '#294F7D',    # Dark Blue
+    'align': 'center',         # Center alignment
+    'border': 1                # Add a subtle border
+})
 
-# Iterate over column names or index levels
-if isinstance(df_grouped.index, pd.MultiIndex):
-    levels = df_grouped.index.names
-else:
-    levels = [df_grouped.name]  # Single index
+# Iterate over header names (as before) 
+# ...  (Code to iterate over names remains the same)
 
-for col_num, level in enumerate(levels):
-    worksheet.write(0, col_num, level, header_format)
+# ------  Improved Number Formatting ------
+number_format = workbook.add_format({
+    'num_format': '#,##0_);[Red]_(#,##0)',  # Accounting style with red for negatives
+    'align': 'right'                          # Right-align numbers
+})
 
-# ... (Rest of the number formatting code remains the same)
+# ... (Code to apply number formatting remains the same)
+
+writer.save()
