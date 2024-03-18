@@ -1,0 +1,30 @@
+import pandas as pd
+
+def replace_dash_with_zero(df, columns):
+    """
+    Replace all occurrences of "-" with 0 under specified columns in a DataFrame.
+
+    Parameters:
+        df (pandas.DataFrame): Input DataFrame.
+        columns (list): List of column names where "-" should be replaced with 0.
+
+    Returns:
+        pandas.DataFrame: DataFrame with "-" replaced with 0 under specified columns.
+    """
+    df_copy = df.copy()  # Make a copy to avoid modifying the original DataFrame
+    df_copy[columns] = df_copy[columns].replace('-', 0)
+    return df_copy
+
+
+# Example usage:
+data = {
+    'A': ['1', '2', '3', '-'],
+    'B': ['-', '5', '6', '7'],
+    'C': ['8', '-', '10', '11']
+}
+
+df = pd.DataFrame(data)
+columns_to_replace = ['A', 'B']
+
+result_df = replace_dash_with_zero(df, columns_to_replace)
+print(result_df)
