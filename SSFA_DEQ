@@ -77,3 +77,36 @@ df = pd.DataFrame(data)
 df['New_Column_1'], df['New_Column_2'] = zip(*df.apply(custom_function, axis=1))
 
 print(df)
+
+
+import pandas as pd
+from datetime import datetime, timedelta
+
+def status(last_updated):
+    """
+    Determine the status based on the difference between the last updated date and the reference date.
+
+    Parameters:
+        last_updated (datetime): The last updated date.
+
+    Returns:
+        str: "STALE" if last updated date is greater than 90 days before March 29, 2024, otherwise "OK".
+    """
+    reference_date = datetime(2024, 3, 29)
+    if (reference_date - last_updated).days > 90:
+        return "STALE"
+    else:
+        return "OK"
+
+# Example usage:
+data = {
+    'Lastest Update': [datetime(2024, 3, 1), datetime(2023, 12, 31), datetime(2024, 1, 1)]
+}
+
+df = pd.DataFrame(data)
+
+# Apply the status function to each row in the "Lastest Update" column using apply, and assign the status to a new column
+df['Status'] = df['Lastest Update'].apply(status)
+
+print(df)
+
