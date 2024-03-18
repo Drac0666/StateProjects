@@ -2,17 +2,19 @@ import pandas as pd
 
 def replace_dash_with_zero(df, columns):
     """
-    Replace all occurrences of "-" with 0 under specified columns in a DataFrame.
+    Replace all occurrences of "-" with 0 under specified columns in a DataFrame,
+    and ensure the values are numeric.
 
     Parameters:
         df (pandas.DataFrame): Input DataFrame.
         columns (list): List of column names where "-" should be replaced with 0.
 
     Returns:
-        pandas.DataFrame: DataFrame with "-" replaced with 0 under specified columns.
+        pandas.DataFrame: DataFrame with "-" replaced with 0 and converted to numeric under specified columns.
     """
     df_copy = df.copy()  # Make a copy to avoid modifying the original DataFrame
     df_copy[columns] = df_copy[columns].replace('-', 0)
+    df_copy[columns] = df_copy[columns].apply(pd.to_numeric, errors='coerce')  # Convert to numeric
     return df_copy
 
 
