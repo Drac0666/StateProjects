@@ -30,3 +30,50 @@ columns_to_replace = ['A', 'B']
 
 result_df = replace_dash_with_zero(df, columns_to_replace)
 print(result_df)
+import pandas as pd
+
+def cap_at_100(func):
+    """
+    Decorator function to cap the value returned by the decorated function at 100.
+
+    Parameters:
+        func: The function to be decorated.
+
+    Returns:
+        The decorated function.
+    """
+    def wrapper(row):
+        result = func(row)
+        # Cap the value at 100 if it exceeds 100
+        if result[0] > 100:
+            result = (100, result[1])  # Cap the first value (DettachmentPoint) at 100
+        return result
+    return wrapper
+
+@cap_at_100
+def custom_function(row):
+    """
+    Custom function to be applied to each row of the DataFrame.
+    This function returns two values.
+
+    Parameters:
+        row (pandas.Series): A row of the DataFrame.
+
+    Returns:
+        tuple: A tuple containing two values.
+    """
+    # Example logic: return double the value in Column_A and the sum of Column_A and Column_B
+    return row['Column_A'] * 2, row['Column_A'] + row['Column_B']
+
+# Example usage:
+data = {
+    'Column_A': [1, 2, 3, 4, 5],
+    'Column_B': [6, 7, 8, 9, 10]
+}
+
+df = pd.DataFrame(data)
+
+# Apply the custom function to each row using apply, and assign the returned values to new columns
+df['New_Column_1'], df['New_Column_2'] = zip(*df.apply(custom_function, axis=1))
+
+print(df)
