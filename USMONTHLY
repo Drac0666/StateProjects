@@ -1,18 +1,7 @@
-Sub ChangeChartDataSource()
-    Dim myChart As Chart
-    Dim newDataSource As String
-    
-    ' Check if a chart is selected
-    If ActiveWindow.Selection.Type = ppSelectionShapes Then
-        If ActiveWindow.Selection.ShapeRange.Type = msoChart Then
-            Set myChart = ActiveWindow.Selection.ShapeRange(1).Chart
-            ' Change the data source to the desired worksheet
-            newDataSource = "='Sheet2'!$A$1:$B$5"  ' Modify this to your desired worksheet range
-            myChart.ChartData.Workbook.Worksheets(1).ListObjects(1).Resize Range(newDataSource)
-        Else
-            MsgBox "Please select a chart."
-        End If
-    Else
-        MsgBox "Please select a chart."
-    End If
+Sub SaveValuesOnly()
+    Dim ws As Worksheet
+    For Each ws In ThisWorkbook.Worksheets
+        ws.UsedRange.Value = ws.UsedRange.Value
+    Next ws
+    ThisWorkbook.SaveAs ThisWorkbook.Path & "\" & Left(ThisWorkbook.Name, InStr(1, ThisWorkbook.Name, ".") - 1) & "_ValuesOnly.xlsx", xlOpenXMLWorkbook
 End Sub
