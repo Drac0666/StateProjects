@@ -1,0 +1,22 @@
+import pandas as pd
+
+# Example DataFrame
+data = {
+    'ISIN': ['ISIN1', 'ISIN2', 'ISIN3', 'ISIN4', 'ISIN5'],
+    'Par Value': [100, 200, 150, 250, 300],
+    'Country': ['United Kingdom', 'United Kingdom', 'United States', 'Germany', 'Germany'],
+    'Deal Type': ['RMBS', 'Consumer Loan', 'RMBS', 'RMBS', 'Consumer Loan']
+}
+df = pd.DataFrame(data)
+
+# Create an Excel writer object
+with pd.ExcelWriter('output.xlsx') as writer:
+    # Iterate over unique combinations of 'Country' and 'Deal Type'
+    for (country, deal_type), group in df.groupby(['Country', 'Deal Type']):
+        # Exclude 'Consumer Loan' deal type if present
+        if deal_type == 'Consumer Loan':
+            continue
+        
+        # Write the group to a worksheet named based on the combination of 'Country' and 'Deal Type'
+        worksheet_name = f'{country} {deal_type}'
+        group.to_excel(writer, sheet_name=worksheet_name, index=False)
