@@ -1,7 +1,30 @@
-Sub SaveValuesOnly()
-    Dim ws As Worksheet
-    For Each ws In ThisWorkbook.Worksheets
-        ws.UsedRange.Value = ws.UsedRange.Value
-    Next ws
-    ThisWorkbook.SaveAs ThisWorkbook.Path & "\" & Left(ThisWorkbook.Name, InStr(1, ThisWorkbook.Name, ".") - 1) & "_ValuesOnly.xlsx", xlOpenXMLWorkbook
-End Sub
+import pandas as pd
+
+def summarize_ratings(df):
+    # Calculate total Par Value
+    total_par_value = df['Par Value'].sum()
+
+    # Group by "LowestRating" and sum "Par Value"
+    grouped_df = df.groupby('LowestRating')['Par Value'].sum().reset_index()
+
+    # Calculate percentage compared to total
+    grouped_df['Percentage'] = grouped_df['Par Value'] / total_par_value * 100
+
+    # Generate sentences
+    sentences = []
+    for index, row in grouped_df.iterrows():
+        sentence = f"{row['Par Value']} is rated {row['LowestRating']}, which is {row['Percentage']:.2f}% of the total"
+        sentences.append(sentence)
+    
+    return sentences
+
+# Example usage
+data = {
+    'LowestRating': ['A', 'B', 'A', 'C', 'B'],
+    'Par Value': [1000, 2000, 500, 1500, 800]
+}
+
+df = pd.DataFrame(data)
+result = summarize_ratings(df)
+for sentence in result:
+    print(sentence)
