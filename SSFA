@@ -1,3 +1,41 @@
+import os
+import shutil
+
+def backup_files(file_list, backup_folder):
+    # Create the backup folder if it doesn't exist
+    if not os.path.exists(backup_folder):
+        os.makedirs(backup_folder)
+
+    # Iterate over each file in the list
+    for file_path in file_list:
+        # Extract the filename from the path
+        file_name = os.path.basename(file_path)
+
+        # Construct the destination path in the backup folder
+        destination_path = os.path.join(backup_folder, file_name)
+
+        # Check if the file already exists in the backup folder
+        if os.path.exists(destination_path):
+            # If the file already exists, add an underscore prefix to the new file's name
+            file_name, file_extension = os.path.splitext(file_name)
+            file_name = "_" + file_name + file_extension
+            destination_path = os.path.join(backup_folder, file_name)
+
+        # Copy the file to the backup folder
+        shutil.copy2(file_path, destination_path)
+
+        print(f"File '{file_name}' backed up to '{destination_path}'")
+
+# Example usage:
+files_to_backup = ["file1.txt", "file2.txt", "file3.txt"]  # List of files to backup
+backup_folder = "BackupFolder"  # Backup folder name
+
+backup_files(files_to_backup, backup_folder)
+
+
+
+
+
 import pandas as pd
 
 # Assuming df is your DataFrame
