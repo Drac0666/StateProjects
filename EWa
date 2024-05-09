@@ -1,3 +1,24 @@
+from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+import pandas as pd
+
+# Load the workbook
+workbook = load_workbook('example.xlsx')
+
+# Iterate through each worksheet
+for sheet in workbook.sheetnames:
+    ws = workbook[sheet]
+    # Convert formulas to values
+    for row in ws.iter_rows(values_only=True):
+        for cell in row:
+            if cell.data_type == 'f':  # Check if cell contains a formula
+                cell.value = cell.value
+
+# Save the workbook as values only
+workbook.save('example_values_only.xlsx')
+
+
+
 import os
 from openpyxl import load_workbook
 from openpyxl import Workbook
