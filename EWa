@@ -1,0 +1,32 @@
+import os
+from openpyxl import load_workbook
+from openpyxl import Workbook
+
+def extract_data(filename):
+    # Load the workbook
+    wb = load_workbook(filename)
+    # Get the sheet named "MC"
+    sheet = wb["MC"]
+    # Extract data from specified cells
+    data = [sheet["A1"].value, sheet["C5"].value, sheet["C10"].value]
+    return data
+
+def process_files(input_folder, output_filename):
+    # Create a new workbook
+    output_wb = Workbook()
+    output_ws = output_wb.active
+    # Iterate over each file in the input folder
+    for filename in os.listdir(input_folder):
+        if filename.endswith(".xlsx"):
+            filepath = os.path.join(input_folder, filename)
+            # Extract data from the "MC" sheet
+            data = extract_data(filepath)
+            # Write the data to the output workbook
+            output_ws.append(data)
+    # Save the output workbook
+    output_wb.save(output_filename)
+
+# Example usage
+input_folder = "input_folder"
+output_filename = "output.xlsx"
+process_files(input_folder, output_filename)
