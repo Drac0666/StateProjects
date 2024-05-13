@@ -1,0 +1,13 @@
+import pandas as pd
+from rapidfuzz import process
+
+# Assuming df1 and df2 are your DataFrames and 'Master Servicer' and 'bankname' are the columns
+def get_best_match(master_servicer, banknames):
+    best_match = process.extractOne(master_servicer, banknames, scorer=process.scorer.WRatio)
+    return best_match[0], best_match[1]
+
+# Convert the 'bankname' column in df2 to a list
+banknames_list = df2['bankname'].tolist()
+
+# Apply the get_best_match function to the 'Master Servicer' column in df1
+df1['Best Match'], df1['Similarity Score'] = zip(*df1['Master Servicer'].apply(get_best_match, banknames=banknames_list))
