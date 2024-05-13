@@ -11,3 +11,37 @@ banknames_list = df2['bankname'].tolist()
 
 # Apply the get_best_match function to the 'Master Servicer' column in df1
 df1['Best Match'], df1['Similarity Score'] = zip(*df1['Master Servicer'].apply(get_best_match, banknames=banknames_list))
+
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Example DataFrames
+df1 = pd.DataFrame({'Master Servicer': ['Bank A', 'Bank B', 'Bank C']})
+df2 = pd.DataFrame({'bankname': ['Bank Alpha', 'Bank Beta', 'Bank Gamma']})
+
+# Initialize the TfidfVectorizer
+vectorizer = TfidfVectorizer()
+
+# Combine the text data to fit the vectorizer
+all_text = df1['Master Servicer'].tolist() + df2['bankname'].tolist()
+vectorizer.fit(all_text)
+
+# Transform the text data into TF-IDF vectors
+tfidf_df1 = vectorizer.transform(df1['Master Servicer'])
+tfidf_df2 = vectorizer.transform(df2['bankname'])
+
+# Calculate the cosine similarity
+cosine_similarities = cosine_similarity(tfidf_df1, tfidf_df2)
+
+# Find the best match and similarity score for each 'Master Servicer'
+best_matches = []
+for idx, row in enumerate(cosine_similarities):
+    best_match_idx = row.argmax()
+    best_matches.append((df2['bankname'].iloc[best_match_idx], row[best_match_idx]))
+
+# Add the best match and similarity score to df1
+df1['Best Match'], df1['Similarity Score'] = zip(*best_matches)
+
+print(df1)
