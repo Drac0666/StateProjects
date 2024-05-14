@@ -1,47 +1,20 @@
 import pandas as pd
-from rapidfuzz import process
 
-# Assuming df1 and df2 are your DataFrames and 'Master Servicer' and 'bankname' are the columns
-def get_best_match(master_servicer, banknames):
-    best_match = process.extractOne(master_servicer, banknames, scorer=process.scorer.WRatio)
-    return best_match[0], best_match[1]
+# Example DataFrame
+data = {'First_Column': ['A', 'A', 'B', 'B', 'C'],
+        'Second_Column': ['String1', 'String2', 'String3', 'String4', 'String5']}
 
-# Convert the 'bankname' column in df2 to a list
-banknames_list = df2['bankname'].tolist()
+df = pd.DataFrame(data)
 
-# Apply the get_best_match function to the 'Master Servicer' column in df1
-df1['Best Match'], df1['Similarity Score'] = zip(*df1['Master Servicer'].apply(get_best_match, banknames=banknames_list))
+# Adding a column to count the number of occurrences for each group
+df['count'] = df.groupby('First_Column').cumcount()
 
+# Pivoting the DataFrame
+pivoted = df.pivot(index='First_Column', columns='count', values='Second_Column').reset_index()
 
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+# Renaming columns
+pivoted.columns.name = None  # Removing the name of the columns index
+pivoted.columns = [f'Second_Column_{col}' if col != 'First_Column' else col for col in pivoted.columns]
 
-# Example DataFrames
-df1 = pd.DataFrame({'Master Servicer': ['Bank A', 'Bank B', 'Bank C']})
-df2 = pd.DataFrame({'bankname': ['Bank Alpha', 'Bank Beta', 'Bank Gamma']})
-
-# Initialize the TfidfVectorizer
-vectorizer = TfidfVectorizer()
-
-# Combine the text data to fit the vectorizer
-all_text = df1['Master Servicer'].tolist() + df2['bankname'].tolist()
-vectorizer.fit(all_text)
-
-# Transform the text data into TF-IDF vectors
-tfidf_df1 = vectorizer.transform(df1['Master Servicer'])
-tfidf_df2 = vectorizer.transform(df2['bankname'])
-
-# Calculate the cosine similarity
-cosine_similarities = cosine_similarity(tfidf_df1, tfidf_df2)
-
-# Find the best match and similarity score for each 'Master Servicer'
-best_matches = []
-for idx, row in enumerate(cosine_similarities):
-    best_match_idx = row.argmax()
-    best_matches.append((df2['bankname'].iloc[best_match_idx], row[best_match_idx]))
-
-# Add the best match and similarity score to df1
-df1['Best Match'], df1['Similarity Score'] = zip(*best_matches)
-
-print(df1)
+# Displaying the result
+print(pivoted)
