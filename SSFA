@@ -19,7 +19,7 @@ df['Proportion_RW'] = df['RW'] / total_rw
 asset_class_counts = df['Asset Class'].value_counts().reset_index()
 asset_class_counts.columns = ['Asset Class', 'Cusip Count']
 
-# Merge the counts back into the original DataFramed
+# Merge the counts back into the original DataFrame
 df = df.merge(asset_class_counts, on='Asset Class', how='left')
 
 # Filter and sum values for asset classes B and C
@@ -36,5 +36,14 @@ new_asset_class = pd.DataFrame({
 
 # Append the new row to the DataFrame
 df = df.append(new_asset_class, ignore_index=True)
+
+# Define the desired order
+desired_order = ['A', 'C', 'B+C', 'B']
+
+# Convert the 'Asset Class' column to a categorical type with the specified order
+df['Asset Class'] = pd.Categorical(df['Asset Class'], categories=desired_order, ordered=True)
+
+# Sort the DataFrame based on this categorical column
+df = df.sort_values('Asset Class').reset_index(drop=True)
 
 print(df)
