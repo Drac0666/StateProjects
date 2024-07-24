@@ -1,14 +1,17 @@
+import pandas as pd
 from pptx import Presentation
 
-def edit_table_in_pptx(file_path, slide_index, table_index, data):
+def extract_table_from_pptx_to_df(file_path, slide_index, table_index):
     """
-    Edit a table in a PowerPoint file.
+    Extract a table from a PowerPoint file and convert it to a pandas DataFrame.
 
     Parameters:
     file_path (str): The path to the PowerPoint file.
     slide_index (int): The index of the slide containing the table.
     table_index (int): The index of the table in the slide.
-    data (list of list of str): The new data for the table.
+
+    Returns:
+    pd.DataFrame: The extracted table as a DataFrame.
     """
     # Load the PowerPoint file
     prs = Presentation(file_path)
@@ -19,13 +22,16 @@ def edit_table_in_pptx(file_path, slide_index, table_index, data):
     # Locate the table in the slide
     table = slide.shapes[table_index].table
     
-    # Iterate over the data and update the table
-    for row_idx, row in enumerate(data):
-        for col_idx, cell_value in enumerate(row):
-            table.cell(row_idx, col_idx).text = cell_value
-
-    # Save the modified PowerPoint file
-    prs.save('modified_' + file_path)
+    # Extract the table data
+    data = []
+    for row in table.rows:
+        row_data = [cell.text for cell in row.cells]
+        data.append(row_data)
+    
+    # Convert the data to a pandas DataFrame
+    df = pd.DataFrame(data)
+    
+    return df
 
 # Path to the PowerPoint file
 file_path = 'example.pptx'
@@ -36,12 +42,7 @@ slide_index = 0
 # Index of the table in the slide (0-based)
 table_index = 0
 
-# New data for the table
-data = [
-    ['Header 1', 'Header 2', 'Header 3'],
-    ['Row 1 Col 1', 'Row 1 Col 2', 'Row 1 Col 3'],
-    ['Row 2 Col 1', 'Row 2 Col 2', 'Row 2 Col 3']
-]
+# Extract the table and convert it to a DataFrame
+df = extract_table_from_pptx_to_df(file_path, slide_index, table_index)
 
-# Edit the table in the PowerPoint file
-edit_table_in_pptx(file_path, slide_index, table_index, data)
+print(df)
