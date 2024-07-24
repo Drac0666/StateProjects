@@ -1,34 +1,47 @@
-import pandas as pd
+from pptx import Presentation
 
-def dataframes_to_excel(dataframes, excel_file):
+def edit_table_in_pptx(file_path, slide_index, table_index, data):
     """
-    Save a list of DataFrames to an Excel file with each sheet named after the DataFrame variable name.
+    Edit a table in a PowerPoint file.
 
     Parameters:
-    dataframes (list): List of DataFrames to be written to the Excel file.
-    excel_file (str): The path of the Excel file to save the DataFrames.
+    file_path (str): The path to the PowerPoint file.
+    slide_index (int): The index of the slide containing the table.
+    table_index (int): The index of the table in the slide.
+    data (list of list of str): The new data for the table.
     """
-    with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
-        for df in dataframes:
-            # Find the variable name of the DataFrame
-            df_name = [name for name in globals() if globals()[name] is df][0]
-            # Write the DataFrame to the specified sheet
-            df.to_excel(writer, sheet_name=df_name, index=False)
+    # Load the PowerPoint file
+    prs = Presentation(file_path)
+    
+    # Select the slide by index
+    slide = prs.slides[slide_index]
+    
+    # Locate the table in the slide
+    table = slide.shapes[table_index].table
+    
+    # Iterate over the data and update the table
+    for row_idx, row in enumerate(data):
+        for col_idx, cell_value in enumerate(row):
+            table.cell(row_idx, col_idx).text = cell_value
 
-# Sample DataFrames
-df1 = pd.DataFrame({
-    'Asset Class': ['A', 'B', 'C'],
-    'EAD': [100, 200, 300],
-    'RW': [0.5, 0.7, 0.9]
-})
+    # Save the modified PowerPoint file
+    prs.save('modified_' + file_path)
 
-df2 = pd.DataFrame({
-    'Category': ['X', 'Y', 'Z'],
-    'Value': [10, 20, 30]
-})
+# Path to the PowerPoint file
+file_path = 'example.pptx'
 
-# List of DataFrames
-dataframes = [df1, df2]
+# Index of the slide containing the table (0-based)
+slide_index = 0
 
-# Save to Excel file
-dataframes_to_excel(dataframes, 'output.xlsx')
+# Index of the table in the slide (0-based)
+table_index = 0
+
+# New data for the table
+data = [
+    ['Header 1', 'Header 2', 'Header 3'],
+    ['Row 1 Col 1', 'Row 1 Col 2', 'Row 1 Col 3'],
+    ['Row 2 Col 1', 'Row 2 Col 2', 'Row 2 Col 3']
+]
+
+# Edit the table in the PowerPoint file
+edit_table_in_pptx(file_path, slide_index, table_index, data)
