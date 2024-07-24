@@ -1,208 +1,40 @@
-import os
-import shutil
-
-def backup_files(file_list, backup_folder):
-    # Create the backup folder if it doesn't exist
-    if not os.path.exists(backup_folder):
-        os.makedirs(backup_folder)
-
-    # Iterate over each file in the list
-    for file_path in file_list:
-        # Extract the filename from the path
-        file_name = os.path.basename(file_path)
-
-        # Construct the destination path in the backup folder
-        destination_path = os.path.join(backup_folder, file_name)
-
-        # Check if the file already exists in the backup folder
-        if os.path.exists(destination_path):
-            # If the file already exists, add an underscore prefix to the new file's name
-            file_name, file_extension = os.path.splitext(file_name)
-            file_name = "_" + file_name + file_extension
-            destination_path = os.path.join(backup_folder, file_name)
-
-        # Copy the file to the backup folder
-        shutil.copy2(file_path, destination_path)
-
-        print(f"File '{file_name}' backed up to '{destination_path}'")
-
-# Example usage:
-files_to_backup = ["file1.txt", "file2.txt", "file3.txt"]  # List of files to backup
-backup_folder = "BackupFolder"  # Backup folder name
-
-backup_files(files_to_backup, backup_folder)
-
-
-
-
-
 import pandas as pd
 
-# Assuming df is your DataFrame
-# Sample DataFrame for illustration purposes
-data = {'cusip': ['ABC123', 'ABC123', 'DEF456', 'DEF456'],
-        'KG': [10, 15, 5, 8],
-        'AG': [20, 25, 10, 15]}
+# Sample DataFrame
+data = {
+    'Asset Class': ['A', 'B', 'C', 'A', 'B', 'C'],
+    'EAD': [100, 200, 300, 150, 250, 350],
+    'RW': [0.5, 0.7, 0.9, 0.6, 0.8, 0.95]
+}
 
 df = pd.DataFrame(data)
 
-# Group by 'cusip' and check if any standard deviation is different from 0
-grouped_std = df.groupby('cusip').agg({'KG': 'std', 'AG': 'std'})
+# Calculate the sum of all RW values
+total_rw = df['RW'].sum()
 
-# Check if any standard deviation is different from 0 within each group
-any_non_zero_std_within_group = (grouped_std != 0).any(axis=1)
+# Create a new column with the proportion of each RW value
+df['Proportion_RW'] = df['RW'] / total_rw
 
-# Filter the groups where any standard deviation is different from 0
-groups_with_non_zero_std = any_non_zero_std_within_group[any_non_zero_std_within_group].index
+# Calculate the count of each Asset Class
+asset_class_counts = df['Asset Class'].value_counts().reset_index()
+asset_class_counts.columns = ['Asset Class', 'Cusip Count']
 
-# Create a new DataFrame containing only the selected groups in grouped_std
-result_grouped_std = grouped_std[grouped_std.index.isin(groups_with_non_zero_std)].copy()
+# Merge the counts back into the original DataFrame
+df = df.merge(asset_class_counts, on='Asset Class', how='left')
 
-# Exclude groups where all standard deviations are "NaN"
-result_grouped_std = result_grouped_std.dropna(how='all')
+# Filter and sum values for asset classes B and C
+bc_sum = df[df['Asset Class'].isin(['B', 'C'])].groupby('Asset Class').sum()
 
-print(result_grouped_std)
+# Create a new row with the combined values
+new_asset_class = pd.DataFrame({
+    'Asset Class': ['B+C'],
+    'EAD': [bc_sum['EAD'].sum()],
+    'RW': [bc_sum['RW'].sum()],
+    'Proportion_RW': [bc_sum['RW'].sum() / total_rw],
+    'Cusip Count': [bc_sum['Cusip Count'].sum()]
+})
 
+# Append the new row to the DataFrame
+df = df.append(new_asset_class, ignore_index=True)
 
-
-
-
-
-
-import pandas as pd
-
-# Sample data
-data1 = {'ISIN': ['ISIN1', 'ISIN2', 'ISIN3', 'ISIN4', 'ISIN5', 'ISIN6'],
-         'Column1_df1': [1, 2, 3, 4, 5, 6],
-         'Column2_df1': [10, 20, 30, 40, 50, 60]}
-
-data2 = {'ISIN': ['ISIN1', 'ISIN3', 'ISIN5', 'ISIN7', 'ISIN9'],
-         'Column1_df2': [100, 300, 500, 700, 900],
-         'Column2_df2': [1000, 3000, 5000, 7000, 9000]}
-
-df1 = pd.DataFrame(data1)
-df2 = pd.DataFrame(data2)
-
-# Columns to update
-columns_to_update = ['Column1_df1', 'Column2_df1']
-
-# Iterate through rows of df1
-for index, row in df1.iterrows():
-    isin = row['ISIN']
-    
-    # Check if ISIN is present in df2
-    if isin in df2['ISIN'].values:
-        # Update specified columns in df1 with values from df2
-        for column in columns_to_update:
-            df1.at[index, column] = df2.loc[df2['ISIN'] == isin, column + '_df2'].values[0]
-
-# Drop unnecessary columns from df2
-df2 = df2.drop(columns=[col + '_df2' for col in columns_to_update])
-
-# Resulting dataframe with updated values
-print(df1)
-
-
-
-
-
-import pandas as pd
-
-# Sample DataFrames
-df1 = pd.DataFrame({'Instrument_ID': [1, 2, 3, 4],
-                    'Data_1': ['A', 'B', 'C', 'D']})
-
-df2 = pd.DataFrame({'PARENT_CUSIP': ['Cusip1', 'Cusip2', 'Cusip3', 'Cusip4'],
-                    'BIII': [10, 20, 30, 40]})
-
-# Merge DataFrames based on PARENT_CUSIP
-result_df = pd.merge(df1, df2, left_on='Instrument_ID', right_on='PARENT_CUSIP', how='left')
-
-# Drop the redundant column
-result_df.drop('PARENT_CUSIP', axis=1, inplace=True)
-
-print(result_df)
-
-
-import pandas as pd
-
-def extract_nonzero_rows(workbook_path, sheet_name, columns_list):
-    """
-    Extract rows from a specified sheet in a workbook where values in specified columns are different than 0.
-
-    Parameters:
-    - workbook_path (str): Path to the Excel workbook.
-    - sheet_name (str): Name of the sheet in the workbook.
-    - columns_list (list): List of column names to check for non-zero values.
-
-    Returns:
-    - pd.DataFrame: DataFrame containing rows where values in specified columns are non-zero.
-    """
-
-    # Read the specified sheet from the workbook
-    df = pd.read_excel(workbook_path, sheet_name)
-
-    # Filter rows where values in specified columns are different than 0
-    non_zero_rows = df[(df[columns_list] != 0).any(axis=1)]
-
-    return non_zero_rows
-
-# Example usage:
-workbook_path = 'path/to/your/workbook.xlsx'
-sheet_name = 'Sheet1'
-columns_to_check = ['Column1', 'Column2', 'Column3']
-
-result_df = extract_nonzero_rows(workbook_path, sheet_name, columns_to_check)
-print(result_df)
-
-
-import pandas as pd
-
-def check_relationship_and_save_missing(DF1, DF2):
-    """
-    Check if all elements from the "Security" column of DF1 exist in the "Instrument_ID" column of DF2,
-    and vice versa. Save the missing values to an Excel file named "MissingIP.xlsx".
-
-    Parameters:
-    - DF1: First DataFrame
-    - DF2: Second DataFrame
-
-    Returns:
-    - True if all elements from DF1["Security"] are in DF2["Instrument_ID"] and vice versa, False otherwise.
-    """
-
-    # Extract unique values from "Security" column of DF1
-    security_values_df1 = set(DF1["Security"])
-
-    # Extract unique values from "Instrument_ID" column of DF2
-    instrument_id_values_df2 = set(DF2["Instrument_ID"])
-
-    # Check if all elements from DF1["Security"] are in DF2["Instrument_ID"]
-    relationship_df1_to_df2 = security_values_df1.issubset(instrument_id_values_df2)
-
-    # Check if all elements from DF2["Instrument_ID"] are in DF1["Security"]
-    relationship_df2_to_df1 = instrument_id_values_df2.issubset(security_values_df1)
-
-    # Create DataFrames with missing values
-    missing_df1_to_df2 = pd.DataFrame(list(security_values_df1 - instrument_id_values_df2), columns=["Missing_Security_in_DF2"])
-    missing_df2_to_df1 = pd.DataFrame(list(instrument_id_values_df2 - security_values_df1), columns=["Missing_Instrument_ID_in_DF1"])
-
-    # Save missing values to Excel
-     with pd.ExcelWriter(excel_file_path, engine='xlsxwriter') as writer:
-    missing_df1_to_df2.to_excel("MissingIP.xlsx", sheet_name="Missing_Security_in_DF2", index=False)
-    missing_df2_to_df1.to_excel("MissingIP.xlsx", sheet_name="Missing_Instrument_ID_in_DF1", index=False, mode='a')
-
-    # Return the overall relationship result
-    return relationship_df1_to_df2 and relationship_df2_to_df1
-
-# Example usage:
-# Assuming DF1 and DF2 are your DataFrames
-# Replace 'your_dataframe1.csv' and 'your_dataframe2.csv' with the actual file or data sources you have
-DF1 = pd.read_csv('your_dataframe1.csv')
-DF2 = pd.read_csv('your_dataframe2.csv')
-
-# Check the relationship and save missing values
-relationship_result = check_relationship_and_save_missing(DF1, DF2)
-
-# Print the overall relationship result
-print("All elements from DF1[\"Security\"] exist in DF2[\"Instrument_ID\"] and vice versa:", relationship_result)
+print(df)
