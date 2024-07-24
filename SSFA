@@ -19,7 +19,7 @@ df['Proportion_RW'] = df['RW'] / total_rw
 asset_class_counts = df['Asset Class'].value_counts().reset_index()
 asset_class_counts.columns = ['Asset Class', 'Cusip Count']
 
-# Merge the counts back into the original DataFrame
+# Merge the counts back into the original DataFramed
 df = df.merge(asset_class_counts, on='Asset Class', how='left')
 
 # Filter and sum values for asset classes B and C
