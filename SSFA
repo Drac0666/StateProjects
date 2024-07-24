@@ -1,5 +1,6 @@
 import pandas as pd
 from pptx import Presentation
+from pptx.util import Inches
 
 def extract_table_from_pptx_to_df(file_path, slide_index, table_index):
     """
@@ -31,7 +32,28 @@ def extract_table_from_pptx_to_df(file_path, slide_index, table_index):
     # Convert the data to a pandas DataFrame
     df = pd.DataFrame(data)
     
-    return df
+    return df, prs
+
+def update_table_in_pptx(prs, slide_index, table_index, updated_df):
+    """
+    Update a table in a PowerPoint file with a DataFrame.
+
+    Parameters:
+    prs (Presentation): The Presentation object.
+    slide_index (int): The index of the slide containing the table.
+    table_index (int): The index of the table in the slide.
+    updated_df (pd.DataFrame): The DataFrame with updated data.
+    """
+    # Select the slide by index
+    slide = prs.slides[slide_index]
+    
+    # Locate the table in the slide
+    table = slide.shapes[table_index].table
+    
+    # Update the table with the DataFrame data
+    for row_idx, row in enumerate(updated_df.itertuples(index=False, name=None)):
+        for col_idx, value in enumerate(row):
+            table.cell(row_idx, col_idx).text = str(value)
 
 # Path to the PowerPoint file
 file_path = 'example.pptx'
@@ -43,6 +65,24 @@ slide_index = 0
 table_index = 0
 
 # Extract the table and convert it to a DataFrame
-df = extract_table_from_pptx_to_df(file_path, slide_index, table_index)
+df, prs = extract_table_from_pptx_to_df(file_path, slide_index, table_index)
 
+# Print the extracted DataFrame
+print("Original DataFrame:")
 print(df)
+
+# Update the DataFrame (example: adding a new row)
+df.loc[len(df)] = ['New Header 1', 'New Header 2', 'New Header 3']
+
+# Print the updated DataFrame
+print("Updated DataFrame:")
+print(df)
+
+# Update the table in the PowerPoint file with the updated DataFrame
+update_table_in_pptx(prs, slide_index, table_index, df)
+
+# Save the modified PowerPoint file as a new file
+new_file_path = 'modified_example.pptx'
+prs.save(new_file_path)
+
+print(f"Updated PowerPoint saved as {new_file_path}")
