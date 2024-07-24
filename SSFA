@@ -1,49 +1,34 @@
 import pandas as pd
 
-# Sample DataFrame
-data = {
-    'Asset Class': ['A', 'B', 'C', 'A', 'B', 'C'],
-    'EAD': [100, 200, 300, 150, 250, 350],
-    'RW': [0.5, 0.7, 0.9, 0.6, 0.8, 0.95]
-}
+def dataframes_to_excel(dataframes, excel_file):
+    """
+    Save a list of DataFrames to an Excel file with each sheet named after the DataFrame variable name.
 
-df = pd.DataFrame(data)
+    Parameters:
+    dataframes (list): List of DataFrames to be written to the Excel file.
+    excel_file (str): The path of the Excel file to save the DataFrames.
+    """
+    with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+        for df in dataframes:
+            # Find the variable name of the DataFrame
+            df_name = [name for name in globals() if globals()[name] is df][0]
+            # Write the DataFrame to the specified sheet
+            df.to_excel(writer, sheet_name=df_name, index=False)
 
-# Calculate the sum of all RW values
-total_rw = df['RW'].sum()
-
-# Create a new column with the proportion of each RW value
-df['Proportion_RW'] = df['RW'] / total_rw
-
-# Calculate the count of each Asset Class
-asset_class_counts = df['Asset Class'].value_counts().reset_index()
-asset_class_counts.columns = ['Asset Class', 'Cusip Count']
-
-# Merge the counts back into the original DataFrame
-df = df.merge(asset_class_counts, on='Asset Class', how='left')
-
-# Filter and sum values for asset classes B and C
-bc_sum = df[df['Asset Class'].isin(['B', 'C'])].groupby('Asset Class').sum()
-
-# Create a new row with the combined values
-new_asset_class = pd.DataFrame({
-    'Asset Class': ['B+C'],
-    'EAD': [bc_sum['EAD'].sum()],
-    'RW': [bc_sum['RW'].sum()],
-    'Proportion_RW': [bc_sum['RW'].sum() / total_rw],
-    'Cusip Count': [bc_sum['Cusip Count'].sum()]
+# Sample DataFrames
+df1 = pd.DataFrame({
+    'Asset Class': ['A', 'B', 'C'],
+    'EAD': [100, 200, 300],
+    'RW': [0.5, 0.7, 0.9]
 })
 
-# Append the new row to the DataFrame
-df = df.append(new_asset_class, ignore_index=True)
+df2 = pd.DataFrame({
+    'Category': ['X', 'Y', 'Z'],
+    'Value': [10, 20, 30]
+})
 
-# Define the desired order
-desired_order = ['A', 'C', 'B+C', 'B']
+# List of DataFrames
+dataframes = [df1, df2]
 
-# Convert the 'Asset Class' column to a categorical type with the specified order
-df['Asset Class'] = pd.Categorical(df['Asset Class'], categories=desired_order, ordered=True)
-
-# Sort the DataFrame based on this categorical column
-df = df.sort_values('Asset Class').reset_index(drop=True)
-
-print(df)
+# Save to Excel file
+dataframes_to_excel(dataframes, 'output.xlsx')
