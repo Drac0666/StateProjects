@@ -1,31 +1,21 @@
 import pandas as pd
-from scipy.optimize import fsolve
 
-# Sample DataFrame with additional columns including 'W'
-data = {'W': [1, 2, 3, 4, 5], 'A': [10, 20, 30, 40, 50], 'B': [5, 10, 15, 20, 25]}
+# Sample data creation (replace this with your actual data loading step)
+data = {
+    'Final Asset Class': ['Class A', 'Class A', 'Class B', 'Class B', 'Class C'],
+    'New W': [0.1, 0.2, 0.3, 0.4, 0.5],
+    'ead_std': [100, 200, 150, 250, 300]
+}
 df = pd.DataFrame(data)
 
-# Function to calculate multiple columns based on 'W'
-def calculate_final_rw(W, row):
-    # Extract other column values
-    A = row['A']
-    B = row['B']
-    # Example calculation (replace with your actual calculation)
-    Final_RW = W * A + B / 2 - 10  # Modify this calculation as needed
-    return Final_RW
+# Group by Final Asset Class
+grouped = df.groupby('Final Asset Class')
 
-# Function to find the root (new W) that results in Final RW of 20.01 for a given row
-def find_new_w_for_row(row):
-    def equation_to_solve(W):
-        return calculate_final_rw(W, row) - 20.01
-    initial_guess = row['W']  # Start with the current W value from the DataFrame
-    solution = fsolve(equation_to_solve, initial_guess)
-    return solution[0]
+# Calculate the weighted average New W for each asset class
+weighted_avg_new_w = grouped.apply(lambda x: (x['New W'] * x['ead_std']).sum() / x['ead_std'].sum())
 
-# Apply the function to each row in the DataFrame
-df['New W'] = df.apply(find_new_w_for_row, axis=1)
+# Rename the resulting Series for better clarity
+weighted_avg_new_w = weighted_avg_new_w.rename('Weighted Avg New W')
 
-# Recalculate the 'Final RW' using the new W values
-df['Final RW'] = df.apply(lambda row: calculate_final_rw(row['New W'], row), axis=1)
-
-print(df)
+# Display the result
+print(weighted_avg_new_w)
