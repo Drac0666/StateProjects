@@ -1,24 +1,48 @@
+import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 # Sample DataFrame
 data = {
     'A': [1, 2, 3, 4, 5],
-    'B': [10, 20, 30, 40, 50]
+    'B': [10, 20, 30, 40, 50],
+    # Add other parameters as needed
 }
 df = pd.DataFrame(data)
 
-# Define the function to create 5 new columns
-def calculate_new_columns(row):
-    # Example calculations (replace these with your actual calculations)
-    C = row['A'] + row['B']
-    D = row['A'] * row['B']
-    E = row['A'] - row['B']
-    F = row['A'] / row['B'] if row['B'] != 0 else 0  # Avoid division by zero
-    G = row['A'] ** 2 + row['B'] ** 2
+# Define your complex function that calculates the "Final RW number" based on multiple parameters including W
+def final_rw_number(W, A, B, other_params):
+    # Example calculation (replace with your actual complex calculation)
+    # This is a placeholder function
+    return A + B + W + sum(other_params)
 
-    return pd.Series([C, D, E, F, G])
+# Define the objective function for optimization
+def objective_function(W, A, B, other_params):
+    # Calculate the Final RW number
+    rw_number = final_rw_number(W, A, B, other_params)
+    # We want the rw_number to be as close to or greater than 20 as possible
+    # Minimize the negative difference to prioritize greater values over lower
+    return max(0, 20 - rw_number)
+
+# Define a function to find W that results in a Final RW number of at least 20
+def find_W(row):
+    A = row['A']
+    B = row['B']
+    # Add other parameters from row as needed
+    other_params = []  # Add other parameters if needed
+
+    # Initial guess for W
+    W_initial_guess = 1
+
+    # Use minimize to find the optimal W
+    result = minimize(objective_function, W_initial_guess, args=(A, B, other_params))
+    
+    # Extract the solution for W
+    W_solution = result.x[0]
+    
+    return W_solution
 
 # Apply the function to the DataFrame
-df[['C', 'D', 'E', 'F', 'G']] = df.apply(calculate_new_columns, axis=1)
+df['W'] = df.apply(find_W, axis=1)
 
 print(df)
