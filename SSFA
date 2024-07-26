@@ -1,21 +1,20 @@
 import pandas as pd
 
-# Sample data creation (replace this with your actual data loading step)
+# Sample data for illustration
 data = {
-    'Final Asset Class': ['Class A', 'Class A', 'Class B', 'Class B', 'Class C'],
-    'New W': [0.1, 0.2, 0.3, 0.4, 0.5],
-    'ead_std': [100, 200, 150, 250, 300]
+    'Asset Class': ['A', 'A', 'B', 'B', 'B', 'C'],
+    'ead_std': [100, 200, 300, 400, 500, 600],
+    'k_g_final': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 }
 df = pd.DataFrame(data)
 
-# Group by Final Asset Class
-grouped = df.groupby('Final Asset Class')
+# Function to calculate the weighted average
+def weighted_avg(group):
+    ead_std_sum = group['ead_std'].sum()
+    k_g_final_weighted_avg = (group['k_g_final'] * group['ead_std']).sum() / ead_std_sum
+    return pd.Series({'ead_std': ead_std_sum, 'k_g_final': k_g_final_weighted_avg})
 
-# Calculate the weighted average New W for each asset class
-weighted_avg_new_w = grouped.apply(lambda x: (x['New W'] * x['ead_std']).sum() / x['ead_std'].sum())
+# Group by Asset Class and apply the function
+result = df.groupby('Asset Class').apply(weighted_avg).reset_index()
 
-# Rename the resulting Series for better clarity
-weighted_avg_new_w = weighted_avg_new_w.rename('Weighted Avg New W')
-
-# Display the result
-print(weighted_avg_new_w)
+print(result)
