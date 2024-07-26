@@ -1,48 +1,27 @@
-import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import fsolve
 
-# Sample DataFrame
-data = {
-    'A': [1, 2, 3, 4, 5],
-    'B': [10, 20, 30, 40, 50],
-    # Add other parameters as needed
-}
+# Sample DataFrame with additional columns
+data = {'A': [10, 20, 30, 40, 50], 'B': [5, 10, 15, 20, 25]}
 df = pd.DataFrame(data)
 
-# Define your complex function that calculates the "Final RW number" based on multiple parameters including W
-def final_rw_number(W, A, B, other_params):
-    # Example calculation (replace with your actual complex calculation)
-    # This is a placeholder function
-    return A + B + W + sum(other_params)
-
-# Define the objective function for optimization
-def objective_function(W, A, B, other_params):
-    # Calculate the Final RW number
-    rw_number = final_rw_number(W, A, B, other_params)
-    # We want the rw_number to be as close to or greater than 20 as possible
-    # Minimize the negative difference to prioritize greater values over lower
-    return max(0, 20 - rw_number)
-
-# Define a function to find W that results in a Final RW number of at least 20
-def find_W(row):
+# Function to calculate multiple columns based on 'W'
+def calculate_final_rw(W, row):
+    # Example calculation (replace with your actual calculation)
     A = row['A']
     B = row['B']
-    # Add other parameters from row as needed
-    other_params = []  # Add other parameters if needed
+    Final_RW = W * A + B / 2 - 10  # Modify this calculation as needed
+    return Final_RW
 
-    # Initial guess for W
-    W_initial_guess = 1
+# Function to find the root (W) that results in Final RW of 20.01 for a given row
+def find_w_for_row(row):
+    def equation_to_solve(W):
+        return calculate_final_rw(W, row) - 20.01
+    initial_guess = 1  # Adjust initial guess if needed
+    solution = fsolve(equation_to_solve, initial_guess)
+    return solution[0]
 
-    # Use minimize to find the optimal W
-    result = minimize(objective_function, W_initial_guess, args=(A, B, other_params))
-    
-    # Extract the solution for W
-    W_solution = result.x[0]
-    
-    return W_solution
-
-# Apply the function to the DataFrame
-df['W'] = df.apply(find_W, axis=1)
+# Apply the function to each row in the DataFrame
+df['W'] = df.apply(find_w_for_row, axis=1)
 
 print(df)
