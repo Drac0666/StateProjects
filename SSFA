@@ -1,88 +1,24 @@
 import pandas as pd
-from pptx import Presentation
-from pptx.util import Inches
 
-def extract_table_from_pptx_to_df(file_path, slide_index, table_index):
-    """
-    Extract a table from a PowerPoint file and convert it to a pandas DataFrame.
+# Sample DataFrame
+data = {
+    'A': [1, 2, 3, 4, 5],
+    'B': [10, 20, 30, 40, 50]
+}
+df = pd.DataFrame(data)
 
-    Parameters:
-    file_path (str): The path to the PowerPoint file.
-    slide_index (int): The index of the slide containing the table.
-    table_index (int): The index of the table in the slide.
+# Define the function to create 5 new columns
+def calculate_new_columns(row):
+    # Example calculations (replace these with your actual calculations)
+    C = row['A'] + row['B']
+    D = row['A'] * row['B']
+    E = row['A'] - row['B']
+    F = row['A'] / row['B'] if row['B'] != 0 else 0  # Avoid division by zero
+    G = row['A'] ** 2 + row['B'] ** 2
 
-    Returns:
-    pd.DataFrame: The extracted table as a DataFrame.
-    """
-    # Load the PowerPoint file
-    prs = Presentation(file_path)
-    
-    # Select the slide by index
-    slide = prs.slides[slide_index]
-    
-    # Locate the table in the slide
-    table = slide.shapes[table_index].table
-    
-    # Extract the table data
-    data = []
-    for row in table.rows:
-        row_data = [cell.text for cell in row.cells]
-        data.append(row_data)
-    
-    # Convert the data to a pandas DataFrame
-    df = pd.DataFrame(data)
-    
-    return df, prs
+    return pd.Series([C, D, E, F, G])
 
-def update_table_in_pptx(prs, slide_index, table_index, updated_df):
-    """
-    Update a table in a PowerPoint file with a DataFrame.
+# Apply the function to the DataFrame
+df[['C', 'D', 'E', 'F', 'G']] = df.apply(calculate_new_columns, axis=1)
 
-    Parameters:
-    prs (Presentation): The Presentation object.
-    slide_index (int): The index of the slide containing the table.
-    table_index (int): The index of the table in the slide.
-    updated_df (pd.DataFrame): The DataFrame with updated data.
-    """
-    # Select the slide by index
-    slide = prs.slides[slide_index]
-    
-    # Locate the table in the slide
-    table = slide.shapes[table_index].table
-    
-    # Update the table with the DataFrame data
-    for row_idx, row in enumerate(updated_df.itertuples(index=False, name=None)):
-        for col_idx, value in enumerate(row):
-            table.cell(row_idx, col_idx).text = str(value)
-
-# Path to the PowerPoint file
-file_path = 'example.pptx'
-
-# Index of the slide containing the table (0-based)
-slide_index = 0
-
-# Index of the table in the slide (0-based)
-table_index = 0
-
-# Extract the table and convert it to a DataFrame
-df, prs = extract_table_from_pptx_to_df(file_path, slide_index, table_index)
-
-# Print the extracted DataFrame
-print("Original DataFrame:")
 print(df)
-
-# Update the DataFrame (example: adding a new row)
-df.loc[len(df)] = ['New Header 1', 'New Header 2', 'New Header 3']
-
-# Print the updated DataFrame
-print("Updated DataFrame:")
-print(df)
-
-# Update the table in the PowerPoint file with the updated DataFrame
-update_table_in_pptx(prs, slide_index, table_index, df)
-
-# Save the modified PowerPoint file as a new file
-new_file_path = 'modified_example.pptx'
-prs.save(new_file_path)
-
-print(f"Updated PowerPoint saved as {new_file_path}")
