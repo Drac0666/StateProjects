@@ -1,23 +1,79 @@
 import pandas as pd
-from datetime import datetime
 
-def get_previous_business_day():
+def save_dfs_to_formats(dfs_dict, hdf_filename, pickle_filename):
     """
-    Get the current date minus one business day in the format YYYY-MM-DD.
+    Save a dictionary of DataFrames to HDF and Pickle files.
 
-    Returns:
-    str: The date of the previous business day in the format YYYY-MM-DD.
+    Parameters:
+    - dfs_dict (dict): A dictionary where keys are the names of the DataFrames and values are the DataFrame objects.
+    - hdf_filename (str): The filename for the HDF5 file.
+    - pickle_filename (str): The filename for the Pickle file.
     """
-    # Get the current date
-    current_date = datetime.today()
-    
-    # Calculate the previous business day using pandas
-    previous_business_day = pd.bdate_range(end=current_date, periods=2)[0]
-    
-    # Format the date as YYYY-MM-DD
-    previous_business_day_str = previous_business_day.strftime('%Y-%m-%d')
-    
-    return previous_business_day_str
+    # Save to HDF5
+    with pd.HDFStore(hdf_filename, mode='w') as store:
+        for key, df in dfs_dict.items():
+            store.put(key, df, format='table')  # 'table' format allows for querying
+
+    # Save to Pickle
+    with open(pickle_filename, 'wb') as pickle_file:
+        pd.to_pickle(dfs_dict, pickle_file)
+
+    print(f"DataFrames have been saved to '{hdf_filename}' and '{pickle_filename}'.")
 
 # Example usage
-print(get_previous_business_day())
+if __name__ == "__main__":
+    # Create example DataFrames
+    df1 = pd.DataFrame({'A': [1, 2, 3], 'B': ['a', 'b', 'c']})
+    df2 = pd.DataFrame({'X': [10, 20, 30], 'Y': [100, 200, 300]})
+
+    # Create a dictionary of DataFrames
+    dfs = {'df1': df1, 'df2': df2}
+
+    # Save to HDF and Pickle formats
+    save_dfs_to_formats(dfs, 'dataframes.h5', 'dataframes.pkl')
+
+import pandas as pd
+
+def read_dfs_from_format(format_type, filename):
+    """
+    Read a dictionary of DataFrames from a specified format.
+
+    Parameters:
+    - format_type (str): The format to read from ('hdf' or 'pickle').
+    - filename (str): The filename for the input file.
+
+    Returns:
+    - dict: A dictionary where keys are the names of the DataFrames and values are the DataFrame objects.
+    """
+    if format_type == 'hdf':
+        # Read from HDF5
+        dfs_dict = {}
+        with pd.HDFStore(filename, mode='r') as store:
+            for key in store.keys():
+                dfs_dict[key.strip('/')] = store.get(key)
+        return dfs_dict
+    
+    elif format_type == 'pickle':
+        # Read from Pickle
+        with open(filename, 'rb') as pickle_file:
+            dfs_dict = pd.read_pickle(pickle_file)
+        return dfs_dict
+    
+    else:
+        raise ValueError("Invalid format_type. Choose 'hdf' or 'pickle'.")
+
+# Example usage
+if __name__ == "__main__":
+    # Example for HDF5 format
+    dfs_hdf = read_dfs_from_format('hdf', 'dataframes.h5')
+    print("DataFrames read from HDF5 format:")
+    for key, df in dfs_hdf.items():
+        print(f"DataFrame '{key}':")
+        print(df)
+
+    # Example for Pickle format
+    dfs_pickle = read_dfs_from_format('pickle', 'dataframes.pkl')
+    print("\nDataFrames read from Pickle format:")
+    for key, df in dfs_pickle.items():
+        print(f"DataFrame '{key}':")
+        print(df)
