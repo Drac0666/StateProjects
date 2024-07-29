@@ -1,50 +1,62 @@
-import customtkinter as ctk
+import pandas as pd
 
-# Create the main window
-root = ctk.CTk()
-root.geometry("1024x768")
-root.resizable(False, False)
-root.title("CustomTkinter GUI")
+def save_dataframe_to_pickle(df, file_path):
+    """
+    Save a DataFrame to a pickle file.
 
-# Set the window size and make it unsizable
-root.geometry("1024x768")
-root.resizable(False, False)
+    Parameters:
+    df (pandas.DataFrame): The DataFrame to save.
+    file_path (str): The path to the pickle file where the DataFrame will be saved.
+    """
+    df.to_pickle(file_path)
+    print(f"DataFrame saved to {file_path}")
 
-# Configure grid layout
-root.grid_columnconfigure(0, weight=1)
-root.grid_columnconfigure(1, weight=4)
-root.grid_rowconfigure(0, weight=1)
+def read_dataframe_from_pickle(file_path):
+    """
+    Read a DataFrame from a pickle file.
 
-# Create the left frame for checkboxes (20% width)
-left_frame = ctk.CTkFrame(root, width=204)
-left_frame.grid(row=0, column=0, sticky="nswe")
-left_frame.grid_propagate(False)
-left_frame.grid_rowconfigure((0, 1, 2, 3, 4), weight=1)
+    Parameters:
+    file_path (str): The path to the pickle file from which the DataFrame will be read.
 
-# Create checkboxes in the left frame
-checkboxes = []
-for i in range(5):
-    checkbox = ctk.CTkCheckBox(left_frame, text=f"Checkbox {i + 1}")
-    checkbox.grid(row=i, column=0, padx=20, pady=20, sticky="w")
-    checkboxes.append(checkbox)
+    Returns:
+    pandas.DataFrame: The DataFrame read from the pickle file.
+    """
+    df = pd.read_pickle(file_path)
+    print(f"DataFrame read from {file_path}")
+    return df
 
-# Create the right frame for buttons and progress bar (80% width)
-right_frame = ctk.CTkFrame(root, width=819)
-right_frame.grid(row=0, column=1, sticky="nswe")
-right_frame.grid_propagate(False)
-right_frame.grid_rowconfigure((0, 1, 2, 3, 4, 5), weight=1)
+def extract_last_index(df):
+    """
+    Extract the last index from a DataFrame.
 
-# Create buttons in the right frame
-buttons = []
-for i in range(5):
-    button = ctk.CTkButton(right_frame, text=f"Button {i + 1}")
-    button.grid(row=i, column=0, padx=20, pady=20, sticky="we")
-    buttons.append(button)
+    Parameters:
+    df (pandas.DataFrame): The DataFrame from which to extract the last index.
 
-# Create a progress bar in the right frame
-progress_bar = ctk.CTkProgressBar(right_frame)
-progress_bar.grid(row=5, column=0, padx=20, pady=20, sticky="we")
-progress_bar.set(0.5)  # Example to set progress to 50%
+    Returns:
+    The last index of the DataFrame.
+    """
+    last_index = df.index[-1]
+    print(f"The last index of the DataFrame is: {last_index}")
+    return last_index
 
-# Run the main loop
-root.mainloop()
+# Example usage
+if __name__ == "__main__":
+    # Creating a sample DataFrame
+    data = {
+        'Date': ['2024-01-01', '2024-01-02', '2024-01-03'],
+        'FX': [1.1, 1.2, 1.3]
+    }
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Saving the DataFrame to a pickle file
+    save_dataframe_to_pickle(df, 'sample_dataframe.pkl')
+    
+    # Reading the DataFrame from the pickle file
+    df_loaded = read_dataframe_from_pickle('sample_dataframe.pkl')
+    print("Loaded DataFrame:")
+    print(df_loaded)
+    
+    # Extracting the last index from the DataFrame
+    last_index = extract_last_index(df_loaded)
