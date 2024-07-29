@@ -1,0 +1,50 @@
+import customtkinter as ctk
+
+# Create the main window
+root = ctk.CTk()
+root.geometry("1024x768")
+root.resizable(False, False)
+root.title("CustomTkinter GUI")
+
+# Set the window size and make it unsizable
+root.geometry("1024x768")
+root.resizable(False, False)
+
+# Configure grid layout
+root.grid_columnconfigure(0, weight=1)
+root.grid_columnconfigure(1, weight=4)
+root.grid_rowconfigure(0, weight=1)
+
+# Create the left frame for checkboxes (20% width)
+left_frame = ctk.CTkFrame(root, width=204)
+left_frame.grid(row=0, column=0, sticky="nswe")
+left_frame.grid_propagate(False)
+left_frame.grid_rowconfigure((0, 1, 2, 3, 4), weight=1)
+
+# Create checkboxes in the left frame
+checkboxes = []
+for i in range(5):
+    checkbox = ctk.CTkCheckBox(left_frame, text=f"Checkbox {i + 1}")
+    checkbox.grid(row=i, column=0, padx=20, pady=20, sticky="w")
+    checkboxes.append(checkbox)
+
+# Create the right frame for buttons and progress bar (80% width)
+right_frame = ctk.CTkFrame(root, width=819)
+right_frame.grid(row=0, column=1, sticky="nswe")
+right_frame.grid_propagate(False)
+right_frame.grid_rowconfigure((0, 1, 2, 3, 4, 5), weight=1)
+
+# Create buttons in the right frame
+buttons = []
+for i in range(5):
+    button = ctk.CTkButton(right_frame, text=f"Button {i + 1}")
+    button.grid(row=i, column=0, padx=20, pady=20, sticky="we")
+    buttons.append(button)
+
+# Create a progress bar in the right frame
+progress_bar = ctk.CTkProgressBar(right_frame)
+progress_bar.grid(row=5, column=0, padx=20, pady=20, sticky="we")
+progress_bar.set(0.5)  # Example to set progress to 50%
+
+# Run the main loop
+root.mainloop()
