@@ -1,62 +1,31 @@
 import pandas as pd
 
-def save_dataframe_to_pickle(df, file_path):
+def drop_duplicated_indexes(df):
     """
-    Save a DataFrame to a pickle file.
+    Drop duplicated indexes from a DataFrame.
 
     Parameters:
-    df (pandas.DataFrame): The DataFrame to save.
-    file_path (str): The path to the pickle file where the DataFrame will be saved.
-    """
-    df.to_pickle(file_path)
-    print(f"DataFrame saved to {file_path}")
-
-def read_dataframe_from_pickle(file_path):
-    """
-    Read a DataFrame from a pickle file.
-
-    Parameters:
-    file_path (str): The path to the pickle file from which the DataFrame will be read.
+    df (pandas.DataFrame): The DataFrame from which to drop duplicated indexes.
 
     Returns:
-    pandas.DataFrame: The DataFrame read from the pickle file.
+    pandas.DataFrame: The DataFrame with duplicated indexes dropped.
     """
-    df = pd.read_pickle(file_path)
-    print(f"DataFrame read from {file_path}")
-    return df
-
-def extract_last_index(df):
-    """
-    Extract the last index from a DataFrame.
-
-    Parameters:
-    df (pandas.DataFrame): The DataFrame from which to extract the last index.
-
-    Returns:
-    The last index of the DataFrame.
-    """
-    last_index = df.index[-1]
-    print(f"The last index of the DataFrame is: {last_index}")
-    return last_index
+    df_no_duplicates = df[~df.index.duplicated(keep='first')]
+    print("Duplicated indexes dropped from the DataFrame.")
+    return df_no_duplicates
 
 # Example usage
 if __name__ == "__main__":
-    # Creating a sample DataFrame
+    # Creating a sample DataFrame with duplicated indexes
     data = {
-        'Date': ['2024-01-01', '2024-01-02', '2024-01-03'],
-        'FX': [1.1, 1.2, 1.3]
+        'Date': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04'],
+        'FX': [1.1, 1.2, 1.3, 1.4]
     }
-    df = pd.DataFrame(data)
-    print("Original DataFrame:")
+    df = pd.DataFrame(data, index=[0, 1, 1, 2])
+    print("Original DataFrame with duplicated indexes:")
     print(df)
     
-    # Saving the DataFrame to a pickle file
-    save_dataframe_to_pickle(df, 'sample_dataframe.pkl')
-    
-    # Reading the DataFrame from the pickle file
-    df_loaded = read_dataframe_from_pickle('sample_dataframe.pkl')
-    print("Loaded DataFrame:")
-    print(df_loaded)
-    
-    # Extracting the last index from the DataFrame
-    last_index = extract_last_index(df_loaded)
+    # Dropping duplicated indexes
+    df_no_duplicates = drop_duplicated_indexes(df)
+    print("DataFrame after dropping duplicated indexes:")
+    print(df_no_duplicates)
