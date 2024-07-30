@@ -1,24 +1,28 @@
-from datetime import datetime
+import pandas as pd
 
-def convert_date(date_str):
-    """
-    Convert a date from 'YYYY-MM-DD' format to 'YYYYMMDD' format.
+def merge_dataframes(dict_of_dfs):
+    # Initialize an empty DataFrame to hold the results
+    result_df = pd.DataFrame()
 
-    Parameters:
-    date_str (str): Date string in 'YYYY-MM-DD' format.
+    # Loop through the dictionary
+    for date, df in dict_of_dfs.items():
+        # Add the date as a new column in the DataFrame
+        df['Date'] = date
+        # Append to the result DataFrame
+        result_df = pd.concat([result_df, df])
 
-    Returns:
-    str: Date string in 'YYYYMMDD' format.
-    """
-    # Parse the date string
-    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+    # Set the 'Date' column as the index
+    result_df.set_index('Date', inplace=True)
     
-    # Format the date as 'YYYYMMDD'
-    formatted_date = date_obj.strftime('%Y%m%d')
+    # Sort the DataFrame by the index (dates)
+    result_df.sort_index(inplace=True)
+
+    # Select and order the columns as required
+    result_df = result_df[['Ticket', 'Fair Price', 'par Value']]
     
-    return formatted_date
+    return result_df
 
 # Example usage
-date_str = '2024-04-04'
-converted_date = convert_date(date_str)
-print(converted_date)  # Output: 20240404
+# Assuming 'dataframes_dict' is your dictionary of DataFrames
+# merged_df = merge_dataframes(dataframes_dict)
+# print(merged_df)
