@@ -1,15 +1,19 @@
 import pandas as pd
 
-def merge_dataframes(dict_of_dfs):
+def merge_dataframes_for_ticket(dict_of_dfs, ticket):
     # Initialize an empty DataFrame to hold the results
     result_df = pd.DataFrame()
 
     # Loop through the dictionary
     for date, df in dict_of_dfs.items():
+        # Filter the DataFrame for the specific ticket
+        filtered_df = df[df['Ticket'] == ticket]
+        
         # Add the date as a new column in the DataFrame
-        df['Date'] = date
+        filtered_df['Date'] = date
+        
         # Append to the result DataFrame
-        result_df = pd.concat([result_df, df])
+        result_df = pd.concat([result_df, filtered_df])
 
     # Set the 'Date' column as the index
     result_df.set_index('Date', inplace=True)
@@ -23,6 +27,6 @@ def merge_dataframes(dict_of_dfs):
     return result_df
 
 # Example usage
-# Assuming 'dataframes_dict' is your dictionary of DataFrames
-# merged_df = merge_dataframes(dataframes_dict)
+# Assuming 'dataframes_dict' is your dictionary of DataFrames and 'TICKET123' is the specific ticket you are looking for
+# merged_df = merge_dataframes_for_ticket(dataframes_dict, 'TICKET123')
 # print(merged_df)
