@@ -1,32 +1,42 @@
-import pandas as pd
+import customtkinter as ctk
+import tkinter as tk
 
-def merge_dataframes_for_ticket(dict_of_dfs, ticket):
-    # Initialize an empty DataFrame to hold the results
-    result_df = pd.DataFrame()
+class ScrollableApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-    # Loop through the dictionary
-    for date, df in dict_of_dfs.items():
-        # Filter the DataFrame for the specific ticket
-        filtered_df = df[df['Ticket'] == ticket]
-        
-        # Add the date as a new column in the DataFrame
-        filtered_df['Date'] = date
-        
-        # Append to the result DataFrame
-        result_df = pd.concat([result_df, filtered_df])
+        self.title("Scrollable CustomTkinter Application")
+        self.geometry("600x400")
 
-    # Set the 'Date' column as the index
-    result_df.set_index('Date', inplace=True)
-    
-    # Sort the DataFrame by the index (dates)
-    result_df.sort_index(inplace=True)
+        # Create a canvas widget
+        self.canvas = tk.Canvas(self)
+        self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-    # Select and order the columns as required
-    result_df = result_df[['Ticket', 'Fair Price', 'par Value']]
-    
-    return result_df
+        # Add a horizontal scrollbar to the canvas
+        self.h_scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.canvas.configure(xscrollcommand=self.h_scrollbar.set)
 
-# Example usage
-# Assuming 'dataframes_dict' is your dictionary of DataFrames and 'TICKET123' is the specific ticket you are looking for
-# merged_df = merge_dataframes_for_ticket(dataframes_dict, 'TICKET123')
-# print(merged_df)
+        # Create a frame inside the canvas
+        self.scrollable_frame = tk.Frame(self.canvas)
+
+        # Create a window in the canvas to hold the frame
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        # Bind the canvas and frame to configure the scroll region
+        self.scrollable_frame.bind("<Configure>", self.on_frame_configure)
+
+        # Add content to the frame
+        self.populate_frame()
+
+    def on_frame_configure(self, event):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def populate_frame(self):
+        # Add widgets to the scrollable frame
+        for i in range(20):
+            ctk.CTkButton(self.scrollable_frame, text=f"Button {i + 1}").grid(row=0, column=i, padx=5, pady=5)
+
+if __name__ == "__main__":
+    app = ScrollableApp()
+    app.mainloop()
