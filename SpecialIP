@@ -10,11 +10,11 @@ class ScrollableApp(ctk.CTk):
 
         # Create a canvas widget
         self.canvas = tk.Canvas(self)
-        self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
 
         # Add a horizontal scrollbar to the canvas
         self.h_scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.canvas.xview)
-        self.h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.h_scrollbar.grid(row=1, column=0, sticky="ew")
         self.canvas.configure(xscrollcommand=self.h_scrollbar.set)
 
         # Create a frame inside the canvas
@@ -22,6 +22,10 @@ class ScrollableApp(ctk.CTk):
 
         # Create a window in the canvas to hold the frame
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        # Configure grid weights for proper resizing
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
         # Bind the canvas and frame to configure the scroll region
         self.scrollable_frame.bind("<Configure>", self.on_frame_configure)
