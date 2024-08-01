@@ -1,46 +1,70 @@
-import customtkinter as ctk
-import tkinter as tk
+import configparser
 
-class ScrollableApp(ctk.CTk):
-    def __init__(self):
-        super().__init__()
+class ConfigLoader:
+    def __init__(self, config_file):
+        """
+        Initialize the ConfigLoader instance with attributes from all sections of the config file.
 
-        self.title("Scrollable CustomTkinter Application")
-        self.geometry("600x400")
+        Parameters:
+        - config_file (str): Path to the configuration file (e.g., 'config.ini').
+        """
+        # Create a ConfigParser object
+        config = configparser.ConfigParser()
 
-        # Create a canvas widget
-        self.canvas = tk.Canvas(self)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
+        # Read the config file
+        config.read(config_file)
 
-        # Add a horizontal scrollbar to the canvas
-        self.h_scrollbar = tk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.canvas.xview)
-        self.h_scrollbar.grid(row=1, column=0, sticky="ew")
-        self.canvas.configure(xscrollcommand=self.h_scrollbar.set)
+        # Iterate over each section in the config file
+        for section in config.sections():
+            # Iterate over key-value pairs in each section
+            for key, value in config[section].items():
+                # Create attribute name as SECTION_NAME_key
+                attr_name = f"{section}_{key}"
+                # Set the attribute on the instance
+                setattr(self, attr_name, value)
 
-        # Create a frame inside the canvas
-        self.scrollable_frame = tk.Frame(self.canvas)
+    def get_attribute(self, attr_name):
+        """
+        Get the value of a specified attribute.
 
-        # Create a window in the canvas to hold the frame
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        Parameters:
+        - attr_name (str): The name of the attribute to retrieve.
 
-        # Configure grid weights for proper resizing
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        Returns:
+        - The value of the specified attribute, or None if it does not exist.
+        """
+        return getattr(self, attr_name, None)
 
-        # Bind the canvas and frame to configure the scroll region
-        self.scrollable_frame.bind("<Configure>", self.on_frame_configure)
+    def display_attributes(self):
+        """
+        Display all the attributes of the instance along with their values.
+        """
+        attributes = vars(self)
+        for key, value in attributes.items():
+            print(f"{key}: {value}")
 
-        # Add content to the frame
-        self.populate_frame()
+# Example usage:
+# Assuming config.ini contains multiple sections with key-value pairs
 
-    def on_frame_configure(self, event):
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+# config.ini example:
+# [default]
+# username = admin
+# password = secret
+# host = localhost
+# port = 8080
 
-    def populate_frame(self):
-        # Add widgets to the scrollable frame
-        for i in range(20):
-            ctk.CTkButton(self.scrollable_frame, text=f"Button {i + 1}").grid(row=0, column=i, padx=5, pady=5)
+# [database]
+# db_name = mydatabase
+# db_user = dbadmin
+# db_password = dbsecret
 
-if __name__ == "__main__":
-    app = ScrollableApp()
-    app.mainloop()
+# Create an instance of ConfigLoader
+config_loader = ConfigLoader('config.ini')
+
+# Accessing attributes
+print("Default Username:", config_loader.default_username)
+print("Default Password:", config_loader.default_password)
+print("Database Name:", config_loader.database_db_name)
+
+# Display all attributes
+config_loader.display_attributes()
