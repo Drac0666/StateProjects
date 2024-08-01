@@ -1,12 +1,13 @@
 import configparser
 
 class ConfigLoader:
-    def __init__(self, config_file):
+    def __init__(self, config_file, section='default'):
         """
-        Initialize the ConfigLoader instance with attributes from all sections of the config file.
+        Initialize the ConfigLoader instance with attributes from the specified section of the config file.
 
         Parameters:
         - config_file (str): Path to the configuration file (e.g., 'config.ini').
+        - section (str): The section of the config file to load. Defaults to 'default'.
         """
         # Create a ConfigParser object
         config = configparser.ConfigParser()
@@ -14,14 +15,13 @@ class ConfigLoader:
         # Read the config file
         config.read(config_file)
 
-        # Iterate over each section in the config file
-        for section in config.sections():
-            # Iterate over key-value pairs in each section
+        # Check if the specified section exists
+        if section in config:
+            # Iterate over key-value pairs in the section and set them as instance attributes
             for key, value in config[section].items():
-                # Create attribute name as SECTION_NAME_key
-                attr_name = f"{section}_{key}"
-                # Set the attribute on the instance
-                setattr(self, attr_name, value)
+                setattr(self, key, value)
+        else:
+            raise ValueError(f"Section '{section}' not found in the config file.")
 
     def get_attribute(self, attr_name):
         """
@@ -44,7 +44,7 @@ class ConfigLoader:
             print(f"{key}: {value}")
 
 # Example usage:
-# Assuming config.ini contains multiple sections with key-value pairs
+# Assuming config.ini contains a default section with some key-value pairs
 
 # config.ini example:
 # [default]
@@ -53,18 +53,14 @@ class ConfigLoader:
 # host = localhost
 # port = 8080
 
-# [database]
-# db_name = mydatabase
-# db_user = dbadmin
-# db_password = dbsecret
-
 # Create an instance of ConfigLoader
 config_loader = ConfigLoader('config.ini')
 
 # Accessing attributes
-print("Default Username:", config_loader.default_username)
-print("Default Password:", config_loader.default_password)
-print("Database Name:", config_loader.database_db_name)
+print("Username:", config_loader.username)
+print("Password:", config_loader.password)
+print("Host:", config_loader.host)
+print("Port:", config_loader.port)
 
 # Display all attributes
 config_loader.display_attributes()
