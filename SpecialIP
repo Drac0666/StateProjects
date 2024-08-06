@@ -1,66 +1,13 @@
-import configparser
+import pandas as pd
 
-class ConfigLoader:
-    def __init__(self, config_file, section='default'):
-        """
-        Initialize the ConfigLoader instance with attributes from the specified section of the config file.
+# Sample DataFrame
+data = {'date_column': ['29-Jul-24', '30-Aug-24', '01-Sep-24']}
+df = pd.DataFrame(data)
 
-        Parameters:
-        - config_file (str): Path to the configuration file (e.g., 'config.ini').
-        - section (str): The section of the config file to load. Defaults to 'default'.
-        """
-        # Create a ConfigParser object
-        config = configparser.ConfigParser()
+# Convert date column to datetime format
+df['date_column'] = pd.to_datetime(df['date_column'], format='%d-%b-%y')
 
-        # Read the config file
-        config.read(config_file)
+# Convert to desired format
+df['date_column'] = df['date_column'].dt.strftime('%Y-%m-%d')
 
-        # Check if the specified section exists
-        if section in config:
-            # Iterate over key-value pairs in the section and set them as instance attributes
-            for key, value in config[section].items():
-                setattr(self, key, value)
-        else:
-            raise ValueError(f"Section '{section}' not found in the config file.")
-
-    def get_attribute(self, attr_name):
-        """
-        Get the value of a specified attribute.
-
-        Parameters:
-        - attr_name (str): The name of the attribute to retrieve.
-
-        Returns:
-        - The value of the specified attribute, or None if it does not exist.
-        """
-        return getattr(self, attr_name, None)
-
-    def display_attributes(self):
-        """
-        Display all the attributes of the instance along with their values.
-        """
-        attributes = vars(self)
-        for key, value in attributes.items():
-            print(f"{key}: {value}")
-
-# Example usage:
-# Assuming config.ini contains a default section with some key-value pairs
-
-# config.ini example:
-# [default]
-# username = admin
-# password = secret
-# host = localhost
-# port = 8080
-
-# Create an instance of ConfigLoader
-config_loader = ConfigLoader('config.ini')
-
-# Accessing attributes
-print("Username:", config_loader.username)
-print("Password:", config_loader.password)
-print("Host:", config_loader.host)
-print("Port:", config_loader.port)
-
-# Display all attributes
-config_loader.display_attributes()
+print(df)
