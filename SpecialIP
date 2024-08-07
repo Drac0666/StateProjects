@@ -16,3 +16,7 @@ with h5py.File('data.h5', 'w') as f:
 with h5py.File('data.h5', 'r') as f:
     loaded_data = {key: pd.DataFrame(data=f[key]) for key in f.keys()}
     print(loaded_data)
+
+with pd.HDFStore('data.h5') as store:
+    for key, df in data.items():
+        store.put(key, df)
