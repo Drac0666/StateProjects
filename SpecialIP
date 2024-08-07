@@ -1,51 +1,50 @@
 import plotly.express as px
 import pandas as pd
-import plotly.io as pio
+import customtkinter as ctk
+import webview
 
-def plot_dataframe(df: pd.DataFrame, output_file: str):
-    # Check if the DataFrame index is of datetime type
-    if not pd.api.types.is_datetime64_any_dtype(df.index):
-        raise ValueError("DataFrame index must be of datetime type.")
-    
+# Function to generate a Plotly chart and return HTML
+def generate_plotly_chart_html():
+    # Sample DataFrame
+    dates = pd.date_range(start='2024-01-01', periods=100, freq='D')
+    data = {
+        'Column1': range(100),
+        'Column2': range(100, 200),
+        'Column3': range(200, 300)
+    }
+    df = pd.DataFrame(data, index=dates)
+
     # Reset the index to use the dates as a column for plotly express
     df_reset = df.reset_index()
-    
+
     # Melt the DataFrame to have a long format suitable for plotly express
     df_melted = df_reset.melt(id_vars=df_reset.columns[0], var_name='Column', value_name='Value')
-    
+
     # Create a line plot using plotly express
     fig = px.line(df_melted, x=df_reset.columns[0], y='Value', color='Column',
                   labels={df_reset.columns[0]: 'Date', 'Value': 'Values'},
                   title='DataFrame Line Plot')
-    
-    # Update layout for better visualization
-    fig.update_layout(
-        width=1200,  # Set the width of the figure
-        height=600,  # Set the height of the figure
-        margin=dict(l=40, r=40, t=40, b=40),  # Adjust margins to minimize whitespace
-        xaxis=dict(
-            tickformat='%Y-%m-%d',  # Format x-axis as dates
-            rangeslider=dict(visible=True)  # Add a range slider for the x-axis
-        ),
-        hovermode='x unified'
-    )
-    
-    # Show the plot
-    fig.show()
-    
-    # Save the plot as a PNG file
-    pio.write_image(fig, output_file, format='png', width=1200, height=600)
-    print(f"Plot saved as {output_file}")
 
-# Example usage:
-# Sample DataFrame creation for demonstration
-dates = pd.date_range(start='2024-01-01', periods=100, freq='D')
-data = {
-    'Column1': range(100),
-    'Column2': range(100, 200),
-    'Column3': range(200, 300)
-}
-df = pd.DataFrame(data, index=dates)
+    # Convert Plotly figure to HTML
+    html_chart = fig.to_html(full_html=True)
+    return html_chart
 
-# Call the function to plot the DataFrame and save it as a PNG
-plot_dataframe(df, 'line_plot.png')
+# Function to create and display the Plotly chart in a customtkinter window
+def show_plotly_chart():
+    # Create the main application window
+    app = ctk.CTk()
+    app.title("Plotly Chart in customtkinter")
+    app.geometry("800x600")
+
+    # Generate the Plotly chart HTML
+    plotly_html = generate_plotly_chart_html()
+
+    # Start a webview window with the Plotly HTML content
+    webview.create_window("Plotly Chart", html=plotly_html)
+    webview.start()
+
+    # Start the main loop for the customtkinter app
+    app.mainloop()
+
+# Call the function to show the Plotly chart
+show_plotly_chart()
