@@ -1,10 +1,12 @@
 import plotly.express as px
 import pandas as pd
 import customtkinter as ctk
-import webview
+from PIL import Image
 
-# Function to generate a Plotly chart and return HTML
-def generate_plotly_chart_html():
+import plotly.io as pio
+
+# Function to generate a Plotly chart and save it as a PNG
+def save_plotly_chart_as_png(output_file: str):
     # Sample DataFrame
     dates = pd.date_range(start='2024-01-01', periods=100, freq='D')
     data = {
@@ -25,26 +27,34 @@ def generate_plotly_chart_html():
                   labels={df_reset.columns[0]: 'Date', 'Value': 'Values'},
                   title='DataFrame Line Plot')
 
-    # Convert Plotly figure to HTML
-    html_chart = fig.to_html(full_html=True)
-    return html_chart
+    # Save the Plotly chart as a PNG file
+    pio.write_image(fig, output_file, format='png', width=1200, height=600)
 
-# Function to create and display the Plotly chart in a customtkinter window
-def show_plotly_chart():
+# Function to display the saved PNG in a CTkToplevel window
+def show_image_in_ctktoplevel(image_path: str):
     # Create the main application window
     app = ctk.CTk()
-    app.title("Plotly Chart in customtkinter")
-    app.geometry("800x600")
+    app.title("Plotly Chart in CTkImage")
 
-    # Generate the Plotly chart HTML
-    plotly_html = generate_plotly_chart_html()
+    # Create a Toplevel window to display the image
+    top_level = ctk.CTkToplevel(app)
+    top_level.title("Plotly Chart Display")
+    top_level.geometry("1200x600")
 
-    # Start a webview window with the Plotly HTML content
-    webview.create_window("Plotly Chart", html=plotly_html)
-    webview.start()
+    # Load the image and create a CTkImage
+    image = Image.open(image_path)
+    ctk_image = ctk.CTkImage(image, size=(1200, 600))
 
-    # Start the main loop for the customtkinter app
+    # Create a label to display the CTkImage
+    image_label = ctk.CTkLabel(top_level, image=ctk_image)
+    image_label.pack(expand=True, fill='both')
+
+    # Start the main loop for the application
     app.mainloop()
 
-# Call the function to show the Plotly chart
-show_plotly_chart()
+# Save the Plotly chart as a PNG
+output_file = 'line_plot.png'
+save_plotly_chart_as_png(output_file)
+
+# Show the saved PNG in a CTkToplevel window
+show_image_in_ctktoplevel(output_file)
