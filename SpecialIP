@@ -1,66 +1,57 @@
-import plotly.express as px
-import pandas as pd
 import customtkinter as ctk
-from PIL import Image
-import plotly.io as pio
 
-# Function to generate a Plotly chart and save it as a PNG
-def save_plotly_chart_as_png(output_file: str):
-    # Sample DataFrame
-    dates = pd.date_range(start='2024-01-01', periods=100, freq='D')
-    data = {
-        'Column1': range(100),
-        'Column2': range(100, 200),
-        'Column3': range(200, 300)
-    }
-    df = pd.DataFrame(data, index=dates)
+def validate_entry(entry: ctk.CTkEntry, placeholder: str) -> bool:
+    """
+    Validate if the text in the CTkEntry is different from the placeholder and if it's an integer.
 
-    # Reset the index to use the dates as a column for plotly express
-    df_reset = df.reset_index()
+    Args:
+        entry (ctk.CTkEntry): The CTkEntry widget to validate.
+        placeholder (str): The placeholder text to compare against.
 
-    # Melt the DataFrame to have a long format suitable for plotly express
-    df_melted = df_reset.melt(id_vars=df_reset.columns[0], var_name='Column', value_name='Value')
+    Returns:
+        bool: True if text is different from placeholder and is an integer, False otherwise.
+    """
+    # Get the current text from the CTkEntry widget
+    current_text = entry.get()
+    
+    # Check if the text is different from the placeholder
+    if current_text == placeholder:
+        return False
+    
+    # Check if the text is an integer
+    if current_text.isdigit():
+        return True
+    
+    return False
 
-    # Create a line plot using plotly express
-    fig = px.line(df_melted, x=df_reset.columns[0], y='Value', color='Column',
-                  labels={df_reset.columns[0]: 'Date', 'Value': 'Values'},
-                  title='DataFrame Line Plot')
+# Example usage in a customtkinter application
+def on_validate_button_click():
+    # Retrieve the entry widget
+    entry_text = my_entry.get()
+    
+    # Define the placeholder text
+    placeholder_text = "Enter an integer"
+    
+    # Validate the entry
+    if validate_entry(my_entry, placeholder_text):
+        print("The entry is valid and contains an integer.")
+    else:
+        print("The entry is either invalid or not an integer.")
 
-    # Save the Plotly chart as a PNG file
-    pio.write_image(fig, output_file, format='png', width=1200, height=600)
-
-# Function to display the saved PNG in a CTkToplevel window
-def show_image_in_ctktoplevel(image_path: str):
-    # Create a Toplevel window to display the image
-    top_level = ctk.CTkToplevel(app)
-    top_level.title("Plotly Chart Display")
-    top_level.geometry("1200x600")
-
-    # Load the image and create a CTkImage
-    image = Image.open(image_path)
-    ctk_image = ctk.CTkImage(image, size=(1200, 600))
-
-    # Create a label to display the CTkImage
-    image_label = ctk.CTkLabel(top_level, image=ctk_image)
-    image_label.pack(expand=True, fill='both')
-
-# Function to be called when the button is pressed
-def on_button_press():
-    # Save the Plotly chart as a PNG
-    output_file = 'line_plot.png'
-    save_plotly_chart_as_png(output_file)
-
-    # Show the saved PNG in a CTkToplevel window
-    show_image_in_ctktoplevel(output_file)
-
-# Create the main application window
+# Create a customtkinter application
 app = ctk.CTk()
-app.title("Main Application")
-app.geometry("400x200")
+app.title("CTkEntry Validation")
 
-# Create a button to trigger the image display
-button = ctk.CTkButton(app, text="Show Plotly Chart", command=on_button_press)
-button.pack(pady=20)
+# Placeholder text
+placeholder_text = "Enter an integer"
 
-# Start the main loop for the application
+# Create an entry widget with placeholder text
+my_entry = ctk.CTkEntry(app, placeholder_text=placeholder_text)
+my_entry.pack(pady=20)
+
+# Create a button to validate the entry
+validate_button = ctk.CTkButton(app, text="Validate", command=on_validate_button_click)
+validate_button.pack(pady=20)
+
+# Start the main loop
 app.mainloop()
