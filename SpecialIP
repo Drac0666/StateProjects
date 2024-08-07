@@ -1,13 +1,9 @@
-import pandas as pd
-
-# Sample DataFrame
-data = {'date_column': ['29-Jul-24', '30-Aug-24', '01-Sep-24']}
-df = pd.DataFrame(data)
-
-# Convert date column to datetime format
-df['date_column'] = pd.to_datetime(df['date_column'], format='%d-%b-%y')
-
-# Convert to desired format
-df['date_column'] = df['date_column'].dt.strftime('%Y-%m-%d')
-
-print(df)
+# create scrollable frame
+        self.scrollable_frame = customtkinter.CTkScrollableFrame(self, label_text="CTkScrollableFrame")
+        self.scrollable_frame.grid(row=1, column=2, padx=(20, 0), pady=(20, 0), sticky="nsew")
+        self.scrollable_frame.grid_columnconfigure(0, weight=1)
+        self.scrollable_frame_switches = []
+        for i in range(100):
+            switch = customtkinter.CTkSwitch(master=self.scrollable_frame, text=f"CTkSwitch {i}")
+            switch.grid(row=i, column=0, padx=10, pady=(0, 20))
+            self.scrollable_frame_switches.append(switch)
