@@ -2,7 +2,6 @@ import plotly.express as px
 import pandas as pd
 import customtkinter as ctk
 from PIL import Image
-
 import plotly.io as pio
 
 # Function to generate a Plotly chart and save it as a PNG
@@ -32,10 +31,6 @@ def save_plotly_chart_as_png(output_file: str):
 
 # Function to display the saved PNG in a CTkToplevel window
 def show_image_in_ctktoplevel(image_path: str):
-    # Create the main application window
-    app = ctk.CTk()
-    app.title("Plotly Chart in CTkImage")
-
     # Create a Toplevel window to display the image
     top_level = ctk.CTkToplevel(app)
     top_level.title("Plotly Chart Display")
@@ -49,12 +44,23 @@ def show_image_in_ctktoplevel(image_path: str):
     image_label = ctk.CTkLabel(top_level, image=ctk_image)
     image_label.pack(expand=True, fill='both')
 
-    # Start the main loop for the application
-    app.mainloop()
+# Function to be called when the button is pressed
+def on_button_press():
+    # Save the Plotly chart as a PNG
+    output_file = 'line_plot.png'
+    save_plotly_chart_as_png(output_file)
 
-# Save the Plotly chart as a PNG
-output_file = 'line_plot.png'
-save_plotly_chart_as_png(output_file)
+    # Show the saved PNG in a CTkToplevel window
+    show_image_in_ctktoplevel(output_file)
 
-# Show the saved PNG in a CTkToplevel window
-show_image_in_ctktoplevel(output_file)
+# Create the main application window
+app = ctk.CTk()
+app.title("Main Application")
+app.geometry("400x200")
+
+# Create a button to trigger the image display
+button = ctk.CTkButton(app, text="Show Plotly Chart", command=on_button_press)
+button.pack(pady=20)
+
+# Start the main loop for the application
+app.mainloop()
