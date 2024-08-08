@@ -2,15 +2,15 @@ import pandas as pd
 
 # Sample DataFrames (replace with your actual data)
 data1 = {
-    'Country': ['USA', 'USA', 'Canada', 'Canada', 'USA'],
-    'SubAssetClass': ['Equity', 'Bond', 'Equity', 'Bond', 'Equity'],
-    'PnL': [100, 200, 150, 300, 250]
+    'Country': ['USA', 'USA', 'Canada', 'Canada', 'USA', 'UK', 'UK', 'Germany', 'Germany', 'France'],
+    'SubAssetClass': ['Equity', 'Bond', 'Equity', 'Bond', 'Equity', 'Equity', 'Bond', 'Equity', 'Bond', 'Equity'],
+    'PnL': [100, 200, 150, 300, 250, 180, 220, 130, 270, 160]
 }
 
 data2 = {
-    'Country': ['USA', 'USA', 'Canada', 'Canada', 'USA'],
-    'SubAssetClass': ['Equity', 'Bond', 'Equity', 'Bond', 'Equity'],
-    'PnL': [110, 190, 140, 310, 260]
+    'Country': ['USA', 'USA', 'Canada', 'Canada', 'USA', 'UK', 'UK', 'Germany', 'Germany', 'France'],
+    'SubAssetClass': ['Equity', 'Bond', 'Equity', 'Bond', 'Equity', 'Equity', 'Bond', 'Equity', 'Bond', 'Equity'],
+    'PnL': [110, 190, 140, 310, 260, 190, 230, 140, 260, 170]
 }
 
 df1 = pd.DataFrame(data1)
@@ -30,12 +30,37 @@ comparison_df = pd.merge(
 # Calculate the daily change in PnL
 comparison_df['PnL_Change'] = comparison_df['PnL_df2'] - comparison_df['PnL_df1']
 
+# Sort by the absolute change in PnL and select the top 5
+top_changes_df = comparison_df.reindex(
+    comparison_df['PnL_Change'].abs().sort_values(ascending=False).index
+).head(5)
+
 # Style the DataFrame
 def style_changes(val):
     color = 'red' if val < 0 else 'green'
     return f'color: {color}'
 
-styled_df = comparison_df.style.applymap(style_changes, subset=['PnL_Change'])
+styled_df = top_changes_df.style.applymap(style_changes, subset=['PnL_Change'])
+
+# Apply header and index style
+styled_df = styled_df.set_table_styles({
+    '': {
+        'selector': 'th, td',
+        'props': [
+            ('background-color', 'darkblue'),
+            ('color', 'white'),
+            ('font-weight', 'bold'),
+        ]
+    },
+    'header': {
+        'selector': 'thead th',
+        'props': [
+            ('background-color', 'darkblue'),
+            ('color', 'white'),
+            ('font-weight', 'bold'),
+        ]
+    }
+})
 
 # Convert the styled DataFrame to HTML
 html_table = styled_df.render()
