@@ -1,22 +1,13 @@
-import pandas as pd
-import h5py
-
-# Create a dictionary of DataFrames
-data = {
-    'df1': pd.DataFrame({'A': [1, 2], 'B': [3, 4]}),
-    'df2': pd.DataFrame({'X': [5, 6], 'Y': [7, 8]})
-}
-
-# Save to HDF5 file
-with h5py.File('data.h5', 'w') as f:
-    for key, df in data.items():
-        f.create_dataset(key, data=df.to_numpy())
-
-# Load from HDF5 file
-with h5py.File('data.h5', 'r') as f:
-    loaded_data = {key: pd.DataFrame(data=f[key]) for key in f.keys()}
-    print(loaded_data)
-
-with pd.HDFStore('data.h5') as store:
-    for key, df in data.items():
-        store.put(key, df)
+Sub UnprotectAllSheets()
+    Dim ws As Worksheet
+    Dim password As String
+    password = "123" ' Set the password used to unprotect the sheets
+    
+    ' Loop through each worksheet in the active workbook
+    For Each ws In ThisWorkbook.Worksheets
+        ' Unprotect the worksheet with the given password
+        ws.Unprotect Password:=password
+    Next ws
+    
+    MsgBox "All sheets have been unprotected.", vbInformation
+End Sub
