@@ -1,13 +1,48 @@
-Sub UnprotectAllSheets()
-    Dim ws As Worksheet
-    Dim password As String
-    password = "123" ' Set the password used to unprotect the sheets
-    
-    ' Loop through each worksheet in the active workbook
-    For Each ws In ThisWorkbook.Worksheets
-        ' Unprotect the worksheet with the given password
-        ws.Unprotect Password:=password
-    Next ws
-    
-    MsgBox "All sheets have been unprotected.", vbInformation
-End Sub
+import pandas as pd
+
+# Sample DataFrames (replace with your actual data)
+data1 = {
+    'Country': ['USA', 'USA', 'Canada', 'Canada', 'USA'],
+    'SubAssetClass': ['Equity', 'Bond', 'Equity', 'Bond', 'Equity'],
+    'PnL': [100, 200, 150, 300, 250]
+}
+
+data2 = {
+    'Country': ['USA', 'USA', 'Canada', 'Canada', 'USA'],
+    'SubAssetClass': ['Equity', 'Bond', 'Equity', 'Bond', 'Equity'],
+    'PnL': [110, 190, 140, 310, 260]
+}
+
+df1 = pd.DataFrame(data1)
+df2 = pd.DataFrame(data2)
+
+# Group by Country and SubAssetClass and sum PnL
+grouped_df1 = df1.groupby(['Country', 'SubAssetClass']).sum().reset_index()
+grouped_df2 = df2.groupby(['Country', 'SubAssetClass']).sum().reset_index()
+
+# Merge the two DataFrames on Country and SubAssetClass
+comparison_df = pd.merge(
+    grouped_df1, grouped_df2,
+    on=['Country', 'SubAssetClass'],
+    suffixes=('_df1', '_df2')
+)
+
+# Calculate the daily change in PnL
+comparison_df['PnL_Change'] = comparison_df['PnL_df2'] - comparison_df['PnL_df1']
+
+# Style the DataFrame
+def style_changes(val):
+    color = 'red' if val < 0 else 'green'
+    return f'color: {color}'
+
+styled_df = comparison_df.style.applymap(style_changes, subset=['PnL_Change'])
+
+# Convert the styled DataFrame to HTML
+html_table = styled_df.render()
+
+# Save to an HTML file for demonstration (or can be used directly in an email)
+with open('styled_table.html', 'w') as f:
+    f.write(html_table)
+
+# Display the styled DataFrame in Jupyter Notebook (if needed)
+styled_df
