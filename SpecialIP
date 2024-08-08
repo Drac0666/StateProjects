@@ -43,24 +43,15 @@ def style_changes(val):
 styled_df = top_changes_df.style.applymap(style_changes, subset=['PnL_Change'])
 
 # Apply header and index style
-styled_df = styled_df.set_table_styles({
-    '': {
-        'selector': 'th, td',
-        'props': [
-            ('background-color', 'darkblue'),
-            ('color', 'white'),
-            ('font-weight', 'bold'),
-        ]
-    },
-    'header': {
-        'selector': 'thead th',
-        'props': [
-            ('background-color', 'darkblue'),
-            ('color', 'white'),
-            ('font-weight', 'bold'),
-        ]
-    }
-})
+styled_df = styled_df.set_table_styles([
+    {'selector': 'th', 
+     'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]},
+    {'selector': 'td:hover', 
+     'props': [('background-color', 'lightgray')]},
+])
+
+# Apply row-wise styles for Country and SubAssetClass
+styled_df = styled_df.apply(lambda x: ['background-color: darkblue; color: white' if (x.name == 'Country' or x.name == 'SubAssetClass') else '' for _ in x], axis=1)
 
 # Convert the styled DataFrame to HTML
 html_table = styled_df.render()
