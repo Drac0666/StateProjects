@@ -1,20 +1,16 @@
-import pandas as pd
+import configparser
 
-# Example dictionary of DataFrames
-dataframes = {
-    "df1": pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}),
-    "df2": pd.DataFrame({"x": [7, 8, 9], "y": [10, 11, 12]})
-}
+# Create a ConfigParser instance
+config = configparser.ConfigParser()
 
-# Save the dictionary of DataFrames to a single HDF5 file
-with pd.HDFStore("dataframes.h5") as store:
-    for name, df in dataframes.items():
-        store.put(name, df)
+# Read the configuration file
+config.read('config.ini')
 
-# Load the dictionary of DataFrames from the HDF5 file
-with pd.HDFStore("dataframes.h5") as store:
-    loaded_dataframes = {name: store[name] for name in store.keys()}
+# Get all sections
+sections = config.sections()
 
-# Display loaded DataFrames to verify
-for name, df in loaded_dataframes.items():
-    print(f"{name}:\n{df}\n")
+# Print all sections and their respective key-value pairs
+for section in sections:
+    print(f"Section: {section}")
+    for key, value in config.items(section):
+        print(f"  {key} = {value}")
