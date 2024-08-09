@@ -1,20 +1,19 @@
-tyled_df = styled_df.set_table_styles([
-    {'selector': 'th',
-     'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]}
-])
+import pandas as pd
+import pyarrow.feather as feather
 
-# Apply custom style to 'Country' and 'SubAssetClass' columns
-def highlight_country_and_subasset(row):
-    return ['background-color: darkblue; color: white' if row.name in ['Country', 'SubAssetClass'] else '' for _ in row]
+# Example dictionary of DataFrames
+dataframes = {
+    "df1": pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}),
+    "df2": pd.DataFrame({"x": [7, 8, 9], "y": [10, 11, 12]})
+}
 
-styled_df = styled_df.apply(highlight_country_and_subasset, axis=1, subset=['Country', 'SubAssetClass'])
+# Save each DataFrame as a separate Feather file
+for name, df in dataframes.items():
+    feather.write_feather(df, f"{name}.feather")
 
-# Convert the styled DataFrame to HTML without the index
-html_table = styled_df.render(index=False)
+# Load each DataFrame from a Feather file
+loaded_dataframes = {name: feather.read_feather(f"{name}.feather") for name in dataframes.keys()}
 
-# Save to an HTML file for demonstration (or can be used directly in an email)
-with open('styled_table.html', 'w') as f:
-    f.write(html_table)
-
-# Display the styled DataFrame in Jupyter Notebook (if needed)
-styled_df
+# Display loaded DataFrames to verify
+for name, df in loaded_dataframes.items():
+    print(f"{name}:\n{df}\n")
