@@ -1,16 +1,29 @@
-import configparser
+import pandasdmx as sdmx
+import pandas as pd
 
-# Create a ConfigParser instance
-config = configparser.ConfigParser()
+# Create an instance of the ECB's SDMX web service
+ecb = sdmx.Request('ECB')
 
-# Read the configuration file
-config.read('config.ini')
+# Fetch metadata about available dataflows
+dataflows = ecb.dataflow()
 
-# Get all sections
-sections = config.sections()
+# Print available dataflows to find the appropriate one
+print(dataflows)
 
-# Print all sections and their respective key-value pairs
-for section in sections:
-    print(f"Section: {section}")
-    for key, value in config.items(section):
-        print(f"  {key} = {value}")
+# Get the "EXR" dataflow for exchange rates
+exchange_rate_dataflow = dataflows.dataflow['EXR']
+
+# Fetch the exchange rate data for USD against EUR
+# 'EXR' is the ID for exchange rates; adjust key as needed for your specific query
+response = ecb.data(
+    'EXR',
+    key={'CURRENCY': 'USD', 'CURRENCY_DENOM': 'EUR', 'FREQ': 'D', 'EXR_TYPE': 'SP00', 'EXR_SUFFIX': 'A'},
+    startPeriod='2023-01-01',
+    endPeriod='2024-01-01'
+)
+
+# Convert the response to a pandas DataFrame
+data = response.to_pandas()
+
+# Display the DataFrame
+print(data.tail())
