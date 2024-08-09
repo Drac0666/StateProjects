@@ -1,5 +1,6 @@
 import pandas as pd
-import sqlite3
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 # Example dictionary of DataFrames
 dataframes = {
@@ -7,21 +8,28 @@ dataframes = {
     "df2": pd.DataFrame({"x": [7, 8, 9], "y": [10, 11, 12]})
 }
 
-# Connect to SQLite database (creates a new database if it doesn't exist)
-conn = sqlite3.connect("dataframes.db")
+# Combine the DataFrames into a single DataFrame with a new column for the DataFrame name
+combined_df = pd.concat(
+    [df.assign(DataFrame_Name=name) for name, df in dataframes.items()]
+)
 
-# Save each DataFrame to a separate table
-for name, df in dataframes.items():
-    df.to_sql(name, conn, if_exists="replace", index=False)
+# Convert the combined DataFrame to an Arrow Table
+table = pa.Table.from_pandas(combined_df)
 
-# Load each DataFrame from the SQLite database
+# Write the table to a Parquet file
+pq.write_table(table, "dataframes.parquet")
+
+# Read the table back from the Parquet file
+read_table = pq.read_table("dataframes.parquet")
+
+# Convert back to a pandas DataFrame
+loaded_combined_df = read_table.to_pandas()
+
+# Separate the DataFrames using the 'DataFrame_Name' column
 loaded_dataframes = {
-    name: pd.read_sql(f"SELECT * FROM {name}", conn)
-    for name in dataframes.keys()
+    name: group.drop(columns='DataFrame_Name').reset_index(drop=True)
+    for name, group in loaded_combined_df.groupby('DataFrame_Name')
 }
-
-# Close the connection
-conn.close()
 
 # Display loaded DataFrames to verify
 for name, df in loaded_dataframes.items():
