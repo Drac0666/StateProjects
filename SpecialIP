@@ -1,29 +1,14 @@
-import pandasdmx as sdmx
 import pandas as pd
 
-# Create an instance of the ECB's SDMX web service
-ecb = sdmx.Request('ECB')
+# Assuming your DataFrame is named df
 
-# Fetch metadata about available dataflows
-dataflows = ecb.dataflow()
+# Define your filters
+asset_class_filter = df['Asset Class'] == 'ABS'
+sector1_filter = df['SECTOR1'].isin(['ABS', 'FRMBS'])
+sector2_filter = df['SECTOR2'].isin(['Australia', 'Britain', 'CNSM', 'Italy', 'Netherlands'])
 
-# Print available dataflows to find the appropriate one
-print(dataflows)
+# Apply the filters
+filtered_df = df[asset_class_filter & sector1_filter & sector2_filter]
 
-# Get the "EXR" dataflow for exchange rates
-exchange_rate_dataflow = dataflows.dataflow['EXR']
-
-# Fetch the exchange rate data for USD against EUR
-# 'EXR' is the ID for exchange rates; adjust key as needed for your specific query
-response = ecb.data(
-    'EXR',
-    key={'CURRENCY': 'USD', 'CURRENCY_DENOM': 'EUR', 'FREQ': 'D', 'EXR_TYPE': 'SP00', 'EXR_SUFFIX': 'A'},
-    startPeriod='2023-01-01',
-    endPeriod='2024-01-01'
-)
-
-# Convert the response to a pandas DataFrame
-data = response.to_pandas()
-
-# Display the DataFrame
-print(data.tail())
+# Display the filtered DataFrame
+print(filtered_df)
