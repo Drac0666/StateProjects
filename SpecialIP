@@ -6,8 +6,10 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
 
     fig, ax1 = plt.subplots(figsize=(9, 6))
 
-    # Plot YieldsX
-    ax1.plot(YieldsX.index, YieldsX, label="10Y Yields")
+    # Plot each column in YieldsX with its own label
+    for column in YieldsX.columns:
+        ax1.plot(YieldsX.index, YieldsX[column], label=column)
+    
     ax1.set_xlabel("Date")
     ax1.set_ylabel("Yields")
     
@@ -36,7 +38,18 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
 # Example DataFrames (replace with your actual data)
 YieldsX = pd.DataFrame({
     'Date': pd.date_range(start='1/1/2021', periods=10),
-    'Yields': range(10)
+    'Yields_1': range(10, 20),
+    'Yields_2': range(20, 30)
 })
 PnL = pd.DataFrame({
-    'Date': pd.date_range(start='1/1
+    'Date': pd.date_range(start='1/1/2021', periods=10),
+    'PnL': range(10, 20)
+})
+YieldsX.set_index('Date', inplace=True)
+PnL.set_index('Date', inplace=True)
+
+# Example columns to plot
+ColumnsToPlot = ['Yields_1', 'Yields_2']
+
+# Create the chart
+CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot)
