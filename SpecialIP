@@ -1,18 +1,5 @@
-import pandas as pd
+import webview
 
-# Assuming 'ParValue' is a column in final_df that needs to be summed
-
-# Group by 'IntexAssetClass' and sum the 'ParValue'
-grouped_df = final_df.groupby('IntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
-
-# Merge the grouped data with the Limits data
-result_df = pd.merge(grouped_df, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
-
-# Calculate Utilization %
-result_df['Utilization %'] = (result_df['ParValue'] / result_df['Limit']) * 100
-
-# Select the required columns
-final_output = result_df[['IntexAssetClass', 'ParValue', 'Limit', 'Utilization %']]
-
-# Display the final output
-print(final_output)
+# Create a window and load an HTML file
+webview.create_window('My Webview', 'path/to/your/file.html')
+webview.start()
