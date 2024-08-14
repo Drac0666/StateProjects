@@ -1,17 +1,21 @@
 import pandas as pd
 
 def determine_intex_asset_class(row):
+    # Rename specific countries
+    country = row['Intex_Country']
+    if country == 'Netherlands':
+        country = 'Dutch'
+    elif country == 'United Kingdom':
+        country = 'U.K'
+
     # Check the value in 'Intex_Deal Type'
     if row['Intex_Deal Type'] == 'Consumer Loan':
         return 'Consumer ABS'
     elif row['Intex_Deal Type'] == 'RMBS':
-        # Combine 'Intex_Country' and 'Intex_Group Collateral Type'
-        return f"{row['Intex_Country']} {row['Intex_Group Collateral Type']}"
+        # Combine the (possibly renamed) 'Intex_Country' and 'Intex_Group Collateral Type'
+        return f"{country} {row['Intex_Group Collateral Type']}"
     else:
         return None  # or return any default value if needed
 
 # Apply the function to create the 'IntexAssetClass' column
-merged_df['IntexAssetClass'] = merged_df.apply(determine_intex_asset_class, axis=1)
-
-# Display the DataFrame with the new column
-print(merged_df)
+merged_df['IntexAssetClass'] = merged_df.apply(determine_in
