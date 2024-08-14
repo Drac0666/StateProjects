@@ -22,13 +22,16 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
     ax2.plot(PnL.index, PnL, 'r--', linewidth=3, label="10Y Yields (Except Germany and UST)")
     ax2.set_ylabel("Unrealized P/L")
     
+    # Format the secondary y-axis to avoid scientific notation
+    ax2.ticklabel_format(style='plain', axis='y')
+    
     # Adding title and customizations
     plt.title("Yields and SSBI Unrealized P/L Development", pad=20)
     
-    # Combine legends from both axes
+    # Combine legends from both axes and position it near the right axis
     lines_1, labels_1 = ax1.get_legend_handles_labels()
     lines_2, labels_2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center')
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='center left', bbox_to_anchor=(1.05, 0.5), frameon=False)
 
     plt.tight_layout()
     
