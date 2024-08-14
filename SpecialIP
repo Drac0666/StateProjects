@@ -10,6 +10,9 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
     ax1.plot(YieldsX.index, YieldsX, label="10Y Yields")
     ax1.set_xlabel("Date")
     ax1.set_ylabel("Yields")
+    
+    # Set custom ticks on X-axis
+    ax1.set_xticks(YieldsX.index[::2])  # Show every second date (customize as needed)
     ax1.tick_params(axis='x', rotation=45)
     
     # Set up secondary y-axis for PnL
@@ -28,4 +31,12 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
     plt.tight_layout()
     
     # Save the figure
-    plt.savefig("Test2.png")This positive development stems from a favorable shift in the yield environment.
+    plt.savefig("Test2.png")
+
+# Example DataFrames (replace with your actual data)
+YieldsX = pd.DataFrame({
+    'Date': pd.date_range(start='1/1/2021', periods=10),
+    'Yields': range(10)
+})
+PnL = pd.DataFrame({
+    'Date': pd.date_range(start='1/1
