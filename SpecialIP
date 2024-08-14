@@ -1,16 +1,17 @@
 import pandas as pd
 
-# Assuming your Intex DataFrame is named 'intex_df'
+def determine_intex_asset_class(row):
+    # Check the value in 'Intex_Deal Type'
+    if row['Intex_Deal Type'] == 'Consumer Loan':
+        return 'Consumer ABS'
+    elif row['Intex_Deal Type'] == 'RMBS':
+        # Combine 'Intex_Country' and 'Intex_Group Collateral Type'
+        return f"{row['Intex_Country']} {row['Intex_Group Collateral Type']}"
+    else:
+        return None  # or return any default value if needed
 
-# Select only the required columns from intex_df and add the prefix
-intex_columns = ['Deal/Tranche ID', 'Tranche Currency', 'Deal Name', 'Deal Type', 'Country', 'Group Collateral Type']
-intex_df_filtered = intex_df[intex_columns].add_prefix('Intex_')
+# Apply the function to create the 'IntexAssetClass' column
+merged_df['IntexAssetClass'] = merged_df.apply(determine_intex_asset_class, axis=1)
 
-# Perform a left join on the 'Deal/Tranche ID' column (assuming it's the key column)
-merged_df = pd.merge(filtered_df, intex_df_filtered, left_on='Deal/Tranche ID', right_on='Intex_Deal/Tranche ID', how='left')
-
-# If you want to remove the duplicate 'Deal/Tranche ID' column after the merge
-merged_df = merged_df.drop(columns=['Intex_Deal/Tranche ID'])
-
-# Display the merged DataFrame
+# Display the DataFrame with the new column
 print(merged_df)
