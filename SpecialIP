@@ -1,14 +1,16 @@
 import pandas as pd
 
-# Assuming your DataFrame is named df
+# Assuming your Intex DataFrame is named 'intex_df'
 
-# Define your filters
-asset_class_filter = df['Asset Class'] == 'ABS'
-sector1_filter = df['SECTOR1'].isin(['ABS', 'FRMBS'])
-sector2_filter = df['SECTOR2'].isin(['Australia', 'Britain', 'CNSM', 'Italy', 'Netherlands'])
+# Select only the required columns from intex_df and add the prefix
+intex_columns = ['Deal/Tranche ID', 'Tranche Currency', 'Deal Name', 'Deal Type', 'Country', 'Group Collateral Type']
+intex_df_filtered = intex_df[intex_columns].add_prefix('Intex_')
 
-# Apply the filters
-filtered_df = df[asset_class_filter & sector1_filter & sector2_filter]
+# Perform a left join on the 'Deal/Tranche ID' column (assuming it's the key column)
+merged_df = pd.merge(filtered_df, intex_df_filtered, left_on='Deal/Tranche ID', right_on='Intex_Deal/Tranche ID', how='left')
 
-# Display the filtered DataFrame
-print(filtered_df)
+# If you want to remove the duplicate 'Deal/Tranche ID' column after the merge
+merged_df = merged_df.drop(columns=['Intex_Deal/Tranche ID'])
+
+# Display the merged DataFrame
+print(merged_df)
