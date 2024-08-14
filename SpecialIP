@@ -1,1 +1,31 @@
-This positive development stems from a favorable shift in the yield environment.
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
+    YieldsX = YieldsX[ColumnsToPlot]
+
+    fig, ax1 = plt.subplots(figsize=(9, 6))
+
+    # Plot YieldsX
+    ax1.plot(YieldsX.index, YieldsX, label="10Y Yields")
+    ax1.set_xlabel("Date")
+    ax1.set_ylabel("Yields")
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Set up secondary y-axis for PnL
+    ax2 = ax1.twinx()
+    ax2.plot(PnL.index, PnL, 'r--', linewidth=3, label="10Y Yields (Except Germany and UST)")
+    ax2.set_ylabel("Unrealized P/L")
+    
+    # Adding title and customizations
+    plt.title("Yields and SSBI Unrealized P/L Development", pad=20)
+    
+    # Combine legends from both axes
+    lines_1, labels_1 = ax1.get_legend_handles_labels()
+    lines_2, labels_2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper center')
+
+    plt.tight_layout()
+    
+    # Save the figure
+    plt.savefig("Test2.png")This positive development stems from a favorable shift in the yield environment.
