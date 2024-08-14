@@ -17,10 +17,10 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
     ax1.set_xticks(YieldsX.index[::2])  # Show every second date (customize as needed)
     ax1.tick_params(axis='x', rotation=45)
     
-    # Set up secondary y-axis for PnL
+    # Set up secondary y-axis for PnL and convert values to EUR millions
     ax2 = ax1.twinx()
-    ax2.plot(PnL.index, PnL, 'r--', linewidth=3, label="10Y Yields (Except Germany and UST)")
-    ax2.set_ylabel("Unrealized P/L")
+    ax2.plot(PnL.index, PnL / 1e6, 'r--', linewidth=3, label="10Y Yields (Except Germany and UST)")
+    ax2.set_ylabel("Unrealized P/L (EUR millions)")
     
     # Format the secondary y-axis to avoid scientific notation
     ax2.ticklabel_format(style='plain', axis='y')
@@ -31,7 +31,7 @@ def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
     # Combine legends from both axes and position it near the right axis
     lines_1, labels_1 = ax1.get_legend_handles_labels()
     lines_2, labels_2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='center left', bbox_to_anchor=(1.05, 0.5), frameon=False)
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='center left', bbox_to_anchor=(1.15, 0.5), frameon=False)
 
     plt.tight_layout()
     
@@ -46,7 +46,7 @@ YieldsX = pd.DataFrame({
 })
 PnL = pd.DataFrame({
     'Date': pd.date_range(start='1/1/2021', periods=10),
-    'PnL': range(10, 20)
+    'PnL': range(10000000, 20000000, 1000000)  # Example in EUR
 })
 YieldsX.set_index('Date', inplace=True)
 PnL.set_index('Date', inplace=True)
