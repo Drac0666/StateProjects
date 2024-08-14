@@ -1,12 +1,18 @@
 import pandas as pd
 
-# Assuming your Limits DataFrame is named 'limits_df'
+# Assuming 'ParValue' is a column in final_df that needs to be summed
 
-# Multiply the 'Limit' column by a billion (1e9)
-limits_df['Limit'] = limits_df['Limit'] * 1e9
+# Group by 'IntexAssetClass' and sum the 'ParValue'
+grouped_df = final_df.groupby('IntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
 
-# Perform a left join on the 'IntexAssetClass' column
-final_df = pd.merge(merged_df, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
+# Merge the grouped data with the Limits data
+result_df = pd.merge(grouped_df, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
 
-# Display the final DataFrame with the merged Limit column
-print(final_df)
+# Calculate Utilization %
+result_df['Utilization %'] = (result_df['ParValue'] / result_df['Limit']) * 100
+
+# Select the required columns
+final_output = result_df[['IntexAssetClass', 'ParValue', 'Limit', 'Utilization %']]
+
+# Display the final output
+print(final_output)
