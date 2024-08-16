@@ -36,4 +36,21 @@ grouped_df = final_df.groupby('NormalizedIntexAssetClass', as_index=False).agg({
 
 # Step 3: Merge with Limits data
 result_df = pd.merge(grouped_df, limits_df[['IntexAssetClass', 'Limit']], 
-                     left_on=
+                     left_on='NormalizedIntexAssetClass', right_on='IntexAssetClass', how='left')
+
+# Step 4: Calculate Utilization %
+result_df['Utilization %'] = (result_df['ParValue'] / result_df['Limit']) * 100
+
+# Step 5: Append multiple specific IntexAssetClass rows using the function
+
+# List of asset classes to append separately
+asset_classes_to_append = ['Dutch BTL', 'Australian RMBS']
+
+# Call the function with the list of asset classes
+appended_rows = append_specific_asset_classes(final_df, limits_df, asset_classes_to_append)
+
+# Concatenate the results
+final_output = pd.concat([result_df[['NormalizedIntexAssetClass', 'ParValue', 'Limit', 'Utilization %']].rename(columns={'NormalizedIntexAssetClass': 'IntexAssetClass'}), appended_rows])
+
+# Display the final output
+print(final_output)
