@@ -1,35 +1,39 @@
 import pandas as pd
 
-# Sample DataFrame for illustration (final_df)
-# Assuming final_df already has columns IntexAssetClass, ParValue, and Limits
+# Function to append specific IntexAssetClass rows based on a list
+def append_specific_asset_classes(final_df, limits_df, asset_class_list):
+    appended_rows = pd.DataFrame()
+    
+    for asset_class in asset_class_list:
+        # Filter and group the specific IntexAssetClass
+        specific_row = final_df[final_df['IntexAssetClass'] == asset_class].groupby('IntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
+        
+        # Merge with the limits data to get the Limit for the specific IntexAssetClass
+        specific_row = pd.merge(specific_row, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
+        
+        # Calculate the Utilization %
+        specific_row['Utilization %'] = (specific_row['ParValue'] / specific_row['Limit']) * 100
+        
+        # Append the specific row to the results
+        appended_rows = pd.concat([appended_rows, specific_row], ignore_index=True)
+    
+    return appended_rows
 
-# Step 1: Create a mapping function for normalization
+# Example data (for illustration purposes)
+# final_df and limits_df are assumed to be already defined
+
+# Step 1: Normalization
 def normalize_asset_class(asset_class):
     if asset_class in ['Dutch Prime', 'Dutch BTL']:
         return 'Dutch RMBS'
     else:
         return asset_class
 
-# Apply the normalization function
 final_df['NormalizedIntexAssetClass'] = final_df['IntexAssetClass'].apply(normalize_asset_class)
 
 # Step 2: Group by the normalized asset class and sum ParValue
 grouped_df = final_df.groupby('NormalizedIntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
 
-# Step 3: Merge the grouped data with Limits on IntexAssetClass (to get original limits)
+# Step 3: Merge with Limits data
 result_df = pd.merge(grouped_df, limits_df[['IntexAssetClass', 'Limit']], 
-                     left_on='NormalizedIntexAssetClass', right_on='IntexAssetClass', how='left')
-
-# Step 4: Calculate Utilization %
-result_df['Utilization %'] = (result_df['ParValue'] / result_df['Limit']) * 100
-
-# Step 5: Append the original Dutch BTL row
-dutch_btl_row = final_df[final_df['IntexAssetClass'] == 'Dutch BTL'].groupby('IntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
-dutch_btl_row = pd.merge(dutch_btl_row, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
-dutch_btl_row['Utilization %'] = (dutch_btl_row['ParValue'] / dutch_btl_row['Limit']) * 100
-
-# Append the Dutch BTL row to the result
-final_output = pd.concat([result_df[['NormalizedIntexAssetClass', 'ParValue', 'Limit', 'Utilization %']].rename(columns={'NormalizedIntexAssetClass': 'IntexAssetClass'}), dutch_btl_row])
-
-# Display the final output
-print(final_output)
+                     left_on=
