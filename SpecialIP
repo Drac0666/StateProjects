@@ -1,56 +1,10 @@
 import pandas as pd
 
-# Function to append specific IntexAssetClass rows based on a list
-def append_specific_asset_classes(final_df, limits_df, asset_class_list):
-    appended_rows = pd.DataFrame()
-    
-    for asset_class in asset_class_list:
-        # Filter and group the specific IntexAssetClass
-        specific_row = final_df[final_df['IntexAssetClass'] == asset_class].groupby('IntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
-        
-        # Merge with the limits data to get the Limit for the specific IntexAssetClass
-        specific_row = pd.merge(specific_row, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
-        
-        # Calculate the Utilization %
-        specific_row['Utilization %'] = (specific_row['ParValue'] / specific_row['Limit']) * 100
-        
-        # Append the specific row to the results
-        appended_rows = pd.concat([appended_rows, specific_row], ignore_index=True)
-    
-    return appended_rows
+# Assuming you already have a DataFrame `df` with the columns `parvalue` and `FXRate`
 
-# Example data (for illustration purposes)
-# final_df and limits_df are assumed to be already defined
+# Calculate ParValue [USD] based on the condition
+df['ParValue [USD]'] = df.apply(
+    lambda row: row['parvalue'] * row['FXRate'] if row['FXRate'] >= 1 else row['parvalue'] / row['FXRate'], axis=1
+)
 
-# Step 1: Normalization
-def normalize_asset_class(asset_class):
-    if asset_class in ['Dutch Prime', 'Dutch BTL']:
-        return 'Dutch RMBS'
-    else:
-        return asset_class
-
-final_df['NormalizedIntexAssetClass'] = final_df['IntexAssetClass'].apply(normalize_asset_class)
-
-# Step 2: Group by the normalized asset class and sum ParValue
-grouped_df = final_df.groupby('NormalizedIntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
-
-# Step 3: Merge with Limits data
-result_df = pd.merge(grouped_df, limits_df[['IntexAssetClass', 'Limit']], 
-                     left_on='NormalizedIntexAssetClass', right_on='IntexAssetClass', how='left')
-
-# Step 4: Calculate Utilization %
-result_df['Utilization %'] = (result_df['ParValue'] / result_df['Limit']) * 100
-
-# Step 5: Append multiple specific IntexAssetClass rows using the function
-
-# List of asset classes to append separately
-asset_classes_to_append = ['Dutch BTL', 'Australian RMBS']
-
-# Call the function with the list of asset classes
-appended_rows = append_specific_asset_classes(final_df, limits_df, asset_classes_to_append)
-
-# Concatenate the results
-final_output = pd.concat([result_df[['NormalizedIntexAssetClass', 'ParValue', 'Limit', 'Utilization %']].rename(columns={'NormalizedIntexAssetClass': 'IntexAssetClass'}), appended_rows])
-
-# Display the final output
-print(final_output)
+# Now, df will contain the new 'ParValue [USD]' column with the calculated values
