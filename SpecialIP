@@ -1,58 +1,35 @@
-import matplotlib.pyplot as plt
 import pandas as pd
 
-def CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot):
-    YieldsX = YieldsX[ColumnsToPlot]
+# Sample DataFrame for illustration (final_df)
+# Assuming final_df already has columns IntexAssetClass, ParValue, and Limits
 
-    fig, ax1 = plt.subplots(figsize=(9, 6))
+# Step 1: Create a mapping function for normalization
+def normalize_asset_class(asset_class):
+    if asset_class in ['Dutch Prime', 'Dutch BTL']:
+        return 'Dutch RMBS'
+    else:
+        return asset_class
 
-    # Plot each column in YieldsX with its own label
-    for column in YieldsX.columns:
-        ax1.plot(YieldsX.index, YieldsX[column], label=column)
-    
-    ax1.set_xlabel("Date")
-    ax1.set_ylabel("Yields")
-    
-    # Set custom ticks on X-axis
-    ax1.set_xticks(YieldsX.index[::2])  # Show every second date (customize as needed)
-    ax1.tick_params(axis='x', rotation=45)
-    
-    # Set up secondary y-axis for PnL and convert values to EUR millions
-    ax2 = ax1.twinx()
-    ax2.plot(PnL.index, PnL / 1e6, 'r--', linewidth=3, label="10Y Yields (Except Germany and UST)")
-    ax2.set_ylabel("Unrealized P/L (EUR millions)")
-    
-    # Format the secondary y-axis to avoid scientific notation
-    ax2.ticklabel_format(style='plain', axis='y')
-    
-    # Adding title and customizations
-    plt.title("Yields and SSBI Unrealized P/L Development", pad=20)
-    
-    # Combine legends from both axes and position it near the right axis
-    lines_1, labels_1 = ax1.get_legend_handles_labels()
-    lines_2, labels_2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='center left', bbox_to_anchor=(1.15, 0.5), frameon=False)
+# Apply the normalization function
+final_df['NormalizedIntexAssetClass'] = final_df['IntexAssetClass'].apply(normalize_asset_class)
 
-    plt.tight_layout()
-    
-    # Save the figure
-    plt.savefig("Test2.png")
+# Step 2: Group by the normalized asset class and sum ParValue
+grouped_df = final_df.groupby('NormalizedIntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
 
-# Example DataFrames (replace with your actual data)
-YieldsX = pd.DataFrame({
-    'Date': pd.date_range(start='1/1/2021', periods=10),
-    'Yields_1': range(10, 20),
-    'Yields_2': range(20, 30)
-})
-PnL = pd.DataFrame({
-    'Date': pd.date_range(start='1/1/2021', periods=10),
-    'PnL': range(10000000, 20000000, 1000000)  # Example in EUR
-})
-YieldsX.set_index('Date', inplace=True)
-PnL.set_index('Date', inplace=True)
+# Step 3: Merge the grouped data with Limits on IntexAssetClass (to get original limits)
+result_df = pd.merge(grouped_df, limits_df[['IntexAssetClass', 'Limit']], 
+                     left_on='NormalizedIntexAssetClass', right_on='IntexAssetClass', how='left')
 
-# Example columns to plot
-ColumnsToPlot = ['Yields_1', 'Yields_2']
+# Step 4: Calculate Utilization %
+result_df['Utilization %'] = (result_df['ParValue'] / result_df['Limit']) * 100
 
-# Create the chart
-CreateBaseYieldsPnLChart(YieldsX, PnL, ColumnsToPlot)
+# Step 5: Append the original Dutch BTL row
+dutch_btl_row = final_df[final_df['IntexAssetClass'] == 'Dutch BTL'].groupby('IntexAssetClass', as_index=False).agg({'ParValue': 'sum'})
+dutch_btl_row = pd.merge(dutch_btl_row, limits_df[['IntexAssetClass', 'Limit']], on='IntexAssetClass', how='left')
+dutch_btl_row['Utilization %'] = (dutch_btl_row['ParValue'] / dutch_btl_row['Limit']) * 100
+
+# Append the Dutch BTL row to the result
+final_output = pd.concat([result_df[['NormalizedIntexAssetClass', 'ParValue', 'Limit', 'Utilization %']].rename(columns={'NormalizedIntexAssetClass': 'IntexAssetClass'}), dutch_btl_row])
+
+# Display the final output
+print(final_output)
