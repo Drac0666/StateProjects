@@ -1,10 +1,7 @@
-import pandas as pd
+During one of our recent monthly processes, I identified a discrepancy in an Italian RMBS bond. It appears that the "PAR" column may represent the USD equivalent, while all these Italian bonds are denominated in euros. I recalculated the INTR - Par/Curr Face values by applying the FX rate provided in the file. In doing so, I discovered a difference of 100 between the "PAR" and "INTR" values for one of the bonds.
 
-# Assuming you already have a DataFrame `df` with the columns `parvalue` and `FXRate`
+Additionally, I noticed that the GAAP BV INTR Variance column reflects the same variance for this particular bond.
 
-# Calculate ParValue [USD] based on the condition
-df['ParValue [USD]'] = df.apply(
-    lambda row: row['parvalue'] * row['FXRate'] if row['FXRate'] >= 1 else row['parvalue'] / row['FXRate'], axis=1
-)
+Could you please clarify the cause of this discrepancy? Any additional context or insights would be greatly appreciated.
 
-# Now, df will contain the new 'ParValue [USD]' column with the calculated values
+Thank you for your assistance.
