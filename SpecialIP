@@ -1,49 +1,18 @@
-import matplotlib.pyplot as plt
 import pandas as pd
 
-def plot_dataframe(df, title='DataFrame Plot', xlabel='Date', ylabel='Value'):
-    """
-    Plots a DataFrame using matplotlib where the index is used as the x-axis and the columns are used as y-values.
-    
-    Parameters:
-    df (pd.DataFrame): The DataFrame to plot.
-    title (str): The title of the plot.
-    xlabel (str): The label for the x-axis.
-    ylabel (str): The label for the y-axis.
-    """
-    plt.figure(figsize=(10, 6))
+def infer_date_format_trial(date_str):
+  formats = ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']  # Add more formats
+  for fmt in formats:
+    try:
+      pd.to_datetime(date_str, format=fmt)
+      return fmt
+    except ValueError:
+      pass
+  return None
 
-    # Plot each column
-    for column in df.columns:
-        plt.plot(df.index, df[column], label=column)
+# Example usage
+data = {'date': ['2023-11-24', '03/12/2023', '15-01-2024']}
+df = pd.DataFrame(data)
 
-    # Format x-axis as dates
-    plt.gca().xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
-    plt.gcf().autofmt_xdate()  # Rotate date labels to avoid overlap
-
-    # Adding labels and title
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-
-    # Show legend
-    plt.legend()
-
-    # Show grid
-    plt.grid(True)
-
-    # Show the plot
-    plt.show()
-
-# Example usage:
-# Create a sample DataFrame
-dates = pd.date_range(start='2024-01-01', end='2024-01-10')
-data = {
-    'Column1': range(10, 20),
-    'Column2': range(20, 30),
-    'Column3': range(30, 40)
-}
-df = pd.DataFrame(data, index=dates)
-
-# Call the function to plot
-plot_dataframe(df)
+df['format'] = df['date'].apply(infer_date_format_trial)
+print(df)
