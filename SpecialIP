@@ -1,18 +1,10 @@
-import pandas as pd
+Subject: Business Trip Request: Białystok to Kraków on September 11th
 
-def infer_date_format_trial(date_str):
-  formats = ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']  # Add more formats
-  for fmt in formats:
-    try:
-      pd.to_datetime(date_str, format=fmt)
-      return fmt
-    except ValueError:
-      pass
-  return None
+Hi Paulina,
 
-# Example usage
-data = {'date': ['2023-11-24', '03/12/2023', '15-01-2024']}
-df = pd.DataFrame(data)
+Could you please approve my request for a business trip from Białystok to Kraków and back on September 11th? Steve will be visiting Kraków that day, and a business meeting has been planned.
 
-df['format'] = df['date'].apply(infer_date_format_trial)
-print(df)
+Thank you!
+
+Best regards,
+[Your Name]
