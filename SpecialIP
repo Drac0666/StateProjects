@@ -1,4 +1,21 @@
-When reconciling CMBS data, discrepancies between the 'W' and 'Deafasance' reasons may arise due to differences in data sources. The TDR system pulls Intex data using the 'Total' metric, while the manual process defaults to 'Trust Mortgage Assets.'
+"Section: Manual Overrides
 
-For CUSIPs that do not align with Intex reporting, adjust the data source to 'Total' instead of 'Trust Mortgage Assets.' Update the corresponding securities in the 'Intex CMBS' tab of the SSFA file."
-Some discrepancies may require manual data changes or the application of manual overrides. Detailed instructions for these procedures can be found in the following sections [insert section references here]."
+This section outlines the process for manual overrides.
+
+For certain securities, the TDR system may extract incorrect data due to various reasons, such as:
+
+    Intex data formatting inconsistencies
+    Delays in Intex data updates compared to manual calculations
+    Incomplete Intex deal modeling (refer to Section X)
+
+In such cases, these securities and their associated parameters used for calculating SSFA factors must be added to the 'Manual Overrides' tab of the SSFA File, along with a detailed explanation justifying the manual override.
+
+Once the necessary information is entered, the data is transferred to the REF_MANUAL_OVERRIDE Excel file and uploaded to the TDR system to ensure alignment between manual data and TDR-generated data."
+
+Key Improvements:
+
+    Clarity: The prompt provides a clear explanation of the reasons for manual overrides.
+    Conciseness: The language is concise and avoids unnecessary jargon.
+    Actionable Steps: The prompt outlines the specific steps involved in the manual override process.
+
+This revised prompt effectively communicates the procedures for applying manual overrides, ensuring accurate data reconciliation.
