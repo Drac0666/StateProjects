@@ -1,3 +1,1 @@
-Section: QoQ Comparison for GT Source and BOLI
-
-Perform a Quarter-over-Quarter comparison on the 'GT Source' and 'BOLI' tabs of the SSFA file. For the 'GT Source' tab, use columns AV to AZ, and for the 'BOLI' tab, use columns BC to BG. Ensure that these columns have embedded conditional formatting to highlight any QoQ changes that exceed the threshold. For all securities that trigger the conditional formatting, provide detailed comments explaining the changes. It is crucial to verify that the conditional formatting is correctly implemented before finalizing the review.
+"Review columns U to AA on the TDR Compare tab of the SSFA file for any discrepancies. Investigate the reasons for any inconsistencies in values."
