@@ -1,5 +1,1 @@
-"The analyst should review all final attachment and detachment data to verify that no attachment point is below 0% and no detachment point exceeds 100%."
-"The analyst should investigate all instances where the senior balance is zero and the detachment point, as derived from Intex data, is below 100%."
-"Thoroughly review all data to identify any values that may be hardcoded. If hardcoded values are found, verify that their use was intentional and not the result of an error.
-
-For the 'GT Source data' and 'BOLI' fields, ensure that appropriate formulas are used to dynamically calculate their values. To review the underlying formulas, press Ctrl+~ on your keyboard while the spreadsheet is open. This will toggle between displaying the cell values and their formulas.
+Once all the aforementioned steps have been completed and no data issues or mismatches are identified, a KC-3 email should be prepared and sent to the SSFA manager."
