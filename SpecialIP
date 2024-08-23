@@ -1,3 +1,4 @@
 When reconciling CMBS data, discrepancies between the 'W' and 'Deafasance' reasons may arise due to differences in data sources. The TDR system pulls Intex data using the 'Total' metric, while the manual process defaults to 'Trust Mortgage Assets.'
 
 For CUSIPs that do not align with Intex reporting, adjust the data source to 'Total' instead of 'Trust Mortgage Assets.' Update the corresponding securities in the 'Intex CMBS' tab of the SSFA file."
+Some discrepancies may require manual data changes or the application of manual overrides. Detailed instructions for these procedures can be found in the following sections [insert section references here]."
