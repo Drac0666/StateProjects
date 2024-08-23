@@ -1,3 +1,10 @@
-Improved Prompt:
+To filter the HIERARCHY PARENT ALL data for relevant RMBS, apply the following filters within Spotfire:
 
-"To initiate the DR collection process, the updated REF CUSIP file (as described in the specified section) must be uploaded to the TDR database using the designated front-end solution. While the other REF files are optional, uploading them alongside the REF CUSIP file is recommended to ensure alignment between TDR and manual data."*
+    PILLAR_3_CLASSIFICATION: Foreign RMBS, US RMBS
+    GT_CLASSIFICATION: Aussie RMBS, Dutch_FRMBS, US Alta, US Prime
+
+Select the PARENT_CUSIP and BIII_NPR_KG_FINAL columns.
+
+Ensure the data is for the same reporting period.
+
+Copy and paste the filtered data into the RMBS_kg tab of the SSFA File. Manually drag down column G to assign classifications to all securities."
