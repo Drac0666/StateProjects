@@ -1,11 +1,1 @@
-he Spotfire report for the processing date must be downloaded and pasted into the 'Spotfire data' tab of the SSFA file. To download the Spotfire report, use the provided link or follow the steps outlined in the process. Once the Spotfire report is processed for the reporting date, the HIERARCHY PARENT ALL columns must be adjusted to display only the following columns:
-
-a. PARENT_CUSIP
-b. ATTACHMENT_POINT_FINAL
-c. DETACHMENT_POINT_FINAL
-d. W_FINAL
-e. P_FINAL
-f. INITIAL_KG_FINAL
-g. RW_PERCENT_FINAL
-
-"Review columns U to AA on the TDR Compare tab of the SSFA file for any discrepancies. Investigate the reasons for any inconsistencies in values."
+The Spotfire report is the primary source for accessing SSFA TDR data within the Spotfire platform. It can be located on the Spotfire page by [insert specific navigation instructions here]."
