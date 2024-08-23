@@ -1,21 +1,3 @@
-"Section: Manual Overrides
+Reconciling Australian RMBS:
 
-This section outlines the process for manual overrides.
-
-For certain securities, the TDR system may extract incorrect data due to various reasons, such as:
-
-    Intex data formatting inconsistencies
-    Delays in Intex data updates compared to manual calculations
-    Incomplete Intex deal modeling (refer to Section X)
-
-In such cases, these securities and their associated parameters used for calculating SSFA factors must be added to the 'Manual Overrides' tab of the SSFA File, along with a detailed explanation justifying the manual override.
-
-Once the necessary information is entered, the data is transferred to the REF_MANUAL_OVERRIDE Excel file and uploaded to the TDR system to ensure alignment between manual data and TDR-generated data."
-
-Key Improvements:
-
-    Clarity: The prompt provides a clear explanation of the reasons for manual overrides.
-    Conciseness: The language is concise and avoids unnecessary jargon.
-    Actionable Steps: The prompt outlines the specific steps involved in the manual override process.
-
-This revised prompt effectively communicates the procedures for applying manual overrides, ensuring accurate data reconciliation.
+If any Australian RMBS securities are flagged in the TDR comparison, the corresponding AUS Low Doc data must be carefully reviewed and corrected as outlined in the specified section. This ensures alignment between manual and TDR-generated data."
