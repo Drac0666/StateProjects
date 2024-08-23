@@ -1,10 +1,1 @@
-To filter the HIERARCHY PARENT ALL data for relevant RMBS, apply the following filters within Spotfire:
-
-    PILLAR_3_CLASSIFICATION: Foreign RMBS, US RMBS
-    GT_CLASSIFICATION: Aussie RMBS, Dutch_FRMBS, US Alta, US Prime
-
-Select the PARENT_CUSIP and BIII_NPR_KG_FINAL columns.
-
-Ensure the data is for the same reporting period.
-
-Copy and paste the filtered data into the RMBS_kg tab of the SSFA File. Manually drag down column G to assign classifications to all securities."
+If any process discrepancies are encountered during the data review or reconciliation process, consult with the SSFA manager to discuss potential adjustments and ensure the procedure remains accurate and aligned with best practices
