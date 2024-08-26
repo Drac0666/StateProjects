@@ -6,19 +6,19 @@ import glob
 # Function to get the previous business day
 def previous_business_day():
     today = datetime.today()
-    offset = max(1, (today.weekday() + 6) % 7 - 3)  # Ensure it skips weekends
+    offset = max(1, (today.weekday() + 6) % 7 - 3)  # Adjust for weekends
     prev_business_day = today - timedelta(days=offset)
     return prev_business_day
 
 # Get the previous business day date
 prev_business_day = previous_business_day()
-date_str = prev_business_day.strftime('%d%m%y')
+date_str = prev_business_day.strftime('%y%m%d')  # Changed to YYMMDD format
 
-# File pattern to search for
+# File pattern to search for (e.g., ITR_IPDAILY_MUN_01_YYMMDD.csv)
 file_pattern = f'ITR_IPDAILY_???_01_{date_str}.csv'
 
 # Folder path where files are stored
-folder_path = '/path/to/your/folder/'
+folder_path = '/path/to/your/folder/'  # Update this with the correct path
 
 # Full path pattern
 search_pattern = os.path.join(folder_path, file_pattern)
