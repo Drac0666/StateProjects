@@ -1,1 +1,45 @@
-The team will conduct a detailed review of the new Liquidity Stress Testing (LST) scope following the recent regulatory examination to ensure compliance and address any adjustments required.
+import pytesseract
+import pandas as pd
+import cv2
+import numpy as np
+from PIL import ImageGrab
+
+# Set up the Tesseract executable path (adjust the path as needed)
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# Capture the image from the clipboard
+image = ImageGrab.grabclipboard()
+
+if isinstance(image, Image.Image):
+    # Convert the image to OpenCV format
+    image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Apply thresholding to binarize the image
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+
+    # Optionally, apply dilation to join text blocks
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    dilated = cv2.dilate(thresh, kernel, iterations=1)
+
+    # Extract text from image using Tesseract
+    extracted_text = pytesseract.image_to_string(dilated, config='--psm 6')  # psm 6 assumes a uniform block of text
+
+    # Split text into rows and columns
+    rows = extracted_text.strip().split('\n')
+    data = [row.split() for row in rows]  # Adjust split based on the delimiter used in the OCR result
+
+    # Create a DataFrame
+    df = pd.DataFrame(data)
+
+    # Example: Removing empty rows and setting the first row as column headers
+    df = df.dropna(how='all')
+    df.columns = df.iloc[0]  # Set the first row as header
+    df = df[1:]  # Remove the header row from data
+
+    # Display the DataFrame
+    print(df)
+else:
+    print("No image found in the clipboard.")
