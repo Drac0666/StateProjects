@@ -1,1 +1,44 @@
-U.S. CMBS can be included in either an Investment Portfolio (IP) or a Bank-Owned Life Insurance (BOLI) portfolio. Once the 'orange' tab is populated with data, both the GT Source Data and BOLI tabs will automatically update accordingly.
+import pandas as pd
+
+def compare_t2_t1(t2_df: pd.DataFrame, t1_df: pd.DataFrame, key_column: str = 'Ticket') -> pd.DataFrame:
+    """
+    Compare the 'Ticket' column between T-2 and T-1 DataFrames and identify what is 'Gone' and 'New'.
+    
+    Parameters:
+    - t2_df: DataFrame corresponding to T-2 (older data)
+    - t1_df: DataFrame corresponding to T-1 (newer data)
+    - key_column: The column name to compare, default is 'Ticket'
+    
+    Returns:
+    - A DataFrame with 'Gone' and 'New' entries.
+    """
+    
+    # Identify what is 'Gone' (in T-2 but not in T-1)
+    gone_tickets = t2_df[~t2_df[key_column].isin(t1_df[key_column])]
+    gone_tickets['Status'] = 'Gone'
+    
+    # Identify what is 'New' (in T-1 but not in T-2)
+    new_tickets = t1_df[~t1_df[key_column].isin(t2_df[key_column])]
+    new_tickets['Status'] = 'New'
+    
+    # Combine the 'Gone' and 'New' entries into a single DataFrame
+    comparison_df = pd.concat([gone_tickets, new_tickets], ignore_index=True)
+    
+    return comparison_df
+
+# Example usage:
+# Load the T-2 and T-1 DataFrames
+t2_file = '/path/to/IP_T2_YYMMDD.xlsx'  # Replace with actual file path
+t1_file = '/path/to/IP_T1_YYMMDD.xlsx'  # Replace with actual file path
+
+t2_df = pd.read_excel(t2_file)
+t1_df = pd.read_excel(t1_file)
+
+# Compare the 'Ticket' column between T-2 and T-1
+comparison_df = compare_t2_t1(t2_df, t1_df)
+
+# Save the comparison result to an Excel file
+output_comparison_file = '/path/to/Comparison_YYMMDD.xlsx'  # Update with desired output path
+comparison_df.to_excel(output_comparison_file, index=False)
+
+print("Comparison complete. Results saved to", output_comparison_file)
