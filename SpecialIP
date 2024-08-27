@@ -1,44 +1,28 @@
-import pandas as pd
+from datetime import datetime, timedelta
+import numpy as np
 
-def compare_t2_t1(t2_df: pd.DataFrame, t1_df: pd.DataFrame, key_column: str = 'Ticket') -> pd.DataFrame:
-    """
-    Compare the 'Ticket' column between T-2 and T-1 DataFrames and identify what is 'Gone' and 'New'.
+# Function to get a previous business day, with an option to specify how many business days to go back
+def previous_business_day(days_back: int = 1) -> datetime:
+    today = datetime.today()
     
-    Parameters:
-    - t2_df: DataFrame corresponding to T-2 (older data)
-    - t1_df: DataFrame corresponding to T-1 (newer data)
-    - key_column: The column name to compare, default is 'Ticket'
+    # Create a timedelta array representing how far to move back each step
+    delta_days = np.arange(1, days_back + 1) * -1
     
-    Returns:
-    - A DataFrame with 'Gone' and 'New' entries.
-    """
-    
-    # Identify what is 'Gone' (in T-2 but not in T-1)
-    gone_tickets = t2_df[~t2_df[key_column].isin(t1_df[key_column])]
-    gone_tickets['Status'] = 'Gone'
-    
-    # Identify what is 'New' (in T-1 but not in T-2)
-    new_tickets = t1_df[~t1_df[key_column].isin(t2_df[key_column])]
-    new_tickets['Status'] = 'New'
-    
-    # Combine the 'Gone' and 'New' entries into a single DataFrame
-    comparison_df = pd.concat([gone_tickets, new_tickets], ignore_index=True)
-    
-    return comparison_df
+    # Iterate back until we find the requested number of business days ago
+    for delta in delta_days:
+        candidate_day = today + timedelta(days=delta)
+        # Check if the candidate day is a weekday (Mon-Fri)
+        if candidate_day.weekday() < 5:  # 0 = Monday, 4 = Friday
+            days_back -= 1
+            if days_back == 0:
+                return candidate_day
 
 # Example usage:
-# Load the T-2 and T-1 DataFrames
-t2_file = '/path/to/IP_T2_YYMMDD.xlsx'  # Replace with actual file path
-t1_file = '/path/to/IP_T1_YYMMDD.xlsx'  # Replace with actual file path
+# Get the previous business day (default, 1 business day back)
+t1_day = previous_business_day()
 
-t2_df = pd.read_excel(t2_file)
-t1_df = pd.read_excel(t1_file)
+# Get the date 5 business days back
+t5_day = previous_business_day(5)
 
-# Compare the 'Ticket' column between T-2 and T-1
-comparison_df = compare_t2_t1(t2_df, t1_df)
-
-# Save the comparison result to an Excel file
-output_comparison_file = '/path/to/Comparison_YYMMDD.xlsx'  # Update with desired output path
-comparison_df.to_excel(output_comparison_file, index=False)
-
-print("Comparison complete. Results saved to", output_comparison_file)
+print("T-1 Business Day:", t1_day.strftime('%d/%m/%Y'))
+print("T-5 Business Day:", t5_day.strftime('%d/%m/%Y'))
