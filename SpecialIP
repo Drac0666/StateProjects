@@ -1,24 +1,23 @@
-from datetime import datetime, timedelta
+import pandas as pd
 
-def previous_business_day(days_back: int = 1) -> datetime:
-    today = datetime.today()
-    business_days_count = 0
-    current_date = today
+def clipboard_to_list() -> list:
+    """
+    Reads data from the clipboard (assumed to be Excel data), converts the first row of
+    the DataFrame into a list of column names, and returns this list.
     
-    while business_days_count < days_back:
-        current_date -= timedelta(days=1)
-        # Check if the current date is a weekday (Mon-Fri)
-        if current_date.weekday() < 5:  # 0 = Monday, 4 = Friday
-            business_days_count += 1
+    Returns:
+    - A list of column names from the clipboard data.
+    """
+    # Read the data from the clipboard into a DataFrame
+    df = pd.read_clipboard()
     
-    return current_date
+    # Get the column names from the DataFrame and convert to a list
+    column_names = df.columns.tolist()
+    
+    # Print the list in the desired format
+    print(f"Column names as list: {column_names}")
+    
+    return column_names
 
 # Example usage:
-# Get the previous business day (default, 1 business day back)
-t1_day = previous_business_day()
-
-# Get the date 5 business days back
-t5_day = previous_business_day(5)
-
-print("T-1 Business Day:", t1_day.strftime('%d/%m/%Y'))
-print("T-5 Business Day:", t5_day.strftime('%d/%m/%Y'))
+column_list = clipboard_to_list()
