@@ -1,21 +1,17 @@
 from datetime import datetime, timedelta
-import numpy as np
 
-# Function to get a previous business day, with an option to specify how many business days to go back
 def previous_business_day(days_back: int = 1) -> datetime:
     today = datetime.today()
+    business_days_count = 0
+    current_date = today
     
-    # Create a timedelta array representing how far to move back each step
-    delta_days = np.arange(1, days_back + 1) * -1
+    while business_days_count < days_back:
+        current_date -= timedelta(days=1)
+        # Check if the current date is a weekday (Mon-Fri)
+        if current_date.weekday() < 5:  # 0 = Monday, 4 = Friday
+            business_days_count += 1
     
-    # Iterate back until we find the requested number of business days ago
-    for delta in delta_days:
-        candidate_day = today + timedelta(days=delta)
-        # Check if the candidate day is a weekday (Mon-Fri)
-        if candidate_day.weekday() < 5:  # 0 = Monday, 4 = Friday
-            days_back -= 1
-            if days_back == 0:
-                return candidate_day
+    return current_date
 
 # Example usage:
 # Get the previous business day (default, 1 business day back)
