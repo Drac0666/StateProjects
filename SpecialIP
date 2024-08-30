@@ -1,23 +1,24 @@
-import pandas as pd
+import requests
 
-def clipboard_to_list() -> list:
-    """
-    Reads data from the clipboard (assumed to be Excel data), converts the first row of
-    the DataFrame into a list of column names, and returns this list.
-    
-    Returns:
-    - A list of column names from the clipboard data.
-    """
-    # Read the data from the clipboard into a DataFrame
-    df = pd.read_clipboard()
-    
-    # Get the column names from the DataFrame and convert to a list
-    column_names = df.columns.tolist()
-    
-    # Print the list in the desired format
-    print(f"Column names as list: {column_names}")
-    
-    return column_names
+# URL of the webpage you want to open
+url = 'https://example.com/api/endpoint'
 
-# Example usage:
-column_list = clipboard_to_list()
+# Define the headers you want to send with the request
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+    'Authorization': 'Bearer YOUR_ACCESS_TOKEN',  # Replace with your actual token if needed
+    'Accept-Language': 'en-US,en;q=0.9',
+    # Add any other custom headers here
+}
+
+# Send the GET request with the defined headers
+response = requests.get(url, headers=headers)
+
+# Check if the request was successful
+if response.ok:
+    print('Page opened successfully!')
+    print('Response Content:', response.text)  # Print the page content
+else:
+    print('Failed to open the page.')
+    print('Status Code:', response.status_code)
+    print('Response Text:', response.text)
