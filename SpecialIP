@@ -1,24 +1,58 @@
-import requests
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep  4 09:21:18 2024
 
-# URL of the webpage you want to open
-url = 'https://example.com/api/endpoint'
+@author: edena
+"""
 
-# Define the headers you want to send with the request
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
-    'Authorization': 'Bearer YOUR_ACCESS_TOKEN',  # Replace with your actual token if needed
-    'Accept-Language': 'en-US,en;q=0.9',
-    # Add any other custom headers here
-}
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Alignment
 
-# Send the GET request with the defined headers
-response = requests.get(url, headers=headers)
+# Create the DataFrame
+data = {'x1': ['a', 'b', 'a'],
+        'x2': ['test', 'test1', 'test3'],
+        'x3': [500, 200, 300]}
+df = pd.DataFrame(data)
 
-# Check if the request was successful
-if response.ok:
-    print('Page opened successfully!')
-    print('Response Content:', response.text)  # Print the page content
-else:
-    print('Failed to open the page.')
-    print('Status Code:', response.status_code)
-    print('Response Text:', response.text)
+df.sort_values('x1',inplace=True)
+
+# Create a workbook and select the active worksheet
+wb = Workbook()
+ws = wb.active
+
+# Write DataFrame to the Excel sheet
+for r in dataframe_to_rows(df, index=False, header=True):
+    ws.append(r)
+
+# Function to merge cells for the same values in the x1 column
+def merge_same_cells(ws, column):
+    # Start after header row
+    current_value = None
+    start_row = None
+
+    # Iterate over each cell in the specified column
+    for row in range(2, ws.max_row + 1):  # Start from row 2 to skip the header
+        cell_value = ws[f'{column}{row}'].value
+
+        if cell_value == current_value:
+            continue
+        if cell_value != current_value:
+            if start_row and row - start_row > 1:
+                ws.merge_cells(f'{column}{start_row}:{column}{row-1}')
+                ws[f'{column}{start_row}'].alignment = Alignment(vertical='center')
+
+            current_value = cell_value
+            start_row = row
+
+    # Check for merging the last set of cells
+    if start_row and ws.max_row - start_row > 0:
+        ws.merge_cells(f'{column}{start_row}:{column}{ws.max_row}')
+        ws[f'{column}{start_row}'].alignment = Alignment(vertical='center')
+
+# Apply the merging function to column A (x1 column)
+merge_same_cells(ws, 'A')
+
+# Save the workbook
+wb.save('output.xlsx')
