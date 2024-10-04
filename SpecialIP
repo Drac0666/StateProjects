@@ -1,58 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Sep  4 09:21:18 2024
+Investment property loans are generally considered riskier compared to owner-occupied loans due to several factors, including higher overall household leverage and a lower emotional attachment to investment properties, which makes divesting them easier in times of financial strain. This elevated risk necessitates higher credit enhancement levels within RMBS structures to mitigate potential losses from defaults.
 
-@author: edena
-"""
+Investment loans in RMBS pools tend to exhibit slightly different performance characteristics compared to owner-occupied loans. Historical data has shown that default rates for investment loans may rise in periods of economic downturn, particularly when property values fall, which directly affects the performance of RMBS. RMBS deals now typically include performance triggers or early amortization provisions to protect senior tranche holders from the increased risk of defaults.
 
-import pandas as pd
-from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.styles import Alignment
-
-# Create the DataFrame
-data = {'x1': ['a', 'b', 'a'],
-        'x2': ['test', 'test1', 'test3'],
-        'x3': [500, 200, 300]}
-df = pd.DataFrame(data)
-
-df.sort_values('x1',inplace=True)
-
-# Create a workbook and select the active worksheet
-wb = Workbook()
-ws = wb.active
-
-# Write DataFrame to the Excel sheet
-for r in dataframe_to_rows(df, index=False, header=True):
-    ws.append(r)
-
-# Function to merge cells for the same values in the x1 column
-def merge_same_cells(ws, column):
-    # Start after header row
-    current_value = None
-    start_row = None
-
-    # Iterate over each cell in the specified column
-    for row in range(2, ws.max_row + 1):  # Start from row 2 to skip the header
-        cell_value = ws[f'{column}{row}'].value
-
-        if cell_value == current_value:
-            continue
-        if cell_value != current_value:
-            if start_row and row - start_row > 1:
-                ws.merge_cells(f'{column}{start_row}:{column}{row-1}')
-                ws[f'{column}{start_row}'].alignment = Alignment(vertical='center')
-
-            current_value = cell_value
-            start_row = row
-
-    # Check for merging the last set of cells
-    if start_row and ws.max_row - start_row > 0:
-        ws.merge_cells(f'{column}{start_row}:{column}{ws.max_row}')
-        ws[f'{column}{start_row}'].alignment = Alignment(vertical='center')
-
-# Apply the merging function to column A (x1 column)
-merge_same_cells(ws, 'A')
-
-# Save the workbook
-wb.save('output.xlsx')
+APRA’s guidelines have influenced the structuring of RMBS pools that include investment loans. APRA's introduction of prudential caps on investor loan growth and measures for responsible lending have directly impacted the composition of RMBS pools, leading to a reduction in the share of investment loans, particularly after 2014. However, these restrictions were eased in 2018, but prudential controls remained in place to ensure high lending standards for investment property loans.
+APRA's oversight has involved imposing limits on investor lending to ensure financial stability. For example, in 2014, APRA introduced a 10% benchmark on investor loan growth for authorized deposit-taking institutions (ADIs) to cool down the housing market. However, this was removed in 2018 as the market stabilized and lending standards improved. APRA has since focused on embedding more robust lending practices, prioritizing sound risk management in mortgage lending, especially concerning investment property loans within RMBS pools.
