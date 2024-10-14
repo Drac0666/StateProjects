@@ -1,7 +1,124 @@
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.io as pio
 
-# Assuming your DataFrame is named 'df' and the date column is named 'datecolumn'
-df['datecolumn'] = pd.to_datetime(df['datecolumn'], format='%d-%b-%y')
+# Sample data dictionary: replace this with your actual dictionary of DataFrames
+# Assume `data_dict` is a dictionary where keys are dates and values are DataFrames
+# Example: data_dict = {'2024-10-01': df1, '2024-10-02': df2, ...}
 
-# Format the date as "2023-10-04"
-df['datecolumn'] = df['datecolumn'].dt.strftime('%Y-%m-%d')
+# Assume `spread_df` is provided with columns "Date", "Spread_France", and "Spread_Spain"
+# For example:
+# spread_df = pd.DataFrame({'Date': ['2024-10-01', '2024-10-02'], 'Spread_France': [0.1, 0.2], 'Spread_Spain': [0.3, 0.4]})
+
+# Step 1: Combine data into a single DataFrame
+combined_df = pd.concat([df.assign(Date=key) for key, df in data_dict.items()])
+
+# Step 2: Group by Date and Asset_Class, summing the Fair Value
+grouped_df = combined_df.groupby(['Date', 'Asset_Class'])['Fair Value'].sum().reset_index()
+
+# Step 3: Pivot the DataFrame to have Asset_Class as columns and Date as rows
+pivot_df = grouped_df.pivot(index='Date', columns='Asset_Class', values='Fair Value').fillna(0)
+
+# Ensure that 'Date' is the index of spread_df for merging
+spread_df.set_index('Date', inplace=True)
+
+# Step 4: Create the main figure with all Asset Classes
+fig_main = make_subplots(specs=[[{"secondary_y": True}]])
+
+# Add traces for "France" data on the primary y-axis
+for col in pivot_df.columns:
+    if col.startswith("France"):
+        fig_main.add_trace(
+            go.Scatter(x=pivot_df.index, y=pivot_df[col], mode='lines', name=col),
+            secondary_y=False
+        )
+
+# Add traces for "Spain" data on the secondary y-axis
+for col in pivot_df.columns:
+    if col.startswith("Spain"):
+        fig_main.add_trace(
+            go.Scatter(x=pivot_df.index, y=pivot_df[col], mode='lines', name=col),
+            secondary_y=True
+        )
+
+# Update layout for the main figure
+fig_main.update_layout(
+    title='Sum of Fair Value per Asset Class Over Time (All Asset Classes)',
+    xaxis_title='Date',
+    yaxis_title='Sum of Fair Value (France)',
+    yaxis2_title='Sum of Fair Value (Spain)',
+    legend_title='Asset Class',
+    xaxis=dict(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        ),
+        rangeslider=dict(visible=True),
+        type="date"
+    )
+)
+
+# Step 5: Create individual figures for each Asset Class with Spread data
+figures_html = [pio.to_html(fig_main, full_html=False)]  # Start with the main figure
+
+for asset_class in pivot_df.columns:
+    # Create a figure for each asset class with a secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # Add trace for the Fair Value of the current Asset Class
+    fig.add_trace(
+        go.Scatter(x=pivot_df.index, y=pivot_df[asset_class], mode='lines', name=asset_class),
+        secondary_y=False
+    )
+    
+    # Add secondary y-axis trace for "Spread_France"
+    fig.add_trace(
+        go.Scatter(x=spread_df.index, y=spread_df['Spread_France'], mode='lines', name='Spread_France', line=dict(dash='dash')),
+        secondary_y=True
+    )
+    
+    # Add secondary y-axis trace for "Spread_Spain"
+    fig.add_trace(
+        go.Scatter(x=spread_df.index, y=spread_df['Spread_Spain'], mode='lines', name='Spread_Spain', line=dict(dash='dot')),
+        secondary_y=True
+    )
+    
+    # Update layout for each individual Asset Class figure
+    fig.update_layout(
+        title=f'Sum of Fair Value Over Time with Spread Data ({asset_class})',
+        xaxis_title='Date',
+        yaxis_title='Sum of Fair Value',
+        yaxis2_title='Spread',
+        legend_title='Legend',
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True),
+            type="date"
+        )
+    )
+    
+    figures_html.append(pio.to_html(fig, full_html=False))
+
+# Step 6: Combine all the figures' HTML into one file
+with open('multiple_plots_with_asset_classes_and_spreads.html', 'w') as f:
+    f.write('<html><head><title>Multiple Plots with Spreads</title></head><body>')
+    for fig_html in figures_html:
+        f.write(fig_html)
+    f.write('</body></html>')
+
+# Optional: Display the main figure
+fig_main.show()
