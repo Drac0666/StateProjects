@@ -1,7 +1,27 @@
-fig = px.line(pivot_df, title='Sum of Fair Value per Asset Class Over Time')
+fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+# Add traces for "France" data on the primary y-axis
+for col in pivot_df.columns:
+    if col.startswith("France"):
+        fig.add_trace(
+            go.Scatter(x=pivot_df.index, y=pivot_df[col], mode='lines', name=col),
+            secondary_y=False
+        )
+
+# Add traces for "Spain" data on the secondary y-axis
+for col in pivot_df.columns:
+    if col.startswith("Spain"):
+        fig.add_trace(
+            go.Scatter(x=pivot_df.index, y=pivot_df[col], mode='lines', name=col),
+            secondary_y=True
+        )
+
+# Step 5: Update layout to add title, axis labels, and range slider
 fig.update_layout(
+    title='Sum of Fair Value per Asset Class Over Time',
     xaxis_title='Date',
-    yaxis_title='Sum of Fair Value',
+    yaxis_title='Sum of Fair Value (France)',
+    yaxis2_title='Sum of Fair Value (Spain)',
     legend_title='Asset Class',
     xaxis=dict(
         rangeselector=dict(
@@ -17,4 +37,5 @@ fig.update_layout(
         type="date"
     )
 )
+
 fig.show()
