@@ -1,30 +1,7 @@
-# Step 5: Create individual figures for each Asset Class
-figures_html = [pio.to_html(fig_main, full_html=False)]  # Start with the main figure
+import pandas as pd
 
-for asset_class in pivot_df.columns:
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(x=pivot_df.index, y=pivot_df[asset_class], mode='lines', name=asset_class)
-    )
-    
-    # Update layout for each individual Asset Class figure
-    fig.update_layout(
-        title=f'Sum of Fair Value Over Time ({asset_class})',
-        xaxis_title='Date',
-        yaxis_title='Sum of Fair Value',
-        legend_title='Asset Class',
-        xaxis=dict(
-            rangeselector=dict(
-                buttons=list([
-                    dict(count=1, label="1m", step="month", stepmode="backward"),
-                    dict(count=6, label="6m", step="month", stepmode="backward"),
-                    dict(count=1, label="YTD", step="year", stepmode="todate"),
-                    dict(count=1, label="1y", step="year", stepmode="backward"),
-                    dict(step="all")
-                ])
-            ),
-            rangeslider=dict(visible=True),
-            type="date"
-        )
-    )
-    figures_html.append(pio.to_html(fig, full_html=False))
+# Assuming your DataFrame is named 'df' and the date column is named 'datecolumn'
+df['datecolumn'] = pd.to_datetime(df['datecolumn'], format='%d-%b-%y')
+
+# Format the date as "2023-10-04"
+df['datecolumn'] = df['datecolumn'].dt.strftime('%Y-%m-%d')
