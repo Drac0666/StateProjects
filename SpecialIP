@@ -1,24 +1,20 @@
-import pandas as pd
-import plotly.express as px
-
-# Sample data dictionary: replace this with your actual dictionary of DataFrames
-# Assume `data_dict` is a dictionary where keys are dates and values are DataFrames
-# Example: data_dict = {'2024-10-01': df1, '2024-10-02': df2, ...}
-
-# Step 1: Combine data into a single DataFrame
-combined_df = pd.concat([df.assign(Date=key) for key, df in data_dict.items()])
-
-# Step 2: Group by Date and Asset_Class, summing the Fair Value
-grouped_df = combined_df.groupby(['Date', 'Asset_Class'])['Fair Value'].sum().reset_index()
-
-# Step 3: Pivot the DataFrame to have Asset_Class as columns and Date as rows
-pivot_df = grouped_df.pivot(index='Date', columns='Asset_Class', values='Fair Value').fillna(0)
-
-# Step 4: Plot using Plotly
 fig = px.line(pivot_df, title='Sum of Fair Value per Asset Class Over Time')
 fig.update_layout(
     xaxis_title='Date',
     yaxis_title='Sum of Fair Value',
-    legend_title='Asset Class'
+    legend_title='Asset Class',
+    xaxis=dict(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all")
+            ])
+        ),
+        rangeslider=dict(visible=True),
+        type="date"
+    )
 )
 fig.show()
