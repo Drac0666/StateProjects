@@ -1,9 +1,28 @@
-fig = make_subplots(specs=[[{"secondary_y": True}]])
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.io as pio
+
+# Sample data dictionary: replace this with your actual dictionary of DataFrames
+# Assume `data_dict` is a dictionary where keys are dates and values are DataFrames
+# Example: data_dict = {'2024-10-01': df1, '2024-10-02': df2, ...}
+
+# Step 1: Combine data into a single DataFrame
+combined_df = pd.concat([df.assign(Date=key) for key, df in data_dict.items()])
+
+# Step 2: Group by Date and Asset_Class, summing the Fair Value
+grouped_df = combined_df.groupby(['Date', 'Asset_Class'])['Fair Value'].sum().reset_index()
+
+# Step 3: Pivot the DataFrame to have Asset_Class as columns and Date as rows
+pivot_df = grouped_df.pivot(index='Date', columns='Asset_Class', values='Fair Value').fillna(0)
+
+# Step 4: Create the main figure with all Asset Classes
+fig_main = make_subplots(specs=[[{"secondary_y": True}]])
 
 # Add traces for "France" data on the primary y-axis
 for col in pivot_df.columns:
     if col.startswith("France"):
-        fig.add_trace(
+        fig_main.add_trace(
             go.Scatter(x=pivot_df.index, y=pivot_df[col], mode='lines', name=col),
             secondary_y=False
         )
@@ -11,14 +30,14 @@ for col in pivot_df.columns:
 # Add traces for "Spain" data on the secondary y-axis
 for col in pivot_df.columns:
     if col.startswith("Spain"):
-        fig.add_trace(
+        fig_main.add_trace(
             go.Scatter(x=pivot_df.index, y=pivot_df[col], mode='lines', name=col),
             secondary_y=True
         )
 
-# Step 5: Update layout to add title, axis labels, and range slider
-fig.update_layout(
-    title='Sum of Fair Value per Asset Class Over Time',
+# Update layout for the main figure
+fig_main.update_layout(
+    title='Sum of Fair Value per Asset Class Over Time (All Asset Classes)',
     xaxis_title='Date',
     yaxis_title='Sum of Fair Value (France)',
     yaxis2_title='Sum of Fair Value (Spain)',
@@ -38,4 +57,39 @@ fig.update_layout(
     )
 )
 
-fig.show()
+# Step 5: Create individual figures for each Asset Class
+figures = [fig_main]  # Start with the main figure
+
+for asset_class in pivot_df.columns:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=pivot_df.index, y=pivot_df[asset_class], mode='lines', name=asset_class)
+    )
+    
+    # Update layout for each individual Asset Class figure
+    fig.update_layout(
+        title=f'Sum of Fair Value Over Time ({asset_class})',
+        xaxis_title='Date',
+        yaxis_title='Sum of Fair Value',
+        legend_title='Asset Class',
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True),
+            type="date"
+        )
+    )
+    figures.append(fig)
+
+# Step 6: Export all figures to a single HTML file
+pio.write_html(figures, file='multiple_plots_with_asset_classes.html', auto_open=True)
+
+# Optional: Display the main figure
+fig_main.show()
