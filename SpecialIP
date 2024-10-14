@@ -1,6 +1,24 @@
-Investment property loans are generally considered riskier compared to owner-occupied loans due to several factors, including higher overall household leverage and a lower emotional attachment to investment properties, which makes divesting them easier in times of financial strain. This elevated risk necessitates higher credit enhancement levels within RMBS structures to mitigate potential losses from defaults.
+import pandas as pd
+import plotly.express as px
 
-Investment loans in RMBS pools tend to exhibit slightly different performance characteristics compared to owner-occupied loans. Historical data has shown that default rates for investment loans may rise in periods of economic downturn, particularly when property values fall, which directly affects the performance of RMBS. RMBS deals now typically include performance triggers or early amortization provisions to protect senior tranche holders from the increased risk of defaults.
+# Sample data dictionary: replace this with your actual dictionary of DataFrames
+# Assume `data_dict` is a dictionary where keys are dates and values are DataFrames
+# Example: data_dict = {'2024-10-01': df1, '2024-10-02': df2, ...}
 
-APRA’s guidelines have influenced the structuring of RMBS pools that include investment loans. APRA's introduction of prudential caps on investor loan growth and measures for responsible lending have directly impacted the composition of RMBS pools, leading to a reduction in the share of investment loans, particularly after 2014. However, these restrictions were eased in 2018, but prudential controls remained in place to ensure high lending standards for investment property loans.
-APRA's oversight has involved imposing limits on investor lending to ensure financial stability. For example, in 2014, APRA introduced a 10% benchmark on investor loan growth for authorized deposit-taking institutions (ADIs) to cool down the housing market. However, this was removed in 2018 as the market stabilized and lending standards improved. APRA has since focused on embedding more robust lending practices, prioritizing sound risk management in mortgage lending, especially concerning investment property loans within RMBS pools.
+# Step 1: Combine data into a single DataFrame
+combined_df = pd.concat([df.assign(Date=key) for key, df in data_dict.items()])
+
+# Step 2: Group by Date and Asset_Class, summing the Fair Value
+grouped_df = combined_df.groupby(['Date', 'Asset_Class'])['Fair Value'].sum().reset_index()
+
+# Step 3: Pivot the DataFrame to have Asset_Class as columns and Date as rows
+pivot_df = grouped_df.pivot(index='Date', columns='Asset_Class', values='Fair Value').fillna(0)
+
+# Step 4: Plot using Plotly
+fig = px.line(pivot_df, title='Sum of Fair Value per Asset Class Over Time')
+fig.update_layout(
+    xaxis_title='Date',
+    yaxis_title='Sum of Fair Value',
+    legend_title='Asset Class'
+)
+fig.show()
