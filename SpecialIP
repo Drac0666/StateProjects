@@ -1,31 +1,28 @@
 import pandas as pd
+import openpyxl
+from openpyxl.styles import PatternFill
+import io
 
-# Sample data for combined_df
-data_dict = {
-    '2024-09-14': pd.DataFrame({
-        'Asset_Class': ['France_Equities', 'Spain_Bonds', 'France_Bonds', 'Spain_Equities', 'France_Equities'],
-        'Fair Value': [100, 200, 150, 300, 50]  # Added a duplicate for testing
-    }),
-    '2024-10-11': pd.DataFrame({
-        'Asset_Class': ['France_Equities', 'Spain_Bonds', 'France_Bonds', 'Spain_Equities', 'France_Equities'],
-        'Fair Value': [120, 180, 160, 320, 30]  # Added a duplicate for testing
-    })
-}
+# Read clipboard data into DataFrame
+clipboard_data = pd.read_clipboard()
 
-# Step 1: Combine data into a single DataFrame and add the date
-combined_df = pd.concat([df.assign(Date=key) for key, df in data_dict.items()])
+# Save it into a temporary Excel file in memory
+with pd.ExcelWriter('AusRMBS.xlsx', engine='openpyxl') as writer:
+    clipboard_data.to_excel(writer, index=False)
 
-# Step 2: Group by 'Asset_Class' and 'Date', and sum the 'Fair Value' to remove duplicates
-grouped_df = combined_df.groupby(['Asset_Class', 'Date']).sum().reset_index()
+# Reopen the saved file to edit with openpyxl
+wb = openpyxl.load_workbook('AusRMBS.xlsx')
+ws = wb.active
 
-# Step 3: Filter for the required dates (2024-09-14 and 2024-10-11)
-filtered_df = grouped_df[grouped_df['Date'].isin(['2024-09-14', '2024-10-11'])]
+# Define the fill color (yellow)
+yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-# Step 4: Pivot the DataFrame to have 'Asset_Class' as the index, 'Date' as columns, and 'Fair Value' as values
-comparison_df = filtered_df.pivot(index='Asset_Class', columns='Date', values='Fair Value')
+# Iterate through rows and apply yellow color to the first column if "SME Input" is found in any row
+for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+    if row[1].value == "SME Input":  # Assuming the "SME Input" value is in the second column (index 1)
+        row[0].fill = yellow_fill     # Apply yellow fill to the first column (index 0)
 
-# Step 5: Calculate the difference between the two dates
-comparison_df['Difference'] = comparison_df['2024-10-11'] - comparison_df['2024-09-14']
+# Save the modified Excel file
+wb.save('AusRMBS.xlsx')
 
-# Display the resulting DataFrame with the differences
-import ace_tools as tools; tools.display_dataframe_to_user(name="Comparison of Fair Values with Differences", dataframe=comparison_df)
+print("File saved as AusRMBS.xlsx")
