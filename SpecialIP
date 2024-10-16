@@ -1,26 +1,25 @@
 import pandas as pd
 import openpyxl
 from openpyxl.styles import PatternFill
-import io
 
-# Read clipboard data into DataFrame
+# Read clipboard data into a DataFrame
 clipboard_data = pd.read_clipboard()
 
-# Save it into a temporary Excel file in memory
-with pd.ExcelWriter('AusRMBS.xlsx', engine='openpyxl') as writer:
-    clipboard_data.to_excel(writer, index=False)
+# Save DataFrame to an Excel file
+clipboard_data.to_excel('AusRMBS.xlsx', index=False)
 
-# Reopen the saved file to edit with openpyxl
+# Reopen the saved file with openpyxl
 wb = openpyxl.load_workbook('AusRMBS.xlsx')
 ws = wb.active
 
-# Define the fill color (yellow)
+# Define the yellow fill color
 yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-# Iterate through rows and apply yellow color to the first column if "SME Input" is found in any row
-for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-    if row[1].value == "SME Input":  # Assuming the "SME Input" value is in the second column (index 1)
-        row[0].fill = yellow_fill     # Apply yellow fill to the first column (index 0)
+# Iterate through rows and check for "SME Input" in any column except the first
+for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+    for cell in row[1:]:  # Skip the first column, start checking from the second column onwards
+        if cell.value == "SME Input":
+            row[0].fill = yellow_fill  # Color the first column cell in the same row
 
 # Save the modified Excel file
 wb.save('AusRMBS.xlsx')
