@@ -1,43 +1,29 @@
 import pandas as pd
-import numpy as np
 
-# Sample Series for demonstration
-data_dict = {
-    'series1': pd.Series([10, ' - ', 30], index=['A', 'B', 'C']),  # Extra spaces around '-'
-    'series2': pd.Series([40, 50, ' - ', 70], index=['X', 'Y', 'Z', 'W']),
-    'series3': pd.Series([100, ' - ', ' - '], index=['L', 'M', 'N'])  # Case with NaNs left
-}
+# Assuming df_from_dict is already created
+# Sample df with "Vintage" column for demonstration
+df_vintage = pd.DataFrame({
+    'CUSIP': ['series1', 'series2', 'series3'],
+    'Vintage': [2021, 2022, 2023]
+})
 
-# Create an empty dictionary to store the renamed Series
-renamed_dict = {}
+# Merge df_from_dict with df_vintage based on matching column names (CUSIP)
+# We're going to first transpose df_from_dict to make its columns rows for easier merging
+df_from_dict_transposed = df_from_dict.T.reset_index().rename(columns={'index': 'CUSIP'})
 
-# Iterate through each Series in the original dictionary
-for key, series in data_dict.items():
-    # Strip spaces around values and replace '-' with NaN
-    series = series.apply(lambda x: np.nan if str(x).strip() == '-' else x)
-    
-    # Backfill NaN values with the last valid value
-    series = series.bfill()
-    
-    # Drop any remaining NaN values after backfill
-    series = series.dropna()
-    
-    # Reset the index and assign sequential numbers (starting from 1) as the new index
-    renamed_series = series.reset_index(drop=True)
-    renamed_series.index = renamed_series.index + 1  # To start from 1 instead of 0
-    
-    # Add the renamed series to the new dictionary
-    renamed_dict[key] = renamed_series
+# Merge on the 'CUSIP' column
+merged_df = pd.merge(df_from_dict_transposed, df_vintage, on='CUSIP', how='inner')
 
-# Create a common index based on the longest series
-common_index = pd.Index(range(1, max([len(series) for series in renamed_dict.values()]) + 1))
+# Now, transpose it back to its original format with Vintage column
+merged_df = merged_df.set_index(['CUSIP', 'Vintage']).T
 
-# Reindex all series to the common index
-for key, series in renamed_dict.items():
-    renamed_dict[key] = series.reindex(common_index, method='ffill')  # Forward fill any missing values
+# Create a dictionary where each Vintage year is the key and each subset of data is the value
+data_by_vintage = {}
 
-# Create a DataFrame from the dictionary of series, where each series becomes a column
-df_from_dict = pd.DataFrame(renamed_dict)
+for vintage_year in merged_df.columns.get_level_values('Vintage').unique():
+    # Extract data for each vintage
+    data_by_vintage[vintage_year] = merged_df.xs(vintage_year, level='Vintage', axis=1)
 
-# Display the final DataFrame
-print(df_from_dict)
+# Display the dictionary with each vintage's assigned data
+for vintage, data in data_by_vintage.items():
+    print(f"Vintage {vintage}:\n{data}\n")
