@@ -2,8 +2,8 @@ import pandas as pd
 
 # Sample Series for demonstration
 data_dict = {
-    'series1': pd.Series([10, 20, 30], index=['A', '-', 'C']),
-    'series2': pd.Series([40, 50, 60, 70], index=['X', 'Y', '-', 'W'])
+    'series1': pd.Series([10, ' - ', 30], index=['A', 'B', 'C']),  # Extra spaces around '-'
+    'series2': pd.Series([40, 50, ' - ', 70], index=['X', 'Y', 'Z', 'W'])
 }
 
 # Create an empty dictionary to store the renamed Series
@@ -11,8 +11,8 @@ renamed_dict = {}
 
 # Iterate through each Series in the original dictionary
 for key, series in data_dict.items():
-    # Replace index values that are equal to '-' with 0
-    series.index = series.index.map(lambda x: 0 if x == '-' else x)
+    # Strip spaces around values and replace '-' with 0
+    series = series.apply(lambda x: 0 if str(x).strip() == '-' else x)
     
     # Reset the index and assign sequential numbers (starting from 1) as the new index
     renamed_series = series.reset_index(drop=True)
@@ -23,4 +23,4 @@ for key, series in data_dict.items():
 
 # Displaying the renamed series
 for key, series in renamed_dict.items():
-    print(f"{key} with renamed index and '-' replaced by 0:\n{series}\n")
+    print(f"{key} with values stripped of '-' and replaced by 0:\n{series}\n")
