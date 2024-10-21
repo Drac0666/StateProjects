@@ -1,29 +1,53 @@
 import pandas as pd
+import numpy as np
 
-# Assuming df_from_dict is already created
 # Sample df with "Vintage" column for demonstration
 df_vintage = pd.DataFrame({
     'CUSIP': ['series1', 'series2', 'series3'],
     'Vintage': [2021, 2022, 2023]
 })
 
-# Merge df_from_dict with df_vintage based on matching column names (CUSIP)
-# We're going to first transpose df_from_dict to make its columns rows for easier merging
-df_from_dict_transposed = df_from_dict.T.reset_index().rename(columns={'index': 'CUSIP'})
+# Sample data for df_from_dict
+data_dict = {
+    'series1': pd.Series([10, ' - ', 30], index=['A', 'B', 'C']),  
+    'series2': pd.Series([40, 50, ' - ', 70], index=['X', 'Y', 'Z', 'W']),
+    'series3': pd.Series([100, ' - ', ' - '], index=['L', 'M', 'N'])  
+}
 
-# Merge on the 'CUSIP' column
+# Process each series
+renamed_dict = {}
+for key, series in data_dict.items():
+    # Replace '-' with NaN
+    series = series.apply(lambda x: np.nan if str(x).strip() == '-' else x)
+    
+    # Backfill and drop remaining NaN
+    series = series.bfill().dropna()
+    
+    # Reset index
+    renamed_series = series.reset_index(drop=True)
+    renamed_series.index = renamed_series.index + 1
+    renamed_dict[key] = renamed_series
+
+# Create DataFrame from the processed dictionary
+df_from_dict = pd.DataFrame(renamed_dict)
+
+# Transpose df_from_dict to merge with df_vintage
+df_from_dict_transposed = df_from_dict.T.reset_index().rename(columns={'index': 'CUSIP'})
 merged_df = pd.merge(df_from_dict_transposed, df_vintage, on='CUSIP', how='inner')
 
-# Now, transpose it back to its original format with Vintage column
+# Transpose it back with Vintage
 merged_df = merged_df.set_index(['CUSIP', 'Vintage']).T
 
-# Create a dictionary where each Vintage year is the key and each subset of data is the value
+# Create dictionary based on Vintage year
 data_by_vintage = {}
-
 for vintage_year in merged_df.columns.get_level_values('Vintage').unique():
-    # Extract data for each vintage
     data_by_vintage[vintage_year] = merged_df.xs(vintage_year, level='Vintage', axis=1)
 
-# Display the dictionary with each vintage's assigned data
-for vintage, data in data_by_vintage.items():
-    print(f"Vintage {vintage}:\n{data}\n")
+# Calculate the average for each vintage year
+average_by_vintage = {}
+for vintage_year, data in data_by_vintage.items():
+    # Calculate the average for each vintage across periods
+    average_by_vintage[vintage_year] = data.mean()
+
+# Display the average values for each vintage
+print(average_by_vintage)
