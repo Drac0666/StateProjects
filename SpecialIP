@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 # Sample Series for demonstration
 data_dict = {
@@ -11,8 +12,11 @@ renamed_dict = {}
 
 # Iterate through each Series in the original dictionary
 for key, series in data_dict.items():
-    # Strip spaces around values and replace '-' with 0
-    series = series.apply(lambda x: 0 if str(x).strip() == '-' else x)
+    # Strip spaces around values and replace '-' with NaN
+    series = series.apply(lambda x: np.nan if str(x).strip() == '-' else x)
+    
+    # Backfill NaN values with the last valid value
+    series = series.bfill()
     
     # Reset the index and assign sequential numbers (starting from 1) as the new index
     renamed_series = series.reset_index(drop=True)
@@ -21,6 +25,6 @@ for key, series in data_dict.items():
     # Add the renamed series to the new dictionary
     renamed_dict[key] = renamed_series
 
-# Displaying the renamed series
+# Displaying the renamed series with backfilled values
 for key, series in renamed_dict.items():
-    print(f"{key} with values stripped of '-' and replaced by 0:\n{series}\n")
+    print(f"{key} with backfilled values for '-':\n{series}\n")
