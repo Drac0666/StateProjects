@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 
 # Sample df with "Vintage" column for demonstration
 df_vintage = pd.DataFrame({
@@ -53,5 +54,25 @@ for vintage_year, data in data_by_vintage.items():
 # Create a new DataFrame where the columns are vintages and the values are the averages per index
 df_average_per_vintage = pd.DataFrame(average_per_vintage_index)
 
-# Display the resulting DataFrame
-print(df_average_per_vintage)
+# Plotting the data with Plotly
+fig = go.Figure()
+
+# Add a trace for each vintage
+for vintage in df_average_per_vintage.columns:
+    fig.add_trace(go.Scatter(
+        x=df_average_per_vintage.index,
+        y=df_average_per_vintage[vintage],
+        mode='lines+markers',
+        name=f'Vintage {vintage}'
+    ))
+
+# Set plot title and labels
+fig.update_layout(
+    title="Average Values per Index for Each Vintage",
+    xaxis_title="Index",
+    yaxis_title="Average Value",
+    legend_title="Vintage"
+)
+
+# Show plot
+fig.show()
