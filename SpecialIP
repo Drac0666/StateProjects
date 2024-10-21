@@ -60,10 +60,13 @@ df_average_per_vintage = df_average_per_vintage.iloc[::-1]
 # Plotting the reversed data with Plotly
 fig = go.Figure()
 
+# Reverse the X values (indexes) explicitly
+reversed_index = df_average_per_vintage.index[::-1]
+
 # Add a trace for each vintage
 for vintage in df_average_per_vintage.columns:
     fig.add_trace(go.Scatter(
-        x=df_average_per_vintage.index,
+        x=reversed_index,  # Use reversed index here
         y=df_average_per_vintage[vintage],
         mode='lines+markers',
         name=f'Vintage {vintage}'
@@ -74,7 +77,8 @@ fig.update_layout(
     title="Average Values per Index for Each Vintage (Reversed Index)",
     xaxis_title="Index",
     yaxis_title="Average Value",
-    legend_title="Vintage"
+    legend_title="Vintage",
+    xaxis=dict(autorange="reversed")  # Reverse the X-axis display
 )
 
 # Show plot
