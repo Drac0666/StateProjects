@@ -1,85 +1,41 @@
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+from sklearn.preprocessing import LabelEncoder
 
-# Sample df with "Vintage" column for demonstration
-df_vintage = pd.DataFrame({
-    'CUSIP': ['series1', 'series2', 'series3'],
-    'Vintage': [2021, 2022, 2022]
-})
+# Wczytaj dane do DataFrame
+df = pd.read_csv('twoje_dane.csv')
 
-# Sample data for df_from_dict
-data_dict = {
-    'series1': pd.Series([10, ' - ', 30], index=['A', 'B', 'C']),  
-    'series2': pd.Series([40, 50, ' - ', 70], index=['X', 'Y', 'Z', 'W']),
-    'series3': pd.Series([100, ' - ', ' - '], index=['L', 'M', 'N'])  
-}
+# Zakładam, że kolumna "Delinquency" ma wartości 'Y' oraz 'N'. Zakoduj je na wartości 0 i 1
+df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
 
-# Process each series
-renamed_dict = {}
-for key, series in data_dict.items():
-    # Replace '-' with NaN
-    series = series.apply(lambda x: np.nan if str(x).strip() == '-' else x)
-    
-    # Backfill and drop remaining NaN
-    series = series.bfill().dropna()
-    
-    # Reset index
-    renamed_series = series.reset_index(drop=True)
-    renamed_series.index = renamed_series.index + 1
-    renamed_dict[key] = renamed_series
+# Upewnij się, że inne kolumny są w odpowiednim formacie, np. numerycznym
+# Jeśli masz kolumny kategoryczne, możesz użyć LabelEncoder
+labelencoder = LabelEncoder()
+for column in df.select_dtypes(include=['object']).columns:
+    df[column] = labelencoder.fit_transform(df[column])
 
-# Create DataFrame from the processed dictionary
-df_from_dict = pd.DataFrame(renamed_dict)
+# Zdefiniuj zmienne X (wszystkie kolumny poza Delinquency) i y (Delinquency)
+X = df.drop('Delinquency', axis=1)
+y = df['Delinquency']
 
-# Transpose df_from_dict to merge with df_vintage
-df_from_dict_transposed = df_from_dict.T.reset_index().rename(columns={'index': 'CUSIP'})
-merged_df = pd.merge(df_from_dict_transposed, df_vintage, on='CUSIP', how='inner')
+# Podziel dane na zbiór treningowy i testowy
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# Transpose it back with Vintage
-merged_df = merged_df.set_index(['CUSIP', 'Vintage']).T
+# Zbuduj model regresji logistycznej
+model = LogisticRegression()
+model.fit(X_train, y_train)
 
-# Create dictionary based on Vintage year
-data_by_vintage = {}
-for vintage_year in merged_df.columns.get_level_values('Vintage').unique():
-    data_by_vintage[vintage_year] = merged_df.xs(vintage_year, level='Vintage', axis=1)
+# Przewiduj na podstawie zbioru testowego
+y_pred = model.predict(X_test)
 
-# Calculate the average per vintage and per index
-average_per_vintage_index = {}
+# Wyświetl raport klasyfikacji
+print(classification_report(y_test, y_pred))
 
-for vintage_year, data in data_by_vintage.items():
-    # Calculate the average across all CUSIPs for each index (row)
-    average_per_vintage_index[vintage_year] = data.mean(axis=1)
+# Sprawdź współczynniki modelu, aby zobaczyć, które zmienne mają największy wpływ
+coefficients = pd.DataFrame({"Feature": X.columns, "Coefficient": np.abs(model.coef_[0])})
+coefficients = coefficients.sort_values(by='Coefficient', ascending=False)
 
-# Create a new DataFrame where the columns are vintages and the values are the averages per index
-df_average_per_vintage = pd.DataFrame(average_per_vintage_index)
-
-# Reverse the index so that the most recent (1) is plotted last
-df_average_per_vintage = df_average_per_vintage.iloc[::-1]
-
-# Plotting the reversed data with Plotly
-fig = go.Figure()
-
-# Reverse the X values (indexes) explicitly
-reversed_index = df_average_per_vintage.index[::-1]
-
-# Add a trace for each vintage
-for vintage in df_average_per_vintage.columns:
-    fig.add_trace(go.Scatter(
-        x=reversed_index,  # Use reversed index here
-        y=df_average_per_vintage[vintage],
-        mode='lines+markers',
-        name=f'Vintage {vintage}'
-    ))
-
-# Set plot title and labels
-fig.update_layout(
-    title="Average Values per Index for Each Vintage (Reversed Index)",
-    xaxis_title="Index",
-    yaxis_title="Average Value",
-    legend_title="Vintage",
-    xaxis=dict(autorange="reversed")  # Reverse the X-axis display
-)
-
-# Show plot
-fig.show()
+print(coefficients)
