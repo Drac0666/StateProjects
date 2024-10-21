@@ -50,6 +50,8 @@ for vintage_year, data in data_by_vintage.items():
     # Calculate the average across all CUSIPs for each index (row)
     average_per_vintage_index[vintage_year] = data.mean(axis=1)
 
-# Display the results
-for vintage_year, avg in average_per_vintage_index.items():
-    print(f"Average for Vintage {vintage_year}:\n{avg}\n")
+# Create a new DataFrame where the columns are vintages and the values are the averages per index
+df_average_per_vintage = pd.DataFrame(average_per_vintage_index)
+
+# Display the resulting DataFrame
+print(df_average_per_vintage)
