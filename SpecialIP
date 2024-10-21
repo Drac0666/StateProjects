@@ -11,14 +11,19 @@ df = pd.read_csv('twoje_dane.csv')
 # Zakładam, że kolumna "Delinquency" ma wartości 'Y' oraz 'N'. Zakoduj je na wartości 0 i 1
 df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
 
-# Upewnij się, że inne kolumny są w odpowiednim formacie, np. numerycznym
+# Wybierz konkretne kolumny, które chcesz uwzględnić w analizie
+# Na przykład: ['Column1', 'Column2', 'Column3']
+selected_columns = ['Column1', 'Column2', 'Column3']  # Podaj tutaj nazwy swoich kolumn
+
+# Upewnij się, że wybrane kolumny są w odpowiednim formacie, np. numerycznym
 # Jeśli masz kolumny kategoryczne, możesz użyć LabelEncoder
 labelencoder = LabelEncoder()
-for column in df.select_dtypes(include=['object']).columns:
-    df[column] = labelencoder.fit_transform(df[column])
+for column in selected_columns:
+    if df[column].dtype == 'object':
+        df[column] = labelencoder.fit_transform(df[column])
 
-# Zdefiniuj zmienne X (wszystkie kolumny poza Delinquency) i y (Delinquency)
-X = df.drop('Delinquency', axis=1)
+# Zdefiniuj zmienne X (tylko wybrane kolumny) i y (Delinquency)
+X = df[selected_columns]
 y = df['Delinquency']
 
 # Podziel dane na zbiór treningowy i testowy
@@ -34,8 +39,6 @@ y_pred = model.predict(X_test)
 # Wyświetl raport klasyfikacji
 print(classification_report(y_test, y_pred))
 
-# Sprawdź współczynniki modelu, aby zobaczyć, które zmienne mają największy wpływ
+# Sprawdź współczynniki modelu, aby zobaczyć, które z wybranych zmiennych mają największy wpływ
 coefficients = pd.DataFrame({"Feature": X.columns, "Coefficient": np.abs(model.coef_[0])})
-coefficients = coefficients.sort_values(by='Coefficient', ascending=False)
-
-print(coefficients)
+coefficients = coefficients.sort_values(by='Coeffic
