@@ -41,4 +41,6 @@ print(classification_report(y_test, y_pred))
 
 # Sprawdź współczynniki modelu, aby zobaczyć, które z wybranych zmiennych mają największy wpływ
 coefficients = pd.DataFrame({"Feature": X.columns, "Coefficient": np.abs(model.coef_[0])})
-coefficients = coefficients.sort_values(by='Coeffic
+coefficients = coefficients.sort_values(by='Coefficient', ascending=False)
+
+print(coefficients)
