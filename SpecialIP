@@ -1,46 +1,58 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report
+from scipy.stats import chi2_contingency, pointbiserialr
 from sklearn.preprocessing import LabelEncoder
 
-# Wczytaj dane do DataFrame
-df = pd.read_csv('twoje_dane.csv')
+# Load your dataset
+# df = pd.read_csv('your_dataset.csv')
 
-# Zakładam, że kolumna "Delinquency" ma wartości 'Y' oraz 'N'. Zakoduj je na wartości 0 i 1
+# Selected columns you want to analyze
+selected_columns = ["Column1", "Column2", "Column3", "Column4"]  # Replace with actual column names
+
+# Convert 'Delinquency' column to binary (1 for 'Y', 0 for 'N')
 df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
 
-# Wybierz konkretne kolumny, które chcesz uwzględnić w analizie
-# Na przykład: ['Column1', 'Column2', 'Column3']
-selected_columns = ['Column1', 'Column2', 'Column3']  # Podaj tutaj nazwy swoich kolumn
+# Initialize a list to hold the results
+results = []
 
-# Upewnij się, że wybrane kolumny są w odpowiednim formacie, np. numerycznym
-# Jeśli masz kolumny kategoryczne, możesz użyć LabelEncoder
-labelencoder = LabelEncoder()
-for column in selected_columns:
-    if df[column].dtype == 'object':
-        df[column] = labelencoder.fit_transform(df[column])
+# Function to analyze categorical columns using Chi-square test
+def analyze_categorical(col):
+    contingency_table = pd.crosstab(df[col], df['Delinquency'])
+    chi2, p, _, _ = chi2_contingency(contingency_table)
+    return p, chi2
 
-# Zdefiniuj zmienne X (tylko wybrane kolumny) i y (Delinquency)
-X = df[selected_columns]
-y = df['Delinquency']
+# Function to analyze numeric columns using Point-biserial correlation
+def analyze_numeric(col):
+    correlation, p_value = pointbiserialr(df[col], df['Delinquency'])
+    return p_value, correlation
 
-# Podziel dane na zbiór treningowy i testowy
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# Loop through each selected column to check influence
+for col in selected_columns:
+    if df[col].dtype == 'object':
+        # Analyze categorical columns
+        p_val, test_stat = analyze_categorical(col)
+        results.append({
+            'feature': col,
+            'test_type': 'Chi-square',
+            'test_statistic': test_stat,
+            'p_value': p_val
+        })
+    else:
+        # Analyze numeric columns
+        p_val, correlation = analyze_numeric(col)
+        results.append({
+            'feature': col,
+            'test_type': 'Point-biserial',
+            'test_statistic': correlation,
+            'p_value': p_val
+        })
 
-# Zbuduj model regresji logistycznej
-model = LogisticRegression()
-model.fit(X_train, y_train)
+# Convert results to a DataFrame for better viewing
+results_df = pd.DataFrame(results).sort_values(by='test_statistic', ascending=False)
 
-# Przewiduj na podstawie zbioru testowego
-y_pred = model.predict(X_test)
+# Display the results to the user
+import ace_tools as tools; tools.display_dataframe_to_user(name="Influence on Delinquency", dataframe=results_df)
 
-# Wyświetl raport klasyfikacji
-print(classification_report(y_test, y_pred))
-
-# Sprawdź współczynniki modelu, aby zobaczyć, które z wybranych zmiennych mają największy wpływ
-coefficients = pd.DataFrame({"Feature": X.columns, "Coefficient": np.abs(model.coef_[0])})
-coefficients = coefficients.sort_values(by='Coefficient', ascending=False)
-
-print(coefficients)
+# Print the most influential feature
+most_influential = results_df.iloc[0]
+print(f"The most influential feature is: {most_influential['feature']} with test statistic {most_influential['test_statistic']} and p-value {most_influential['p_value']}")
