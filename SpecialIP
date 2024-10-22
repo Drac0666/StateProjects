@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-from scipy.stats import chi2_contingency
 
 # Load your dataset
 # df = pd.read_csv('your_dataset.csv')
@@ -11,41 +9,18 @@ selected_column = 'Column1'  # Replace with your actual column name
 # Convert 'Delinquency' column to binary (1 for 'Y', 0 for 'N')
 df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
 
-# Create a contingency table between the selected column and Delinquency
-contingency_table = pd.crosstab(df[selected_column], df['Delinquency'])
+# Filter the dataset to only include rows where Delinquency = 1
+delinquent_data = df[df['Delinquency'] == 1]
 
-# Perform the Chi-square test
-chi2, p, _, expected = chi2_contingency(contingency_table)
+# Count the occurrences of each value in the selected column where Delinquency = 1
+value_counts = delinquent_data[selected_column].value_counts()
 
-# Display the Chi-square statistic and p-value
-print(f"Chi-square Statistic: {chi2}")
-print(f"P-value: {p}")
+# Display the value counts to the user
+import ace_tools as tools; tools.display_dataframe_to_user(name="Influential Values for Delinquency = 1", dataframe=value_counts)
 
-# Odds ratio calculation for each value in the selected column
-odds_ratios = {}
-for value in contingency_table.index:
-    # Get counts for the selected value
-    delinquency_1 = contingency_table.loc[value, 1]
-    delinquency_0 = contingency_table.loc[value, 0]
-    
-    # Get counts for all other values combined
-    other_delinquency_1 = contingency_table[1].sum() - delinquency_1
-    other_delinquency_0 = contingency_table[0].sum() - delinquency_0
-    
-    # Calculate the odds ratio
-    odds_value = (delinquency_1 / delinquency_0) if delinquency_0 > 0 else np.inf
-    odds_other = (other_delinquency_1 / other_delinquency_0) if other_delinquency_0 > 0 else np.inf
-    odds_ratio = odds_value / odds_other
-    odds_ratios[value] = odds_ratio
+# Find the value with the most influence (the highest count)
+most_influential_value = value_counts.idxmax()
+most_influence_count = value_counts.max()
 
-# Convert odds_ratios to DataFrame for display
-odds_df = pd.DataFrame.from_dict(odds_ratios, orient='index', columns=['Odds Ratio'])
-odds_df = odds_df.sort_values(by='Odds Ratio', ascending=False)
-
-# Display the odds ratios to the user
-import ace_tools as tools; tools.display_dataframe_to_user(name="Odds Ratios for Delinquency = 1", dataframe=odds_df)
-
-# Print the most influential value based on odds ratio
-most_influential_value = odds_df.index[0]
-most_influence_odds = odds_df.iloc[0, 0]
-print(f"The most influential value in {selected_column} for Delinquency = 1 is: {most_influential_value} with an odds ratio of {most_influence_odds:.2f}.")
+# Output the result
+print(f"The most influential value in {selected_column} for Delinquency = 1 is: {most_influential_value} with {most_influence_count} occurrences.")
