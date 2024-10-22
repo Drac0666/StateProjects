@@ -2,23 +2,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Sample DataFrame with 'Original Balance' and 'DQ' columns
-data = {'Original Balance': [1000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000],
-        'DQ': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
+data = {'Original Balance': [1000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000]}
 df = pd.DataFrame(data)
 
-# Divide 'Original Balance' into 6 categories/buckets
-df['Balance Category'] = pd.cut(df['Original Balance'], bins=6)
+# Use qcut to categorize the 'Original Balance' into quantiles
+df['Balance Category'] = pd.qcut(df['Original Balance'], q=6, labels=[f'Q{i+1}' for i in range(6)])
 
-# Get the frequency of each 'Original Balance' category when DQ == 1
+# Get the frequency of each category
 balance_distribution = df['Balance Category'].value_counts().sort_index()
 
-# Display the distribution results
-print("Distribution of 'Original Balance' categories for DQ == 1:")
+# Display the results
+print("Distribution of 'Original Balance' categories using Quantile Binning:")
 print(balance_distribution)
 
-# Plot the distribution for visual analysis
+# Plot the distribution
 balance_distribution.plot(kind='bar', color='skyblue')
-plt.title('Distribution of Original Balance Categories for DQ == 1')
-plt.xlabel('Original Balance Category')
+plt.title('Quantile Binning of Original Balance')
+plt.xlabel('Balance Category (Quantiles)')
 plt.ylabel('Frequency')
 plt.show()
