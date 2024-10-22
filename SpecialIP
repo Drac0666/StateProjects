@@ -1,77 +1,31 @@
 import pandas as pd
-import numpy as np
-from scipy.stats import chi2_contingency, pointbiserialr, pearsonr
-from sklearn.preprocessing import LabelEncoder
 
 # Load your dataset
 # df = pd.read_csv('your_dataset.csv')
 
-# Selected columns you want to analyze
-selected_columns = ["Column1", "Column2", "Column3", "Column4"]  # Replace with actual column names
+# Example selected column and Delinquency
+selected_column = 'Column1'  # Replace with your actual column name
 
 # Convert 'Delinquency' column to binary (1 for 'Y', 0 for 'N')
 df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
 
-# Initialize a list to hold the results
-results = []
+# Create a contingency table between the selected column and Delinquency
+contingency_table = pd.crosstab(df[selected_column], df['Delinquency'], normalize='index')
 
-# Function to analyze categorical columns using Chi-square test
-def analyze_categorical(col):
-    contingency_table = pd.crosstab(df[col], df['Delinquency'])
-    chi2, p, _, _ = chi2_contingency(contingency_table)
-    return p, chi2
+# Display the contingency table
+print("Contingency Table (Proportions of Delinquency per Category):\n")
+print(contingency_table)
 
-# Function to analyze numeric columns using Point-biserial correlation or Pearson correlation as a backup
-def analyze_numeric(col):
-    # Convert the column to numeric, forcing errors to NaN
-    df[col] = pd.to_numeric(df[col], errors='coerce')
-    
-    # Drop rows where the column or Delinquency is NaN
-    valid_data = df[[col, 'Delinquency']].dropna()
-    
-    # Check if the column and Delinquency have more than one unique value
-    if valid_data[col].nunique() > 1 and valid_data['Delinquency'].nunique() > 1:
-        try:
-            # Try Point-biserial correlation
-            correlation, p_value = pointbiserialr(valid_data[col], valid_data['Delinquency'])
-        except Exception as e:
-            print(f"Point-biserial correlation failed for column {col}: {e}")
-            # Use Pearson correlation as a backup
-            correlation, p_value = pearsonr(valid_data[col], valid_data['Delinquency'])
-        return p_value, correlation
-    else:
-        return None, None
+# Calculate the proportion of 'Y' (Delinquency = 1) for each category
+contingency_table['Proportion_Y'] = contingency_table[1]  # 1 represents Delinquency = 'Y'
 
-# Loop through each selected column to check influence
-for col in selected_columns:
-    if df[col].dtype == 'object':
-        # Analyze categorical columns
-        p_val, test_stat = analyze_categorical(col)
-        results.append({
-            'feature': col,
-            'test_type': 'Chi-square',
-            'test_statistic': test_stat,
-            'p_value': p_val
-        })
-    else:
-        # Analyze numeric columns
-        p_val, correlation = analyze_numeric(col)
-        if p_val is not None and correlation is not None:
-            results.append({
-                'feature': col,
-                'test_type': 'Point-biserial or Pearson',
-                'test_statistic': correlation,
-                'p_value': p_val
-            })
-        else:
-            print(f"Skipping column {col} due to insufficient data or unique values.")
+# Sort the categories by the proportion of 'Y' (Delinquency = Y)
+sorted_table = contingency_table.sort_values(by='Proportion_Y', ascending=False)
 
-# Convert results to a DataFrame for better viewing
-results_df = pd.DataFrame(results).sort_values(by='test_statistic', ascending=False)
+# Display the sorted table to the user
+import ace_tools as tools; tools.display_dataframe_to_user(name="Category Influence on Delinquency", dataframe=sorted_table)
 
-# Display the results to the user
-import ace_tools as tools; tools.display_dataframe_to_user(name="Influence on Delinquency", dataframe=results_df)
+# Find the category with the highest proportion of Delinquency = Y
+most_influential_category = sorted_table.iloc[0]
+print(f"The most influential category is: {most_influential_category.name} with a Delinquency rate of {most_influential_category['Proportion_Y']:.2f}")
 
-# Print the most influential feature
-most_influential = results_df.iloc[0]
-print(f"The most influential feature is: {most_influential['feature']} with test statistic {most_influential['test_statistic']} and p-value {most_influential['p_value']}")
