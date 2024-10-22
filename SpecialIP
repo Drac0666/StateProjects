@@ -1,23 +1,26 @@
-import pandas as pd
-import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+import numpy as np
 
-# Sample DataFrame with 'Original Balance' and 'DQ' columns
-data = {'Original Balance': [1000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000]}
-df = pd.DataFrame(data)
+# Convert 'Original Balance' into a 2D array for KMeans
+X = df[['Original Balance']].values
 
-# Use qcut to categorize the 'Original Balance' into quantiles
-df['Balance Category'] = pd.qcut(df['Original Balance'], q=6, labels=[f'Q{i+1}' for i in range(6)])
+# Apply KMeans clustering (6 clusters for example)
+kmeans = KMeans(n_clusters=6, random_state=0)
+df['Cluster'] = kmeans.fit_predict(X)
 
-# Get the frequency of each category
-balance_distribution = df['Balance Category'].value_counts().sort_index()
+# Sort clusters by mean value of 'Original Balance'
+df['Cluster'] = df.groupby('Cluster')['Original Balance'].transform(lambda x: pd.qcut(x, q=1).codes[0])
+
+# Get the frequency of each cluster
+cluster_distribution = df['Cluster'].value_counts().sort_index()
 
 # Display the results
-print("Distribution of 'Original Balance' categories using Quantile Binning:")
-print(balance_distribution)
+print("Distribution of 'Original Balance' using KMeans Clustering:")
+print(cluster_distribution)
 
 # Plot the distribution
-balance_distribution.plot(kind='bar', color='skyblue')
-plt.title('Quantile Binning of Original Balance')
-plt.xlabel('Balance Category (Quantiles)')
+cluster_distribution.plot(kind='bar', color='lightgreen')
+plt.title('KMeans Clustering of Original Balance')
+plt.xlabel('Cluster')
 plt.ylabel('Frequency')
 plt.show()
