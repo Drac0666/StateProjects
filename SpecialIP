@@ -1,40 +1,24 @@
 import pandas as pd
-import numpy as np
-import scipy.stats as stats
+import matplotlib.pyplot as plt
 
 # Sample DataFrame with 'Original Balance' and 'DQ' columns
 data = {'Original Balance': [1000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000],
-        'DQ': [0, 0, 1, 0, 1, 1, 1, 0, 1, 1]}
+        'DQ': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
 df = pd.DataFrame(data)
 
-# 1. Correlation between 'Original Balance' and 'DQ'
-correlation = df['Original Balance'].corr(df['DQ'])
-print(f"Correlation between Original Balance and DQ: {correlation}")
-
-# 2. Mean comparison between DQ == 1 and DQ == 0
-mean_dq_1 = df[df['DQ'] == 1]['Original Balance'].mean()
-mean_dq_0 = df[df['DQ'] == 0]['Original Balance'].mean()
-print(f"Mean Original Balance for DQ == 1: {mean_dq_1}")
-print(f"Mean Original Balance for DQ == 0: {mean_dq_0}")
-
-# Perform t-test to see if the difference in means is statistically significant
-t_stat, p_value = stats.ttest_ind(df[df['DQ'] == 1]['Original Balance'],
-                                  df[df['DQ'] == 0]['Original Balance'],
-                                  equal_var=False)  # Assume unequal variance
-print(f"T-test result: t-statistic = {t_stat}, p-value = {p_value}")
-
-# 3. Create balance buckets and calculate delinquency rates per bucket
+# Divide 'Original Balance' into 6 categories/buckets
 df['Balance Category'] = pd.cut(df['Original Balance'], bins=6)
-cross_tab = pd.crosstab(df['Balance Category'], df['DQ'], normalize='index')
-print("\nDelinquency rates per Original Balance bucket:")
-print(cross_tab)
 
-# Optional: visualize the relationship
-import matplotlib.pyplot as plt
+# Get the frequency of each 'Original Balance' category when DQ == 1
+balance_distribution = df['Balance Category'].value_counts().sort_index()
 
-# Plot the delinquency rate across balance categories
-cross_tab[1].plot(kind='bar', color='skyblue')
-plt.title('Delinquency Rate by Original Balance Category')
-plt.ylabel('Delinquency Rate (DQ == 1)')
+# Display the distribution results
+print("Distribution of 'Original Balance' categories for DQ == 1:")
+print(balance_distribution)
+
+# Plot the distribution for visual analysis
+balance_distribution.plot(kind='bar', color='skyblue')
+plt.title('Distribution of Original Balance Categories for DQ == 1')
 plt.xlabel('Original Balance Category')
+plt.ylabel('Frequency')
 plt.show()
