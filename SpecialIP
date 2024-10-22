@@ -3,8 +3,8 @@ import pandas as pd
 # Load your dataset
 # df = pd.read_csv('your_dataset.csv')
 
-# Example selected column and Delinquency
-selected_column = 'Column1'  # Replace with your actual column name
+# Example of multiple selected columns
+selected_columns = ['Column1', 'Column2', 'Column3']  # Replace with your actual column names
 
 # Convert 'Delinquency' column to binary (1 for 'Y', 0 for 'N')
 df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
@@ -12,15 +12,15 @@ df['Delinquency'] = df['Delinquency'].apply(lambda x: 1 if x == 'Y' else 0)
 # Filter the dataset to only include rows where Delinquency = 1
 delinquent_data = df[df['Delinquency'] == 1]
 
-# Count the occurrences of each value in the selected column where Delinquency = 1
-value_counts = delinquent_data[selected_column].value_counts()
+# Group by the selected columns and count the occurrences where Delinquency = 1
+grouped_counts = delinquent_data.groupby(selected_columns).size().reset_index(name='Count')
 
-# Display the value counts to the user
-import ace_tools as tools; tools.display_dataframe_to_user(name="Influential Values for Delinquency = 1", dataframe=value_counts)
+# Sort the result by the count of delinquency cases
+sorted_counts = grouped_counts.sort_values(by='Count', ascending=False)
 
-# Find the value with the most influence (the highest count)
-most_influential_value = value_counts.idxmax()
-most_influence_count = value_counts.max()
+# Display the sorted counts to the user
+import ace_tools as tools; tools.display_dataframe_to_user(name="Combinations Influence on Delinquency = 1", dataframe=sorted_counts)
 
-# Output the result
-print(f"The most influential value in {selected_column} for Delinquency = 1 is: {most_influential_value} with {most_influence_count} occurrences.")
+# Find the combination with the most influence (the highest count)
+most_influential_combination = sorted_counts.iloc[0]
+print(f"The most influential combination for Delinquency = 1 is:\n{most_influential_combination[selected_columns]} with {most_influential_combination['Count']} occurrences.")
