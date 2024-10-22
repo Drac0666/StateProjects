@@ -1,15 +1,21 @@
 from sklearn.cluster import KMeans
-import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Sample DataFrame with 'Original Balance' and 'DQ' columns
+data = {'Original Balance': [1000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000]}
+df = pd.DataFrame(data)
 
 # Convert 'Original Balance' into a 2D array for KMeans
 X = df[['Original Balance']].values
 
-# Apply KMeans clustering (6 clusters for example)
+# Apply KMeans clustering (e.g., 6 clusters)
 kmeans = KMeans(n_clusters=6, random_state=0)
 df['Cluster'] = kmeans.fit_predict(X)
 
-# Sort clusters by mean value of 'Original Balance'
-df['Cluster'] = df.groupby('Cluster')['Original Balance'].transform(lambda x: pd.qcut(x, q=1).codes[0])
+# Sort the clusters by the mean value of 'Original Balance' for better readability
+cluster_means = df.groupby('Cluster')['Original Balance'].mean().sort_values()
+df['Cluster'] = df['Cluster'].map(lambda x: cluster_means.index.get_loc(x))
 
 # Get the frequency of each cluster
 cluster_distribution = df['Cluster'].value_counts().sort_index()
@@ -18,7 +24,7 @@ cluster_distribution = df['Cluster'].value_counts().sort_index()
 print("Distribution of 'Original Balance' using KMeans Clustering:")
 print(cluster_distribution)
 
-# Plot the distribution
+# Plot the distribution for visual analysis
 cluster_distribution.plot(kind='bar', color='lightgreen')
 plt.title('KMeans Clustering of Original Balance')
 plt.xlabel('Cluster')
