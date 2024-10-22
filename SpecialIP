@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import chi2_contingency, pointbiserialr
+from scipy.stats import chi2_contingency, pointbiserialr, pearsonr
 from sklearn.preprocessing import LabelEncoder
 
 # Load your dataset
@@ -21,7 +21,7 @@ def analyze_categorical(col):
     chi2, p, _, _ = chi2_contingency(contingency_table)
     return p, chi2
 
-# Function to analyze numeric columns using Point-biserial correlation
+# Function to analyze numeric columns using Point-biserial correlation or Pearson correlation as a backup
 def analyze_numeric(col):
     # Convert the column to numeric, forcing errors to NaN
     df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -29,9 +29,15 @@ def analyze_numeric(col):
     # Drop rows where the column or Delinquency is NaN
     valid_data = df[[col, 'Delinquency']].dropna()
     
-    # If the column still contains valid data, calculate correlation
-    if len(valid_data) > 0:
-        correlation, p_value = pointbiserialr(valid_data[col], valid_data['Delinquency'])
+    # Check if the column and Delinquency have more than one unique value
+    if valid_data[col].nunique() > 1 and valid_data['Delinquency'].nunique() > 1:
+        try:
+            # Try Point-biserial correlation
+            correlation, p_value = pointbiserialr(valid_data[col], valid_data['Delinquency'])
+        except Exception as e:
+            print(f"Point-biserial correlation failed for column {col}: {e}")
+            # Use Pearson correlation as a backup
+            correlation, p_value = pearsonr(valid_data[col], valid_data['Delinquency'])
         return p_value, correlation
     else:
         return None, None
@@ -53,12 +59,12 @@ for col in selected_columns:
         if p_val is not None and correlation is not None:
             results.append({
                 'feature': col,
-                'test_type': 'Point-biserial',
+                'test_type': 'Point-biserial or Pearson',
                 'test_statistic': correlation,
                 'p_value': p_val
             })
         else:
-            print(f"Skipping column {col} due to insufficient data after cleaning.")
+            print(f"Skipping column {col} due to insufficient data or unique values.")
 
 # Convert results to a DataFrame for better viewing
 results_df = pd.DataFrame(results).sort_values(by='test_statistic', ascending=False)
