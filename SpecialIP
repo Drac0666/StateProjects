@@ -1,20 +1,24 @@
 import pandas as pd
-import scipy.stats as stats
 
-# Sample DataFrame with 'Balance Categories' as string and 'DQ'
-data = {'Balance Categories': ['Low', 'Medium', 'High', 'Low', 'Medium', 'High', 'Medium', 'Low', 'High', 'Medium'],
-        'DQ': [1, 1, 0, 1, 0, 1, 1, 0, 1, 0]}
-df = pd.DataFrame(data)
+# Sample DataFrame
+# Ensure 'Issue Date' is datetime, and you have 'Orig LTV' column
+df['Issue Date'] = pd.to_datetime(df['Issue Date'], errors='coerce')
 
-# Perform Chi-Square test to determine if there is a relationship between Balance Categories and DQ
-contingency_table = pd.crosstab(df['Balance Categories'], df['DQ'])
-chi2, p, dof, expected = stats.chi2_contingency(contingency_table)
+# Group by year and calculate the average 'Orig LTV' for each year
+df['Issue Year'] = df['Issue Date'].dt.year
+avg_ltv_by_year = df.groupby('Issue Year')['Orig LTV'].mean()
 
-# Results
-print("Chi-Square Test Results")
-print(f"Chi-Square Statistic: {chi2}")
-print(f"P-value: {p}")
-if p < 0.05:
-    print("There is a significant association between Balance Categories and DQ.")
-else:
-    print("There is no significant association between Balance Categories and DQ.")
+# Define a function to fill missing 'Orig LTV' values based on the average for the year
+def fill_ltv(row):
+    if pd.isnull(row['Orig LTV']):
+        return avg_ltv_by_year.get(row['Issue Year'], row['Orig LTV'])
+    return row['Orig LTV']
+
+# Apply the function to fill missing values
+df['Orig LTV'] = df.apply(fill_ltv, axis=1)
+
+# Drop the helper column 'Issue Year' if not needed
+df.drop(columns=['Issue Year'], inplace=True)
+
+# Display the updated DataFrame
+import ace_tools as tools; tools.display_dataframe_to_user(name="Updated DataFrame", dataframe=df)
