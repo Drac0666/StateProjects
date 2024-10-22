@@ -23,8 +23,18 @@ def analyze_categorical(col):
 
 # Function to analyze numeric columns using Point-biserial correlation
 def analyze_numeric(col):
-    correlation, p_value = pointbiserialr(df[col], df['Delinquency'])
-    return p_value, correlation
+    # Convert the column to numeric, forcing errors to NaN
+    df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Drop rows where the column or Delinquency is NaN
+    valid_data = df[[col, 'Delinquency']].dropna()
+    
+    # If the column still contains valid data, calculate correlation
+    if len(valid_data) > 0:
+        correlation, p_value = pointbiserialr(valid_data[col], valid_data['Delinquency'])
+        return p_value, correlation
+    else:
+        return None, None
 
 # Loop through each selected column to check influence
 for col in selected_columns:
@@ -40,12 +50,15 @@ for col in selected_columns:
     else:
         # Analyze numeric columns
         p_val, correlation = analyze_numeric(col)
-        results.append({
-            'feature': col,
-            'test_type': 'Point-biserial',
-            'test_statistic': correlation,
-            'p_value': p_val
-        })
+        if p_val is not None and correlation is not None:
+            results.append({
+                'feature': col,
+                'test_type': 'Point-biserial',
+                'test_statistic': correlation,
+                'p_value': p_val
+            })
+        else:
+            print(f"Skipping column {col} due to insufficient data after cleaning.")
 
 # Convert results to a DataFrame for better viewing
 results_df = pd.DataFrame(results).sort_values(by='test_statistic', ascending=False)
