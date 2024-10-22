@@ -1,23 +1,20 @@
 import pandas as pd
-import matplotlib.pyplot as plt
+import scipy.stats as stats
 
-# Sample DataFrame with 'Original Balance' and 'DQ' columns
-data = {'Original Balance': [1000, 5000, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000]}
+# Sample DataFrame with 'Balance Categories' as string and 'DQ'
+data = {'Balance Categories': ['Low', 'Medium', 'High', 'Low', 'Medium', 'High', 'Medium', 'Low', 'High', 'Medium'],
+        'DQ': [1, 1, 0, 1, 0, 1, 1, 0, 1, 0]}
 df = pd.DataFrame(data)
 
-# Use qcut to categorize the 'Original Balance' into quantiles
-df['Balance Category'] = pd.qcut(df['Original Balance'], q=6, labels=[f'Q{i+1}' for i in range(6)])
+# Perform Chi-Square test to determine if there is a relationship between Balance Categories and DQ
+contingency_table = pd.crosstab(df['Balance Categories'], df['DQ'])
+chi2, p, dof, expected = stats.chi2_contingency(contingency_table)
 
-# Get the frequency of each category
-balance_distribution = df['Balance Category'].value_counts().sort_index()
-
-# Display the results
-print("Distribution of 'Original Balance' categories using Quantile Binning:")
-print(balance_distribution)
-
-# Plot the distribution
-balance_distribution.plot(kind='bar', color='skyblue')
-plt.title('Quantile Binning of Original Balance')
-plt.xlabel('Balance Category (Quantiles)')
-plt.ylabel('Frequency')
-plt.show()
+# Results
+print("Chi-Square Test Results")
+print(f"Chi-Square Statistic: {chi2}")
+print(f"P-value: {p}")
+if p < 0.05:
+    print("There is a significant association between Balance Categories and DQ.")
+else:
+    print("There is no significant association between Balance Categories and DQ.")
