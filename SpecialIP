@@ -1,21 +1,16 @@
 import pandas as pd
 
-# Sample data (replace this with your actual data)
+# Example data: replace this with your actual data
 data = {
-    'Deal name': ['Deal1', 'Deal2', 'Deal3', 'Deal4', 'Deal5'],
-    'Vintage': [2018, 2018, 2019, 2019, 2020],
-    'Current Balance': [100000, 200000, 150000, 300000, 250000],
-    'Factor': [0.95, 0.92, 0.97, 0.96, 0.93]
+    'Deal ID': ['Deal1', 'Deal1', 'Deal1', 'Deal2', 'Deal2', 'Deal3', 'Deal3', 'Deal3', 'Deal3'],
+    'DQ': [1, 0, 1, 0, 1, 1, 1, 0, 1]
 }
 
 # Create DataFrame
 df = pd.DataFrame(data)
 
-# Calculate the weighted average factor by Current Balance for each Vintage
-df['Weighted Factor'] = df['Factor'] * df['Current Balance']
-
-# Group by Vintage and calculate weighted average
-result = df.groupby('Vintage').apply(lambda x: x['Weighted Factor'].sum() / x['Current Balance'].sum()).reset_index(name='Weighted Avg Factor')
+# Group by 'Deal ID' and 'DQ', and calculate the percentage for each group
+df_grouped = df.groupby(['Deal ID', 'DQ']).size().groupby(level=0).apply(lambda x: 100 * x / x.sum()).reset_index(name='Percentage')
 
 # Display the result
-import ace_tools as tools; tools.display_dataframe_to_user(name="Weighted Average Factor per Vintage", dataframe=result)
+print(df_grouped)
