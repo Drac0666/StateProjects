@@ -1,24 +1,21 @@
 import pandas as pd
 
-# Sample DataFrame
-# Ensure 'Issue Date' is datetime, and you have 'Orig LTV' column
-df['Issue Date'] = pd.to_datetime(df['Issue Date'], errors='coerce')
+# Sample data (replace this with your actual data)
+data = {
+    'Deal name': ['Deal1', 'Deal2', 'Deal3', 'Deal4', 'Deal5'],
+    'Vintage': [2018, 2018, 2019, 2019, 2020],
+    'Current Balance': [100000, 200000, 150000, 300000, 250000],
+    'Factor': [0.95, 0.92, 0.97, 0.96, 0.93]
+}
 
-# Group by year and calculate the average 'Orig LTV' for each year
-df['Issue Year'] = df['Issue Date'].dt.year
-avg_ltv_by_year = df.groupby('Issue Year')['Orig LTV'].mean()
+# Create DataFrame
+df = pd.DataFrame(data)
 
-# Define a function to fill missing 'Orig LTV' values based on the average for the year
-def fill_ltv(row):
-    if pd.isnull(row['Orig LTV']):
-        return avg_ltv_by_year.get(row['Issue Year'], row['Orig LTV'])
-    return row['Orig LTV']
+# Calculate the weighted average factor by Current Balance for each Vintage
+df['Weighted Factor'] = df['Factor'] * df['Current Balance']
 
-# Apply the function to fill missing values
-df['Orig LTV'] = df.apply(fill_ltv, axis=1)
+# Group by Vintage and calculate weighted average
+result = df.groupby('Vintage').apply(lambda x: x['Weighted Factor'].sum() / x['Current Balance'].sum()).reset_index(name='Weighted Avg Factor')
 
-# Drop the helper column 'Issue Year' if not needed
-df.drop(columns=['Issue Year'], inplace=True)
-
-# Display the updated DataFrame
-import ace_tools as tools; tools.display_dataframe_to_user(name="Updated DataFrame", dataframe=df)
+# Display the result
+import ace_tools as tools; tools.display_dataframe_to_user(name="Weighted Average Factor per Vintage", dataframe=result)
