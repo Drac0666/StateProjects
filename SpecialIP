@@ -1,24 +1,23 @@
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
 
-# Assuming df is your DataFrame
-# Select columns to check correlation with DQ
-columns_to_check = ['Mapping', 'Amortization Type', 'Final LTV Bucket', 'IssuanceDateBucket']
+# Assuming you have a DataFrame df with relevant columns
 
-# One-hot encode the categorical columns
-encoder = OneHotEncoder(drop='first')
-encoded_columns = encoder.fit_transform(df[columns_to_check])
+# Sample filter conditions
+conditions = (
+    (df['Mapping'] == 'Float') &
+    (df['Amortization Type'] == 'IO') &
+    (df['LTVBucket'] == 'LTV_75_100') &
+    (df['IssueBucket'] == '<2014')
+)
 
-# Create a DataFrame from the encoded columns
-encoded_df = pd.DataFrame(encoded_columns.toarray(), columns=encoder.get_feature_names_out(columns_to_check))
+# Applying the conditions
+filtered_df = df[conditions]
 
-# Add the DQ column
-encoded_df['DQ'] = df['DQ']
+# Group by 'Deal ID' and count occurrences
+deal_id_counts = filtered_df.groupby('Deal ID').size().reset_index(name='Occurrences')
 
-# Calculate correlation between DQ and the encoded columns
-correlation_matrix = encoded_df.corr()['DQ']
+# Sort the counts in descending order and get the top 5
+top_5_deal_ids = deal_id_counts.sort_values(by='Occurrences', ascending=False).head(5)
 
-# Display correlations for the user
-import ace_tools as tools; tools.display_dataframe_to_user(name="Correlation with DQ", dataframe=correlation_matrix)
-
-correlation_matrix
+# Display the result
+import ace_tools as tools; tools.display_dataframe_to_user(name="Top 5 Deal IDs", dataframe=top_5_deal_ids)
