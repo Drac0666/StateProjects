@@ -1,16 +1,24 @@
 import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
 
-# Example data: replace this with your actual data
-data = {
-    'Deal ID': ['Deal1', 'Deal1', 'Deal1', 'Deal2', 'Deal2', 'Deal3', 'Deal3', 'Deal3', 'Deal3'],
-    'DQ': [1, 0, 1, 0, 1, 1, 1, 0, 1]
-}
+# Assuming df is your DataFrame
+# Select columns to check correlation with DQ
+columns_to_check = ['Mapping', 'Amortization Type', 'Final LTV Bucket', 'IssuanceDateBucket']
 
-# Create DataFrame
-df = pd.DataFrame(data)
+# One-hot encode the categorical columns
+encoder = OneHotEncoder(drop='first')
+encoded_columns = encoder.fit_transform(df[columns_to_check])
 
-# Group by 'Deal ID' and 'DQ', and calculate the percentage for each group
-df_grouped = df.groupby(['Deal ID', 'DQ']).size().groupby(level=0).apply(lambda x: 100 * x / x.sum()).reset_index(name='Percentage')
+# Create a DataFrame from the encoded columns
+encoded_df = pd.DataFrame(encoded_columns.toarray(), columns=encoder.get_feature_names_out(columns_to_check))
 
-# Display the result
-print(df_grouped)
+# Add the DQ column
+encoded_df['DQ'] = df['DQ']
+
+# Calculate correlation between DQ and the encoded columns
+correlation_matrix = encoded_df.corr()['DQ']
+
+# Display correlations for the user
+import ace_tools as tools; tools.display_dataframe_to_user(name="Correlation with DQ", dataframe=correlation_matrix)
+
+correlation_matrix
