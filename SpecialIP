@@ -1,1 +1,21 @@
-The application should include a bookmarking feature, allowing for 5-10 bookmarks to provide a more convenient way to locate frequently used automations, rather than searching through the execution history.
+import pandas as pd
+
+# Twój DataFrame, zakładam, że nazywa się 'df'
+df = pd.DataFrame({
+    'Kolumna1': [1, 2, 3],
+    'Kolumna2': [4, 5, 6],
+    'Kolumna3': [7, 8, 9]
+})
+
+# Stylizacja DataFrame
+styled_df = df.style.set_table_styles([
+    {'selector': 'th', 'props': [('background-color', '#4CAF50'), ('color', 'white'), ('font-weight', 'bold')]},
+    {'selector': 'td', 'props': [('border', '1px solid black'), ('padding', '8px')]}
+]).applymap(lambda x: 'background-color: #f2f2f2' if x % 2 == 0 else '')
+
+# Eksport do HTML
+html = styled_df.to_html(index=False)
+with open("/mnt/data/styled_table.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("Eksport zakończony. Plik HTML został zapisany jako 'styled_table.html'.")
