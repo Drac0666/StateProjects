@@ -8,14 +8,17 @@ df = pd.read_csv(file_path)
 # Step 2: Filter columns containing "HPI" in their names
 hpi_df = df.filter(regex='HPI')
 
-# Step 3: Function to plot a 10-row window starting at a specific index
+# Step 3: Function to plot a 10-row window starting at a specific index, using index as labels
 def plot_hpi_range(start_index):
     # Ensure the index range is within bounds
     end_index = min(start_index + 10, len(hpi_df))
-    window_df = hpi_df.iloc[start_index:end_index]
+    window_df = hpi_df.iloc[start_index:end_index].copy()
+    
+    # Use the index as a label
+    window_df.reset_index(inplace=True)
     
     # Plot using Plotly
-    fig = px.line(window_df, title=f"HPI Data from Index {start_index} to {end_index-1}")
+    fig = px.line(window_df, x='index', y=window_df.columns[1:], title=f"HPI Data from Index {start_index} to {end_index-1}")
     fig.update_layout(xaxis_title='Index', yaxis_title='HPI Value')
     fig.show()
 
