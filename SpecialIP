@@ -1,1 +1,25 @@
-df.columns = df.columns.str.replace('_', ' ').str.title()
+import pandas as pd
+
+# Sample DataFrame
+df = pd.DataFrame({
+    'As Of Date': [1, 2, 3],
+    'Sample Column': [4, 5, 6],
+    'Another Example Column': [7, 8, 9]
+})
+
+# Stylize the DataFrame
+styled_df = df.style.set_table_styles({
+    'header': [
+        {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]}
+    ],
+    'data': [
+        {'selector': 'td', 'props': [('border', '1px solid black'), ('padding', '8px')]}
+    ]
+})
+
+# Export styled DataFrame to HTML
+html = styled_df.render()
+with open("/mnt/data/styled_table.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("Eksport zakończony. Plik HTML został zapisany jako 'styled_table.html'.")
