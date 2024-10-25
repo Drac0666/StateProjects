@@ -1,23 +1,23 @@
 import pandas as pd
+import plotly.express as px
 
-# Assuming you have a DataFrame df with relevant columns
+# Step 1: Load file into DataFrame
+file_path = 'your_file.csv'  # Update with your file path
+df = pd.read_csv(file_path)
 
-# Sample filter conditions
-conditions = (
-    (df['Mapping'] == 'Float') &
-    (df['Amortization Type'] == 'IO') &
-    (df['LTVBucket'] == 'LTV_75_100') &
-    (df['IssueBucket'] == '<2014')
-)
+# Step 2: Filter columns containing "HPI" in their names
+hpi_df = df.filter(regex='HPI')
 
-# Applying the conditions
-filtered_df = df[conditions]
+# Step 3: Function to plot a 10-row window starting at a specific index
+def plot_hpi_range(start_index):
+    # Ensure the index range is within bounds
+    end_index = min(start_index + 10, len(hpi_df))
+    window_df = hpi_df.iloc[start_index:end_index]
+    
+    # Plot using Plotly
+    fig = px.line(window_df, title=f"HPI Data from Index {start_index} to {end_index-1}")
+    fig.update_layout(xaxis_title='Index', yaxis_title='HPI Value')
+    fig.show()
 
-# Group by 'Deal ID' and count occurrences
-deal_id_counts = filtered_df.groupby('Deal ID').size().reset_index(name='Occurrences')
-
-# Sort the counts in descending order and get the top 5
-top_5_deal_ids = deal_id_counts.sort_values(by='Occurrences', ascending=False).head(5)
-
-# Display the result
-import ace_tools as tools; tools.display_dataframe_to_user(name="Top 5 Deal IDs", dataframe=top_5_deal_ids)
+# Example usage
+plot_hpi_range(0)  # Change the start index as needed
