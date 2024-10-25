@@ -8,18 +8,9 @@ df = pd.DataFrame({
 })
 
 # Stylize the DataFrame
-styled_df = df.style.set_table_styles({
-    'header': [
-        {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]}
-    ],
-    'data': [
-        {'selector': 'td', 'props': [('border', '1px solid black'), ('padding', '8px')]}
-    ]
-})
+styled_df = df.style.set_table_styles([
+    {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]}
+]).set_properties(**{'border': '1px solid black', 'padding': '8px'})
 
-# Export styled DataFrame to HTML
-html = styled_df.render()
-with open("/mnt/data/styled_table.html", "w", encoding="utf-8") as f:
-    f.write(html)
-
-print("Eksport zakończony. Plik HTML został zapisany jako 'styled_table.html'.")
+# Display the styled DataFrame in the Jupyter Notebook
+styled_df
