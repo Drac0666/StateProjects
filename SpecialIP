@@ -7,10 +7,17 @@ df = pd.DataFrame({
     'Another Example Column': [7, 8, 9]
 })
 
-# Stylize the DataFrame
-styled_df = df.style.set_table_styles([
-    {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]}
-]).set_properties(**{'border': '1px solid black', 'padding': '8px'})
+# Stylize the DataFrame, adjust width of "Sample Column"
+styled_df = (
+    df.style
+    .hide_index()
+    .set_table_styles([
+        {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold')]},
+        {'selector': 'th.col1', 'props': [('width', '200px')]},  # Adjust width of "Sample Column"
+    ])
+    .set_properties(**{'border': '1px solid black', 'padding': '8px'})
+    .set_table_styles({'Sample Column': [{'selector': '', 'props': [('min-width', '200px')]}]}, overwrite=False)
+)
 
 # Display the styled DataFrame in the Jupyter Notebook
 styled_df
