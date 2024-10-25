@@ -5,22 +5,33 @@ import plotly.express as px
 file_path = 'your_file.csv'  # Update with your file path
 df = pd.read_csv(file_path)
 
+# Ensure "Date" column is in datetime format
+df['Date'] = pd.to_datetime(df['Date'])
+
 # Step 2: Filter columns containing "HPI" in their names
 hpi_df = df.filter(regex='HPI')
+hpi_df['Date'] = df['Date']  # Include the Date column for filtering
 
-# Step 3: Function to plot a 10-row window starting at a specific index, using index as labels
-def plot_hpi_range(start_index):
-    # Ensure the index range is within bounds
+# Step 3: Function to plot a 10-row window starting from a specific date
+def plot_hpi_from_date(start_date):
+    # Convert start_date to datetime to match format in DataFrame
+    start_date = pd.to_datetime(start_date)
+    
+    # Find the index of the row with the specified start date
+    if start_date not in hpi_df['Date'].values:
+        print(f"Date {start_date} not found in the data.")
+        return
+    
+    start_index = hpi_df.index[hpi_df['Date'] == start_date][0]
     end_index = min(start_index + 10, len(hpi_df))
-    window_df = hpi_df.iloc[start_index:end_index].copy()
     
-    # Use the index as a label
-    window_df.reset_index(inplace=True)
+    # Extract the 10-row window and reset index for plotting
+    window_df = hpi_df.iloc[start_index:end_index].reset_index(drop=True)
     
-    # Plot using Plotly
-    fig = px.line(window_df, x='index', y=window_df.columns[1:], title=f"HPI Data from Index {start_index} to {end_index-1}")
-    fig.update_layout(xaxis_title='Index', yaxis_title='HPI Value')
+    # Plot using Plotly with Date as the x-axis
+    fig = px.line(window_df, x='Date', y=window_df.columns[:-1], title=f"HPI Data from {start_date.date()} to {(window_df['Date'].iloc[-1]).date()}")
+    fig.update_layout(xaxis_title='Date', yaxis_title='HPI Value')
     fig.show()
 
 # Example usage
-plot_hpi_range(0)  # Change the start index as needed
+plot_hpi_from_date("2022-01-01")  # Replace with your start date in "YYYY-MM-DD" format
