@@ -48,3 +48,41 @@ pred_sec3 = model_sec3.predict(X)
 pred_sec1_decoded = le_sec1.inverse_transform(pred_sec1)
 pred_sec2_decoded = le_sec2.inverse_transform(pred_sec2)
 pred_sec3_decoded = le_sec3.inverse_transform(pred_sec3)
+
+
+#############
+# Assuming df_new is your new DataFrame with missing SEC values
+df_new = pd.DataFrame()  # Replace this with your actual DataFrame with missing SECs
+
+# Encode categorical features using the same encoders
+df_new['port_id_enc'] = le_port_id.transform(df_new['port_id'])
+df_new['port_curr_enc'] = le_port_curr.transform(df_new['port_curr'])
+df_new['investment_type_enc'] = le_investment_type.transform(df_new['investment_type'])
+
+# Prepare the features for prediction
+X_new = df_new[['port_id_enc', 'port_curr_enc', 'investment_type_enc']]
+
+# Predict missing SEC1 values
+sec1_missing_idx = df_new['SEC1'].isnull()
+if sec1_missing_idx.any():
+    df_new.loc[sec1_missing_idx, 'SEC1'] = le_sec1.inverse_transform(
+        model_sec1.predict(X_new[sec1_missing_idx])
+    )
+
+# Predict missing SEC2 values
+sec2_missing_idx = df_new['SEC2'].isnull()
+if sec2_missing_idx.any():
+    df_new.loc[sec2_missing_idx, 'SEC2'] = le_sec2.inverse_transform(
+        model_sec2.predict(X_new[sec2_missing_idx])
+    )
+
+# Predict missing SEC3 values
+sec3_missing_idx = df_new['SEC3'].isnull()
+if sec3_missing_idx.any():
+    df_new.loc[sec3_missing_idx, 'SEC3'] = le_sec3.inverse_transform(
+        model_sec3.predict(X_new[sec3_missing_idx])
+    )
+
+# Display the DataFrame with predicted SEC values
+print(df_new)
+
