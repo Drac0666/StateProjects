@@ -1,17 +1,7 @@
-import requests
+from requests_html import HTMLSession
 
-# Define the Spotfire server URL and endpoint
-url = "https://your-spotfire-server.com/spotfire/api"
+session = HTMLSession()
 
-# Define your credentials
-username = "your_username"
-password = "your_password"
+r = session.get('http://www.yourjspage.com')
 
-# Perform a GET request with Basic Authentication
-response = requests.get(url, auth=(username, password))
-
-# Check the response status
-if response.status_code == 200:
-    print("Successfully authenticated!")
-else:
-    print("Failed to authenticate:", response.status_code)
+r.html.render()  # this call executes the js in the page
