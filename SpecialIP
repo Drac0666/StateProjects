@@ -1,9 +1,17 @@
-# Load the saved models, encoder, and known conditions
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import RandomForestClassifier
+import joblib
+
+# Load saved models, encoder, and known conditions
 model_sec1 = joblib.load('model_sec1.pkl')
 model_sec2 = joblib.load('model_sec2.pkl')
 model_sec3 = joblib.load('model_sec3.pkl')
 encoder = joblib.load('onehot_encoder.pkl')
 known_conditions_set = joblib.load('known_conditions_set.pkl')
+
+# Global variable to indicate if any unknown conditions are found
+has_unknowns = False
 
 # Assume df_new is the new DataFrame with potential missing SEC values
 df_new = pd.DataFrame()  # Replace with your actual DataFrame with missing SECs
@@ -11,25 +19,32 @@ df_new = pd.DataFrame()  # Replace with your actual DataFrame with missing SECs
 # Use the encoder to transform new data's categorical columns
 X_new_encoded = encoder.transform(df_new[['port_id', 'port_curr', 'investment_type']])
 
-# Convert encoded features to DataFrame for consistency
-X_new = pd.DataFrame(X_new_encoded)
-
-# Initialize SEC columns as "Unknown" by default
-df_new['SEC1'] = 'Unknown'
-df_new['SEC2'] = 'Unknown'
-df_new['SEC3'] = 'Unknown'
-
-# Check each row if it's a known condition and predict if it is
-for idx, row in X_new.iterrows():
+# Check each row in the encoded new data for known conditions
+for idx, row in pd.DataFrame(X_new_encoded).iterrows():
     condition_tuple = tuple(row)
-    if condition_tuple in known_conditions_set:
-        # Predict SEC values only for known conditions
-        df_new.at[idx, 'SEC1'] = model_sec1.predict([row])[0]
-        df_new.at[idx, 'SEC2'] = model_sec2.predict([row])[0]
-        df_new.at[idx, 'SEC3'] = model_sec3.predict([row])[0]
-    else:
-        # Set SEC values to "Unknown" for unknown conditions (already set to "Unknown")
-        pass
+    if condition_tuple not in known_conditions_set:
+        has_unknowns = True
+        print("Unknown conditions found in row:", idx)
+        break  # Stop further checks and code execution if unknown conditions are detected
 
-# Display the DataFrame with predicted or "Unknown" SEC values
-print(df_new)
+# Halt execution if unknowns are found
+if has_unknowns:
+    print("Execution halted due to unknown conditions.")
+else:
+    # If no unknowns, proceed with predictions
+    # Initialize SEC columns as "Unknown" by default
+    df_new['SEC1'] = 'Unknown'
+    df_new['SEC2'] = 'Unknown'
+    df_new['SEC3'] = 'Unknown'
+
+    # Predict only if the condition is in known conditions
+    for idx, row in pd.DataFrame(X_new_encoded).iterrows():
+        condition_tuple = tuple(row)
+        if condition_tuple in known_conditions_set:
+            # Predict SEC values for known conditions
+            df_new.at[idx, 'SEC1'] = model_sec1.predict([row])[0]
+            df_new.at[idx, 'SEC2'] = model_sec2.predict([row])[0]
+            df_new.at[idx, 'SEC3'] = model_sec3.predict([row])[0]
+
+    # Display the DataFrame with predicted or "Unknown" SEC values
+    print(df_new)
