@@ -1,7 +1,50 @@
-from requests_html import HTMLSession
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import LabelEncoder
 
-session = HTMLSession()
+# Load the dataset
+df = pd.DataFrame()  # Replace with your actual DataFrame
 
-r = session.get('http://www.yourjspage.com')
+# Label encode the categorical features
+le_port_id = LabelEncoder()
+le_port_curr = LabelEncoder()
+le_investment_type = LabelEncoder()
+le_sec1 = LabelEncoder()
+le_sec2 = LabelEncoder()
+le_sec3 = LabelEncoder()
 
-r.html.render()  # this call executes the js in the page
+df['port_id_enc'] = le_port_id.fit_transform(df['port_id'])
+df['port_curr_enc'] = le_port_curr.fit_transform(df['port_curr'])
+df['investment_type_enc'] = le_investment_type.fit_transform(df['investment_type'])
+df['SEC1_enc'] = le_sec1.fit_transform(df['SEC1'].fillna('Unknown'))
+df['SEC2_enc'] = le_sec2.fit_transform(df['SEC2'].fillna('Unknown'))
+df['SEC3_enc'] = le_sec3.fit_transform(df['SEC3'].fillna('Unknown'))
+
+# Prepare the features and target for each SEC column
+X = df[['port_id_enc', 'port_curr_enc', 'investment_type_enc']]
+
+# Define function to train and evaluate model for each SEC column
+def train_sec_model(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = RandomForestClassifier(random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    print(classification_report(y_test, y_pred))
+    return model
+
+# Train models for SEC1, SEC2, and SEC3
+model_sec1 = train_sec_model(X, df['SEC1_enc'])
+model_sec2 = train_sec_model(X, df['SEC2_enc'])
+model_sec3 = train_sec_model(X, df['SEC3_enc'])
+
+# Example of predicting missing SEC values (replace with actual missing data handling)
+pred_sec1 = model_sec1.predict(X)
+pred_sec2 = model_sec2.predict(X)
+pred_sec3 = model_sec3.predict(X)
+
+# Decode predictions back to original labels if needed
+pred_sec1_decoded = le_sec1.inverse_transform(pred_sec1)
+pred_sec2_decoded = le_sec2.inverse_transform(pred_sec2)
+pred_sec3_decoded = le_sec3.inverse_transform(pred_sec3)
