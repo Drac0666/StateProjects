@@ -1,32 +1,46 @@
-# Load the saved models and encoder
-model_sec1 = joblib.load('model_sec1.pkl')
-model_sec2 = joblib.load('model_sec2.pkl')
-model_sec3 = joblib.load('model_sec3.pkl')
-encoder = joblib.load('onehot_encoder.pkl')
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+from sklearn.preprocessing import OneHotEncoder
+import joblib
 
-# Assume df_new is the new DataFrame with potential missing SEC values
-df_new = pd.DataFrame()  # Replace with your actual DataFrame with missing SECs
+# Sample data loading (replace with your actual DataFrame)
+df = pd.DataFrame()  # Replace with your actual DataFrame
 
-# Use the encoder to transform new data's categorical columns
-X_new_encoded = encoder.transform(df_new[['port_id', 'port_curr', 'investment_type']])
+# Initialize OneHotEncoder with handle_unknown='ignore'
+encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
 
-# Create DataFrame for the encoded features
-X_new = pd.DataFrame(X_new_encoded)
+# Fit encoder on categorical features in training data
+encoded_features = encoder.fit_transform(df[['port_id', 'port_curr', 'investment_type']])
 
-# Predict missing SEC1 values
-sec1_missing_idx = df_new['SEC1'].isnull()
-if sec1_missing_idx.any():
-    df_new.loc[sec1_missing_idx, 'SEC1'] = model_sec1.predict(X_new[sec1_missing_idx])
+# Create the feature DataFrame with encoded columns and target columns
+X = pd.DataFrame(encoded_features)
+y_sec1 = df['SEC1']
+y_sec2 = df['SEC2']
+y_sec3 = df['SEC3']
 
-# Predict missing SEC2 values
-sec2_missing_idx = df_new['SEC2'].isnull()
-if sec2_missing_idx.any():
-    df_new.loc[sec2_missing_idx, 'SEC2'] = model_sec2.predict(X_new[sec2_missing_idx])
+# Save known conditions from training data to check against in new data
+known_conditions = pd.DataFrame(encoded_features).drop_duplicates()
+known_conditions_set = set([tuple(row) for row in known_conditions.values])
 
-# Predict missing SEC3 values
-sec3_missing_idx = df_new['SEC3'].isnull()
-if sec3_missing_idx.any():
-    df_new.loc[sec3_missing_idx, 'SEC3'] = model_sec3.predict(X_new[sec3_missing_idx])
+# Train separate models for SEC1, SEC2, and SEC3
+def train_model(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = RandomForestClassifier(random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    print(classification_report(y_test, y_pred))
+    return model
 
-# Display the DataFrame with predicted SEC values
-print(df_new)
+# Train and save models
+model_sec1 = train_model(X, y_sec1)
+model_sec2 = train_model(X, y_sec2)
+model_sec3 = train_model(X, y_sec3)
+
+# Save the models, encoder, and known conditions
+joblib.dump(model_sec1, 'model_sec1.pkl')
+joblib.dump(model_sec2, 'model_sec2.pkl')
+joblib.dump(model_sec3, 'model_sec3.pkl')
+joblib.dump(encoder, 'onehot_encoder.pkl')
+joblib.dump(known_conditions_set, 'known_conditions_set.pkl')
