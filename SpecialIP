@@ -1,1 +1,17 @@
-he project aimed to analyze delinquency trends in the U.K. Buy-to-Let (BTL) sector. I developed Python code to process loan-level data, address data gaps, and uncover trends. Additionally, I applied statistical methods to assess correlations between delinquency and various key risk drivers.
+import requests
+
+# Define the Spotfire server URL and endpoint
+url = "https://your-spotfire-server.com/spotfire/api"
+
+# Define your credentials
+username = "your_username"
+password = "your_password"
+
+# Perform a GET request with Basic Authentication
+response = requests.get(url, auth=(username, password))
+
+# Check the response status
+if response.status_code == 200:
+    print("Successfully authenticated!")
+else:
+    print("Failed to authenticate:", response.status_code)
