@@ -1,5 +1,1 @@
-def find_response_id(data_list):
-    for item in data_list:
-        if item.get('requestID') == 222:
-            return item.get('responseID')
-    return None  # Return None if no match is found
+Developing the XXST Portfolio Monitor tool to detect Day-over-Day portfolio shifts, integrating a statistical classifier to accurately assign HFV fields such as SEC 1 and SEC 2 based on MDP data.
