@@ -1,54 +1,48 @@
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.ensemble import RandomForestClassifier
-import joblib
 
-# Load saved models, encoder, and known conditions
-model_sec1 = joblib.load('model_sec1.pkl')
-model_sec2 = joblib.load('model_sec2.pkl')
-model_sec3 = joblib.load('model_sec3.pkl')
-encoder = joblib.load('onehot_encoder.pkl')
-known_conditions_set = joblib.load('known_conditions_set.pkl')
+# Load the Excel file
+file_path = 'your_file.xlsx'  # Replace with your file path
+df = pd.read_excel(file_path)
 
-# Assume df_new is the new DataFrame with potential missing SEC values
-df_new = pd.DataFrame()  # Replace with your actual DataFrame with missing SECs
+# Process the CUSIP column
+df['CUSIP'] = df['CUSIP'].str.upper().apply(lambda x: x + " Mtge" if len(x) == 9 else x)
 
-# Use the encoder to transform new data's categorical columns
-X_new_encoded = encoder.transform(df_new[['port_id', 'port_curr', 'investment_type']])
+# Save or display the modified DataFrame as needed
+df.to_excel('processed_file.xlsx', index=False)  # Save if needed
+print(df)  # Or display the modified DataFrame
 
-# Check each row in the encoded new data for known conditions
-unknown_rows = []  # List to store indices of unknown rows
 
-for idx, row in pd.DataFrame(X_new_encoded).iterrows():
-    condition_tuple = tuple(row)
-    if condition_tuple not in known_conditions_set:
-        unknown_rows.append(idx)  # Add index of unknown row
+from openpyxl import load_workbook
+import pandas as pd
 
-# Filter out unknown rows from df_new and save them to 'UpdateMapping.csv'
-if unknown_rows:
-    df_unknown = df_new.iloc[unknown_rows]
-    df_unknown.to_csv("UpdateMapping.csv", index=False)
-    print("Unknown conditions saved to UpdateMapping.csv")
-    has_unknowns = True  # Global flag to indicate unknowns were found
-else:
-    has_unknowns = False  # No unknowns found
+# Load the Excel files
+bulk_file_path = 'Bulk.xlsx'  # File to write into
+data_file_path = 'your_data_file.xlsx'  # File containing the CUSIP data
 
-# Halt execution if unknowns are found
-if has_unknowns:
-    print("Execution halted due to unknown conditions.")
-else:
-    # Proceed with predictions for known conditions
-    df_new['SEC1'] = 'Unknown'
-    df_new['SEC2'] = 'Unknown'
-    df_new['SEC3'] = 'Unknown'
+# Read the CUSIP data using pandas
+df = pd.read_excel(data_file_path)
+df['CUSIP'] = df['CUSIP'].str.upper()  # Ensure all CUSIPs are uppercase
 
-    # Predict only for known rows
-    for idx, row in pd.DataFrame(X_new_encoded).iterrows():
-        condition_tuple = tuple(row)
-        if condition_tuple in known_conditions_set:
-            df_new.at[idx, 'SEC1'] = model_sec1.predict([row])[0]
-            df_new.at[idx, 'SEC2'] = model_sec2.predict([row])[0]
-            df_new.at[idx, 'SEC3'] = model_sec3.predict([row])[0]
+# Separate the CUSIPs based on conditions
+cusips_len_12 = df[df['CUSIP'].str.len() == 12]['CUSIP'].tolist()
+cusips_mtge = df[df['CUSIP'].str.endswith(" MTGE")]['CUSIP'].tolist()
 
-    # Display the DataFrame with predicted or "Unknown" SEC values
-    print(df_new)
+# Load the bulk workbook and get the active sheet
+wb = load_workbook(bulk_file_path)
+ws = wb.active
+
+# Write CUSIPs with length 12 starting from row 7 in column A
+start_row = 7
+for i, cusip in enumerate(cusips_len_12, start=start_row):
+    ws[f'A{i}'] = cusip
+
+# Find the last row from the previous operation
+last_row = i + 1  # The row after the last written row in column A
+
+# Write CUSIPs containing "Mtge" starting from last_row in column E
+for j, cusip in enumerate(cusips_mtge, start=last_row):
+    ws[f'E{j}'] = cusip
+
+# Save the modified workbook
+wb.save('Bulk_modified.xlsx')
+print("CUSIP data has been written to Bulk_modified.xlsx.")
