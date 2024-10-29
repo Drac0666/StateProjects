@@ -1,19 +1,5 @@
-import pandas as pd
-
-# Load the main data file and the MDP file
-data_file_path = 'your_data_file.xlsx'  # Replace with your actual file
-mdp_file_path = 'MDP.xlsx'
-
-# Load the data
-df = pd.read_excel(data_file_path)
-mdp_df = pd.read_excel(mdp_file_path)
-
-# Create the MDP_CUSIP column in MDP based on the availability of ID_ISIN or ID_SEDOL
-mdp_df['MDP_CUSIP'] = mdp_df.apply(lambda row: row['ID_ISIN'] if pd.notnull(row['ID_ISIN']) else row['ID_SEDOL'], axis=1)
-
-# Perform a merge between df and mdp_df on the CUSIP column (assumes CUSIP is the key)
-merged_df = df.merge(mdp_df, left_on='CUSIP', right_on='MDP_CUSIP', how='left')
-
-# Display or save the merged DataFrame as needed
-merged_df.to_excel('merged_data.xlsx', index=False)  # Save the merged data if needed
-print(merged_df)  # Or display the merged data
+def find_response_id(data_list):
+    for item in data_list:
+        if item.get('requestID') == 222:
+            return item.get('responseID')
+    return None  # Return None if no match is found
