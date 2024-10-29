@@ -1,1 +1,5 @@
-Developing the XXST Portfolio Monitor tool to detect Day-over-Day portfolio shifts, integrating a statistical classifier to accurately assign HFV fields such as SEC 1 and SEC 2 based on MDP data.
+ SSSSS   TTTTT RRRRR   U   U  CCCCC TTTTT U   U RRRRR   EEEEE   DDDD        FFFFF III  N   N   A   N   N  CCCCC EEEEE
+S        T     R    R  U   U C        T   U   U R    R  E       D   D       F      I   NN  N  A A  NN  N C     E    
+ SSSSS   T     RRRRR   U   U C        T   U   U RRRRR   EEEE    D   D       FFFF   I   N N N AAAAA N N N C     EEEE
+      S  T     R   R   U   U C        T   U   U R   R   E       D   D       F      I   N  NN A   A N  NN C     E
+ SSSSS   T     R    R   UUU   CCCCC   T    UUU  R    R  EEEEE   DDDD        F      I   N   N A   A N   N  CCCCC EEEEE
