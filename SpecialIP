@@ -1,17 +1,3 @@
-import pandas as pd
-
-def update_and_request_missing(df1, df2):
-    # Merge df1 with df2 based on 'cusip' to add SEC1 and SEC2 columns
-    merged_df = pd.merge(df1, df2[['cusip', 'SEC1', 'SEC2']], on='cusip', how='left')
-    
-    # Separate rows where SEC1 or SEC2 are still missing (indicating no match in df2)
-    MDP_Request_df = merged_df[merged_df['SEC1'].isna() | merged_df['SEC2'].isna()]
-    
-    # Filter out rows from merged_df that are missing SEC1 and SEC2
-    updated_df1 = merged_df.dropna(subset=['SEC1', 'SEC2'])
-    
-    return updated_df1, MDP_Request_df
-
-# Example usage:
-# df1, df2 = <your dataframes here>
-# updated_df1, MDP_Request_df = update_and_request_missing(df1, df2)
+SELECT table_name
+FROM all_tab_columns
+WHERE column_name = 'TICKET';
