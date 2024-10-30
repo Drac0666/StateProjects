@@ -1,4 +1,8 @@
-SELECT t1.TREAS, t2.*
-FROM table1 t1
-JOIN table2 t2 ON t1."Source ID" = t2.Ticket
-WHERE t2.Act = '056';
+SELECT sector1, sector2
+FROM table3
+WHERE TREAS IN (
+    SELECT t1.TREAS
+    FROM table1 t1
+    JOIN table2 t2 ON t1."Source ID" = t2.Ticket
+    WHERE t2.Act = '056'
+);
