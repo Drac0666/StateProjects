@@ -1,1 +1,1 @@
-merged_df = df_left.merge(df_right[['Security', 'SEC1', 'SEC2']], how='left', left_on='CUSIP', right_on='Security')
+I apologize for any inconvenience caused
