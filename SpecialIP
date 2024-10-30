@@ -1,5 +1,4 @@
-SELECT table_name
-FROM all_tab_columns
-WHERE column_name IN ('TICKET', 'TREAS')
-GROUP BY table_name
-HAVING COUNT(DISTINCT column_name) = 2;
+SELECT t1.TREAS, t2.*
+FROM table1 t1
+JOIN table2 t2 ON t1."Source ID" = t2.Ticket
+WHERE t2.Act = '056';
