@@ -1,1 +1,37 @@
-I apologize for any inconvenience caused
+import pandas as pd
+
+# Sample data structure for your dictionary of dataframes
+# Assume df_dict is a dictionary with dataframes having index "Current Balance" and "Deal Name"
+df_dict = {
+    'df1': pd.DataFrame(...),  # Placeholder for actual dataframes
+    'df2': pd.DataFrame(...),
+    # Add other dataframes as needed
+}
+
+# Dataframe with 'Deal Name' and 'Vintage' columns
+vintage_df = pd.DataFrame({
+    'Deal Name': [...],  # List of deal names
+    'Vintage': [...]     # Corresponding vintage values
+})
+
+# Initialize an empty dataframe to store the results
+result_df = pd.DataFrame(columns=['Vintage', 'Period', 'Current Balance'])
+
+# Loop through each dataframe in the dictionary
+for name, df in df_dict.items():
+    # Check if "Current Balance" and "Deal Name" are in the index
+    if 'Current Balance' in df.index and 'Deal Name' in df.index:
+        # Reset index to access "Deal Name" as a column
+        df_reset = df.reset_index()
+        
+        # Merge with the vintage dataframe to get the Vintage information
+        merged_df = df_reset.merge(vintage_df, left_on='Deal Name', right_on='Deal Name')
+        
+        # Aggregate "Current Balance" by Vintage and Period columns
+        for period in range(1, 25):  # Assuming 24 periods
+            period_sum = merged_df.groupby(['Vintage'])[f'Period {period}']['Current Balance'].sum().reset_index()
+            period_sum['Period'] = period
+            result_df = pd.concat([result_df, period_sum], ignore_index=True)
+
+# View the final result
+print(result_df)
