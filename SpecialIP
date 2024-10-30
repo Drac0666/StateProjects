@@ -1,8 +1,1 @@
-SELECT sector1, sector2
-FROM table3
-WHERE TREAS IN (
-    SELECT t1.TREAS
-    FROM table1 t1
-    JOIN table2 t2 ON t1."Source ID" = t2.Ticket
-    WHERE t2.Act = '056'
-);
+merged_df = df_left.merge(df_right[['Security', 'SEC1', 'SEC2']], how='left', left_on='CUSIP', right_on='Security')
