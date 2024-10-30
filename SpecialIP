@@ -1,3 +1,5 @@
 SELECT table_name
 FROM all_tab_columns
-WHERE column_name = 'TICKET';
+WHERE column_name IN ('TICKET', 'TREAS')
+GROUP BY table_name
+HAVING COUNT(DISTINCT column_name) = 2;
