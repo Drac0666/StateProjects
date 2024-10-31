@@ -1,20 +1,10 @@
-import pandas as pd
+import time
 
-def conditional_merge(df1, df2):
-    # Initial merge on 'CUSIP'
-    merged_df = pd.merge(df1, df2, how='left', on='CUSIP')
-    
-    # Identify rows where all values from the right are NaN
-    nan_rows = merged_df[df2.columns.difference(df1.columns)].isna().all(axis=1)
-    
-    # Separate rows with NaN to perform an additional merge on 'ISIN'
-    rows_with_nan = merged_df[nan_rows]
-    rows_without_nan = merged_df[~nan_rows]
-    
-    # Merge only the NaN rows on 'ISIN'
-    merged_nan_rows = pd.merge(rows_with_nan.drop(columns=df2.columns.difference(df1.columns)), df2, how='left', on='ISIN')
-    
-    # Concatenate back the non-NaN rows and the updated NaN rows
-    final_df = pd.concat([rows_without_nan, merged_nan_rows], ignore_index=True)
-    
-    return final_df
+start_time = time.time()
+
+# Code you want to measure
+for _ in range(1000):
+    _ = sum(range(1000))
+
+end_time = time.time()
+print(f"Execution time: {end_time - start_time} seconds")
