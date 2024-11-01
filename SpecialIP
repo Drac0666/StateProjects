@@ -1,40 +1,34 @@
 import pandas as pd
-from scipy.stats import chi2_contingency
+import statsmodels.api as sm
 
-def chi_square_test(df, columns_to_check):
+def logistic_regression_analysis(df, columns_to_check):
     """
-    Performs a Chi-Square test for independence between each specified column and DQ.
+    Fits a logistic regression model to predict DQ using specified columns.
     
     Parameters:
     df (pd.DataFrame): The input dataframe with a 'DQ' column.
-    columns_to_check (list): List of column names to check against DQ = 1.
+    columns_to_check (list): List of column names to use as predictors.
     
     Returns:
-    dict: A dictionary where keys are column names and values are the p-values of the Chi-Square test.
+    pd.DataFrame: A summary of the logistic regression model.
     """
-    # Dictionary to store the p-values of the Chi-Square test for each specified column
-    chi2_results = {}
+    # Select the columns to check as predictors and add a constant term for the intercept
+    X = df[columns_to_check]
+    X = sm.add_constant(X)
     
-    for col in columns_to_check:
-        # Create a contingency table for the column and DQ
-        contingency_table = pd.crosstab(df[col], df['DQ'])
-        
-        # Perform Chi-Square test
-        chi2, p, dof, expected = chi2_contingency(contingency_table)
-        
-        # Store the p-value result
-        chi2_results[col] = p
+    # Define the target variable
+    y = df['DQ']
     
-    return chi2_results
+    # Fit the logistic regression model
+    model = sm.Logit(y, X).fit()
+    
+    # Return the summary of the model
+    return model.summary()
 
 # Example usage
 # Assuming df is your dataframe and you want to check columns 'column1', 'column2', etc.
 columns_to_analyze = ['column1', 'column2', 'column3']  # Replace with actual column names
-chi2_results = chi_square_test(df, columns_to_analyze)
+logistic_model_summary = logistic_regression_analysis(df, columns_to_analyze)
 
 # Display results
-for column, p_value in chi2_results.items():
-    if p_value < 0.05:
-        print(f"Column '{column}' has a significant association with DQ (p-value: {p_value:.4f})")
-    else:
-        print(f"Column '{column}' has no significant association with DQ (p-value: {p_value:.4f})")
+print(logistic_model_summary)
