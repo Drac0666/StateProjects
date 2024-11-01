@@ -1,5 +1,5 @@
 import pandas as pd
-from scipy.stats import chi2_contingency
+from scipy.stats import fisher_exact
 
 # Sample DataFrame (replace with your actual data)
 data = {
@@ -9,22 +9,20 @@ data = {
 }
 df = pd.DataFrame(data)
 
-# Step 1: Create a binary column indicating if cat_column is "D4"
+# Assuming 'is_D4' has already been created to indicate if cat_column is "D4"
 df['is_D4'] = df['cat_column'].apply(lambda x: 1 if x == 'D4' else 0)
 
-# Step 2: Create a contingency table for the Chi-Square test
+# Create a 2x2 contingency table
 contingency_table = pd.crosstab(df['is_D4'], df['DQ'])
 
-# Step 3: Perform the Chi-Square test
-chi2, p, dof, expected = chi2_contingency(contingency_table)
-print("Chi-Square Test Results:")
-print(f"Chi2 Statistic: {chi2}")
-print(f"P-value: {p}")
-print(f"Degrees of Freedom: {dof}")
-print("Expected frequencies:\n", expected)
+# Apply Fisher's Exact Test
+odds_ratio, p_value = fisher_exact(contingency_table)
+print("Fisher's Exact Test Results:")
+print(f"Odds Ratio: {odds_ratio}")
+print(f"P-value: {p_value}")
 
-# Interpretation of Chi-Square Test
-if p < 0.05:
+# Interpretation of Fisher's Exact Test
+if p_value < 0.05:
     print("There is a statistically significant association between 'D4' and 'DQ = 1'.")
 else:
     print("No significant association found between 'D4' and 'DQ = 1'.")
