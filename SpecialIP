@@ -1,54 +1,51 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov  1 11:25:13 2024
-
-@author: edena
-"""
-
 import pandas as pd
+from collections import defaultdict
 
-# Sample df1 with unique vintages
-df1 = pd.DataFrame({'Vintage': [2020, 2022]})
-
-# Sample dict of dataframes (df_dict), where each dataframe has a unique vintage
+# Sample dict of dataframes (df_dict), where each dataframe has unique vintage information
 df_dict = {
-    'df_2020': pd.DataFrame({
-        'Vintage': [2020, 2020],
-        'Column1': [100, 200],
-        'Column2': [150, 250],
-        'Current Balance': [1000, 2000]
-    }),
+    'df_2020_a': pd.DataFrame({
+        'Jan': [2020, 1000],
+        'Feb': [2020, 2000],
+        'Mar': [2020, 1500]
+    }, index=['Vintage', 'Current Balance']),
+    'df_2020_b': pd.DataFrame({
+        'Jan': [2020, 500],
+        'Feb': [2020, 800],
+        'Mar': [2020, 700]
+    }, index=['Vintage', 'Current Balance']),
     'df_2021': pd.DataFrame({
-        'Vintage': [2020, 2020],
-        'Column1': [300, 400],
-        'Column2': [350, 450],
-        'Current Balance': [3000, 4000]
-    }),
+        'Jan': [2021, 3000],
+        'Feb': [2021, 4000],
+        'Mar': [2021, 2500]
+    }, index=['Vintage', 'Current Balance']),
     'df_2022': pd.DataFrame({
-        'Vintage': [2022],
-        'Column1': [500],
-        'Column2': [550],
-        'Current Balance': [5000]
-    })
+        'Jan': [2022, 5000],
+        'Feb': [2022, 5500],
+        'Mar': [2022, 6000]
+    }, index=['Vintage', 'Current Balance'])
 }
 
-# Initialize a dictionary to store results
-vintage_sums = {}
+# Step 1: Group dataframes by vintage
+vintage_groups = defaultdict(list)
+for key, df in df_dict.items():
+    vintage = df.loc['Vintage', 'Jan']  # Assume all months have the same Vintage value
+    vintage_groups[vintage].append(df)
 
-# Loop through each unique vintage in df1
-for vintage in df1['Vintage'].unique():
-    # Initialize a dictionary to hold sums for each column in the current vintage
-    vintage_sums[vintage] = {}
-    
-    # Find the dataframe in df_dict where the vintage matches
-    for key, df in df_dict.items():
-        if df['Vintage'].iloc[0] == vintage:  # Each dataframe has a unique vintage
-            # Calculate the sum of 'Current Balance' for each column
-            for col in df.columns:
-                if col != 'Vintage':
-                    vintage_sums[vintage][col] = df['Current Balance'].sum()
+# Step 2: Calculate the shared VintageBalance for each vintage
+vintage_balances = {}
+for vintage, dfs in vintage_groups.items():
+    # Sum the "Current Balance" for each month across dataframes with the same vintage
+    vintage_balance = pd.DataFrame({col: sum(df.loc['Current Balance', col] for df in dfs) for col in ['Jan', 'Feb', 'Mar']}, index=['VintageBalance'])
+    vintage_balances[vintage] = vintage_balance
 
-# Convert the result dictionary to a DataFrame for easier viewing
-result_df = pd.DataFrame(vintage_sums).T
+# Step 3: Add the VintageBalance row to each dataframe in the dictionary
+for vintage, dfs in vintage_groups.items():
+    for df in dfs:
+        df.loc['VintageBalance'] = vintage_balances[vintage].loc['VintageBalance']
+        df_dict[key] = df  # Update the dictionary with the modified dataframe
 
-import ace_tools as tools; tools.display_dataframe_to_user(name="Vintage Sums of Current Balance", dataframe=result_df)
+# Display the modified dataframes
+for key, df in df_dict.items():
+    print(f"\n{key}:\n{df}")
+
+import ace_tools as tools; tools.display_dataframe_to_user(name="Modified DataFrames with Shared VintageBalance", dataframe=df_dict)
