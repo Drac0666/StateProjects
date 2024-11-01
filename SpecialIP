@@ -1,94 +1,40 @@
 import pandas as pd
-from collections import defaultdict
+from scipy.stats import chi2_contingency
 
-# Expanded dict of dataframes with varying columns and shared vintages
-df_dict = {
-    'df_2020_a': pd.DataFrame({
-        'Jan': [2020, 1000],
-        'Feb': [2020, 2000],
-        'Mar': [2020, 1500]
-    }, index=['Vintage', 'Current Balance']),
+def chi_square_test(df, columns_to_check):
+    """
+    Performs a Chi-Square test for independence between each specified column and DQ.
     
-    'df_2020_b': pd.DataFrame({
-        'Jan': [2020, 500],
-        'Feb': [2020, 800],
-        'Mar': [2020, 700],
-        'Apr': [2020, 900]  # Extra column in this dataframe
-    }, index=['Vintage', 'Current Balance']),
+    Parameters:
+    df (pd.DataFrame): The input dataframe with a 'DQ' column.
+    columns_to_check (list): List of column names to check against DQ = 1.
     
-    'df_2020_c': pd.DataFrame({
-        'Jan': [2020, 300],
-        'Feb': [2020, 400]
-        # Fewer columns in this dataframe
-    }, index=['Vintage', 'Current Balance']),
+    Returns:
+    dict: A dictionary where keys are column names and values are the p-values of the Chi-Square test.
+    """
+    # Dictionary to store the p-values of the Chi-Square test for each specified column
+    chi2_results = {}
     
-    'df_2021': pd.DataFrame({
-        'Jan': [2021, 3000],
-        'Feb': [2021, 4000],
-        'Mar': [2021, 2500]
-    }, index=['Vintage', 'Current Balance']),
-    
-    'df_2022_a': pd.DataFrame({
-        'Jan': [2022, 5000],
-        'Feb': [2022, 5500],
-        'Mar': [2022, 6000]
-    }, index=['Vintage', 'Current Balance']),
-    
-    'df_2022_b': pd.DataFrame({
-        'Jan': [2022, 2000],
-        'Mar': [2022, 1000],
-        'Apr': [2022, 3000],
-        'May': [2022, 2500]  # Extra columns in this dataframe
-    }, index=['Vintage', 'Current Balance'])
-}
-
-# New dictionary to store dataframes with VintageBalance row added
-modified_df_dict = {}
-
-# Step 1: Group dataframes by vintage
-vintage_groups = defaultdict(list)
-for key, df in df_dict.items():
-    # Use the first column dynamically to get the vintage
-    vintage = df.loc['Vintage', df.columns[0]]
-    vintage_groups[vintage].append((key, df))  # Store the key along with the dataframe
-
-# Step 2: Calculate the VintageBalance row for each vintage and create new dataframes
-for vintage, df_list in vintage_groups.items():
-    # Collect all unique column names across dataframes for this vintage
-    all_columns = set(col for _, df in df_list for col in df.columns)
-    
-    # Initialize an empty dictionary to store the VintageBalance values
-    vintage_balance = {}
-    
-    # Sum current balances by column name across dataframes in the same vintage group
-    for col_name in all_columns:
-        # Sum the Current Balance for this column if it exists in each dataframe
-        column_sum = sum(df.loc['Current Balance', col_name] for _, df in df_list if col_name in df.columns)
+    for col in columns_to_check:
+        # Create a contingency table for the column and DQ
+        contingency_table = pd.crosstab(df[col], df['DQ'])
         
-        # Store the summed balance in the vintage_balance dictionary
-        vintage_balance[col_name] = column_sum
-
-    # Convert the vintage_balance dictionary to a DataFrame row
-    vintage_balance_series = pd.Series(vintage_balance, name='VintageBalance')
-
-    # Step 3: Create new dataframes with the VintageBalance row added
-    for key, df in df_list:
-        # Copy the original dataframe to avoid modifying it
-        modified_df = df.copy()
+        # Perform Chi-Square test
+        chi2, p, dof, expected = chi2_contingency(contingency_table)
         
-        # Align VintageBalance with existing columns, filling with NaN if columns are missing
-        modified_df = pd.concat([modified_df, vintage_balance_series.reindex(modified_df.columns).to_frame().T])
-        
-        # Add the modified dataframe to the new dictionary without changing keys
-        modified_df_dict[key] = modified_df
+        # Store the p-value result
+        chi2_results[col] = p
+    
+    return chi2_results
 
-# Display the modified dataframes with VintageBalance
-for key, df in modified_df_dict.items():
-    print(f"\n{key}:\n{df}")
+# Example usage
+# Assuming df is your dataframe and you want to check columns 'column1', 'column2', etc.
+columns_to_analyze = ['column1', 'column2', 'column3']  # Replace with actual column names
+chi2_results = chi_square_test(df, columns_to_analyze)
 
-
-df_list = [
-    pd.DataFrame({'Jan': [2020, 1000], 'Feb': [2020, 2000], 'Mar': [2020, 1500]}, index=['Vintage', 'Current Balance']),
-    pd.DataFrame({'Jan': [2020, 500], 'Feb': [2020, 800], 'Mar': [2020, 700], 'Apr': [2020, 900]}, index=['Vintage', 'Current Balance'])
-]
-all_columns = set(col for _, df in df_list for col in df.columns)
+# Display results
+for column, p_value in chi2_results.items():
+    if p_value < 0.05:
+        print(f"Column '{column}' has a significant association with DQ (p-value: {p_value:.4f})")
+    else:
+        print(f"Column '{column}' has no significant association with DQ (p-value: {p_value:.4f})")
