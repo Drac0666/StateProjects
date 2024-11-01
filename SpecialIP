@@ -2,11 +2,23 @@ import pandas as pd
 
 # Sample DataFrame
 df = pd.DataFrame({
-    'A': [1.12, 2.68, 3.14],
-    'B': [4.57, 5.68, 6.79],
-    'C': [7.12, 8.68, 9.14]
+    'A': [1.00, 2.67891, 3.14159],
+    'B': [4.00, 5.67891, 6.00],
+    'C': [7.12, 8.00, 9.14159]
 })
 
-# Apply styling with smaller font size
-styled_df = df.style.set_properties(**{'font-size': '12pt'})  # Adjust font size as needed
+# Define a custom formatting function
+def custom_format(x):
+    return f"{x:.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x
+
+# Apply formatting and styling to specific columns ('A' and 'B' in this case)
+styled_df = (
+    df.style
+    .format({'A': custom_format, 'B': custom_format})  # Apply custom format only to columns A and B
+    .set_table_styles({
+        'A': [{'selector': 'td', 'props': [('font-size', '12pt'), ('color', 'blue')]}],
+        'B': [{'selector': 'td', 'props': [('font-size', '12pt'), ('color', 'green')]}]
+    }, overwrite=False)  # Apply styles only to columns A and B
+)
+
 html = styled_df.render()
