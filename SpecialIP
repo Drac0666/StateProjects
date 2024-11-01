@@ -28,14 +28,15 @@ df_dict = {
 # Step 1: Group dataframes by vintage
 vintage_groups = defaultdict(list)
 for key, df in df_dict.items():
-    vintage = df.loc['Vintage', 'Jan']  # Assume all months have the same Vintage value
+    # Use the first column dynamically
+    vintage = df.loc['Vintage', df.columns[0]]
     vintage_groups[vintage].append(df)
 
 # Step 2: Calculate the shared VintageBalance for each vintage
 vintage_balances = {}
 for vintage, dfs in vintage_groups.items():
     # Sum the "Current Balance" for each month across dataframes with the same vintage
-    vintage_balance = pd.DataFrame({col: sum(df.loc['Current Balance', col] for df in dfs) for col in ['Jan', 'Feb', 'Mar']}, index=['VintageBalance'])
+    vintage_balance = pd.DataFrame({col: sum(df.loc['Current Balance', col] for df in dfs) for col in df.columns}, index=['VintageBalance'])
     vintage_balances[vintage] = vintage_balance
 
 # Step 3: Add the VintageBalance row to each dataframe in the dictionary
