@@ -2,14 +2,14 @@ import pandas as pd
 
 # Sample DataFrame
 df = pd.DataFrame({
-    'A': [1.00, 2.67891, 3.14159],
-    'B': [4.00, 5.67891, 6.00],
-    'C': [7.12, 8.00, 9.14159]
+    'A': [1000354.00, 2678912.67891, 314159.14159],
+    'B': [456789.00, 567891.67891, 678901.00],
+    'C': [712345.12, 800000.00, 914159.14159]
 })
 
-# Define a custom formatting function
+# Define a custom formatting function for thousands separator and conditional decimal display
 def custom_format(x):
-    return f"{x:.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x
+    return f"{x:,.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x
 
 # Apply formatting and styling to specific columns ('A' and 'B' in this case)
 styled_df = (
