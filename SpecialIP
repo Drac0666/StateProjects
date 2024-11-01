@@ -1,34 +1,48 @@
 import pandas as pd
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
 import statsmodels.api as sm
 
-def logistic_regression_analysis(df, columns_to_check):
-    """
-    Fits a logistic regression model to predict DQ using specified columns.
-    
-    Parameters:
-    df (pd.DataFrame): The input dataframe with a 'DQ' column.
-    columns_to_check (list): List of column names to use as predictors.
-    
-    Returns:
-    pd.DataFrame: A summary of the logistic regression model.
-    """
-    # Select the columns to check as predictors and add a constant term for the intercept
-    X = df[columns_to_check]
-    X = sm.add_constant(X)
-    
-    # Define the target variable
-    y = df['DQ']
-    
-    # Fit the logistic regression model
-    model = sm.Logit(y, X).fit()
-    
-    # Return the summary of the model
-    return model.summary()
+# Sample DataFrame (replace this with your actual data)
+# Assume 'num_column' is the numerical column, 'cat_column' is the categorical column, and 'DQ' is the target.
+data = {
+    'num_column': [1.5, 2.3, 3.1, 4.7, 5.0, 2.2],
+    'cat_column': ['A', 'B', 'A', 'C', 'B', 'A'],
+    'DQ': [1, 0, 1, 0, 1, 0]
+}
+df = pd.DataFrame(data)
 
-# Example usage
-# Assuming df is your dataframe and you want to check columns 'column1', 'column2', etc.
-columns_to_analyze = ['column1', 'column2', 'column3']  # Replace with actual column names
-logistic_model_summary = logistic_regression_analysis(df, columns_to_analyze)
+# Define the columns you want to check
+num_column = 'num_column'
+cat_column = 'cat_column'
+target_column = 'DQ'
 
-# Display results
-print(logistic_model_summary)
+# Step 1: Check for NaN or infinite values in specified columns and clean them
+# Replace NaNs with the mean of the column
+df[num_column].fillna(df[num_column].mean(), inplace=True)
+
+# Replace infinite values with NaN, then fill with mean
+df[num_column].replace([np.inf, -np.inf], np.nan, inplace=True)
+df[num_column].fillna(df[num_column].mean(), inplace=True)
+
+# Step 2: Encode the categorical (object) column
+le = LabelEncoder()
+df[cat_column] = le.fit_transform(df[cat_column])
+
+# Step 3: Prepare the data for logistic regression
+X = df[[num_column, cat_column]]
+y = df[target_column]
+
+# Add a constant for the intercept term
+X = sm.add_constant(X)
+
+# Step 4: Fit the logistic regression model
+logit_model = sm.Logit(y, X)
+result = logit_model.fit()
+
+# Display the summary of the model
+print(result.summary())
+
+# Interpreting the model:
+# The p-values in the summary table indicate the significance of each variable.
+# Coefficients give you the direction and strength of association with the DQ variable.
