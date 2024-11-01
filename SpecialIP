@@ -11,7 +11,8 @@ df_dict = {
     'df_2020_b': pd.DataFrame({
         'Jan': [2020, 500],
         'Feb': [2020, 800],
-        'Mar': [2020, 700]
+        'Mar': [2020, 700],
+        'Apr': [2020, 900]  # Extra column in this dataframe
     }, index=['Vintage', 'Current Balance']),
     'df_2021': pd.DataFrame({
         'Jan': [2021, 3000],
@@ -28,25 +29,35 @@ df_dict = {
 # Step 1: Group dataframes by vintage
 vintage_groups = defaultdict(list)
 for key, df in df_dict.items():
-    # Use the first column dynamically
+    # Use the first column dynamically to get the vintage
     vintage = df.loc['Vintage', df.columns[0]]
     vintage_groups[vintage].append(df)
 
-# Step 2: Calculate the shared VintageBalance for each vintage
-vintage_balances = {}
+# Step 2: Calculate the VintageBalance row for each dataframe individually
 for vintage, dfs in vintage_groups.items():
-    # Sum the "Current Balance" for each month across dataframes with the same vintage
-    vintage_balance = pd.DataFrame({col: sum(df.loc['Current Balance', col] for df in dfs) for col in df.columns}, index=['VintageBalance'])
-    vintage_balances[vintage] = vintage_balance
-
-# Step 3: Add the VintageBalance row to each dataframe in the dictionary
-for vintage, dfs in vintage_groups.items():
+    # Find common columns across all dataframes for this vintage
+    common_columns = set.intersection(*(set(df.columns) for df in dfs))
+    
+    # Calculate VintageBalance for each dataframe
     for df in dfs:
-        df.loc['VintageBalance'] = vintage_balances[vintage].loc['VintageBalance']
+        # Initialize an empty row for VintageBalance
+        vintage_balance = {}
+        
+        # Sum across common columns
+        for col in common_columns:
+            vintage_balance[col] = sum(other_df.loc['Current Balance', col] for other_df in dfs if col in other_df.columns)
+        
+        # For unique columns in this specific dataframe, take the Current Balance directly
+        unique_columns = set(df.columns) - common_columns
+        for col in unique_columns:
+            vintage_balance[col] = df.loc['Current Balance', col]
+        
+        # Add the VintageBalance row to the current dataframe
+        df.loc['VintageBalance'] = pd.Series(vintage_balance)
         df_dict[key] = df  # Update the dictionary with the modified dataframe
 
 # Display the modified dataframes
 for key, df in df_dict.items():
     print(f"\n{key}:\n{df}")
 
-import ace_tools as tools; tools.display_dataframe_to_user(name="Modified DataFrames with Shared VintageBalance", dataframe=df_dict)
+import ace_tools as tools; tools.display_dataframe_to_user(name="Modified DataFrames with Correct VintageBalance", dataframe=df_dict)
