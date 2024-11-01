@@ -1,28 +1,12 @@
 import pandas as pd
-from scipy.stats import fisher_exact
 
-# Sample DataFrame (replace with your actual data)
-data = {
-    'num_column': [1.5, 2.3, 3.1, 4.7, 5.0, 2.2, 3.4, 4.5, 5.1, 2.9],
-    'cat_column': ['S1', 'A2', 'D4', 'D4', 'B3', 'S1', 'D4', 'A2', 'D4', 'B3'],
-    'DQ': [1, 0, 1, 1, 0, 0, 1, 0, 1, 0]
-}
-df = pd.DataFrame(data)
+# Sample DataFrame
+df = pd.DataFrame({
+    'A': [1.12, 2.68, 3.14],
+    'B': [4.57, 5.68, 6.79],
+    'C': [7.12, 8.68, 9.14]
+})
 
-# Assuming 'is_D4' has already been created to indicate if cat_column is "D4"
-df['is_D4'] = df['cat_column'].apply(lambda x: 1 if x == 'D4' else 0)
-
-# Create a 2x2 contingency table
-contingency_table = pd.crosstab(df['is_D4'], df['DQ'])
-
-# Apply Fisher's Exact Test
-odds_ratio, p_value = fisher_exact(contingency_table)
-print("Fisher's Exact Test Results:")
-print(f"Odds Ratio: {odds_ratio}")
-print(f"P-value: {p_value}")
-
-# Interpretation of Fisher's Exact Test
-if p_value < 0.05:
-    print("There is a statistically significant association between 'D4' and 'DQ = 1'.")
-else:
-    print("No significant association found between 'D4' and 'DQ = 1'.")
+# Apply styling with smaller font size
+styled_df = df.style.set_properties(**{'font-size': '12pt'})  # Adjust font size as needed
+html = styled_df.render()
