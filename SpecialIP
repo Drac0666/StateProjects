@@ -1,14 +1,4 @@
-def move_elements_to_start(lst, target_substring):
-    # Filter elements containing the target substring
-    matching_elements = [item for item in lst if target_substring in item]
-    # Filter elements that do not contain the target substring
-    non_matching_elements = [item for item in lst if target_substring not in item]
-    # Combine matching elements at the start followed by non-matching elements
-    return matching_elements + non_matching_elements
-
-# Example usage
-sample_list = ['apple', 'Python37_test', 'banana', 'Python37_example', 'cherry']
-target_substring = "Python37"
-
-updated_list = move_elements_to_start(sample_list, target_substring)
-print(updated_list)
+@echo off
+echo Current PATH environment variable:
+echo %PATH%
+pause
