@@ -1,24 +1,14 @@
-import pandas as pd
+def move_elements_to_start(lst, target_substring):
+    # Filter elements containing the target substring
+    matching_elements = [item for item in lst if target_substring in item]
+    # Filter elements that do not contain the target substring
+    non_matching_elements = [item for item in lst if target_substring not in item]
+    # Combine matching elements at the start followed by non-matching elements
+    return matching_elements + non_matching_elements
 
-# Sample DataFrame
-df = pd.DataFrame({
-    'A': [1000354.00, 2678912.67891, 314159.14159],
-    'B': [456789.00, 567891.67891, 678901.00],
-    'C': [712345.12, 800000.00, 914159.14159]
-})
+# Example usage
+sample_list = ['apple', 'Python37_test', 'banana', 'Python37_example', 'cherry']
+target_substring = "Python37"
 
-# Define a custom formatting function for thousands separator and conditional decimal display
-def custom_format(x):
-    return f"{x:,.2f}".rstrip('0').rstrip('.') if isinstance(x, float) else x
-
-# Apply formatting and styling to specific columns ('A' and 'B' in this case)
-styled_df = (
-    df.style
-    .format({'A': custom_format, 'B': custom_format})  # Apply custom format only to columns A and B
-    .set_table_styles({
-        'A': [{'selector': 'td', 'props': [('font-size', '12pt'), ('color', 'blue')]}],
-        'B': [{'selector': 'td', 'props': [('font-size', '12pt'), ('color', 'green')]}]
-    }, overwrite=False)  # Apply styles only to columns A and B
-)
-
-html = styled_df.render()
+updated_list = move_elements_to_start(sample_list, target_substring)
+print(updated_list)
