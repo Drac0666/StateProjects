@@ -1,4 +1,34 @@
 @echo off
-echo Current PATH environment variable:
-echo %PATH%
+setlocal
+
+REM Get current PATH environment variable
+set "current_path=%PATH%"
+
+REM Initialize variables for storing paths
+set "python_paths="
+set "other_paths="
+
+REM Split the PATH into tokens based on the semicolon delimiter
+for %%i in (%current_path%) do (
+    echo %%i | findstr /I "Python37" >nul
+    if %errorlevel%==0 (
+        REM If path contains "Python37", add it to python_paths
+        set "python_paths=!python_paths!;%%i"
+    ) else (
+        REM Otherwise, add it to other_paths
+        set "other_paths=!other_paths!;%%i"
+    )
+)
+
+REM Remove any leading semicolons and combine python_paths and other_paths
+set "new_path=%python_paths%%other_paths%"
+
+REM Update PATH with the new ordering
+setx PATH "%new_path:~1%"
+
+REM Display the new PATH for verification
+echo New PATH:
+echo %new_path:~1%
+
+endlocal
 pause
