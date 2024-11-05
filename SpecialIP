@@ -1,33 +1,20 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Nov  5 09:41:50 2024
+import requests
+from datetime import datetime, timedelta
 
-@author: edena
-"""
+# Calculate yesterday's date
+yesterday = datetime.now() - timedelta(days=1)
+date_str = yesterday.strftime('%Y-%m-%d')
 
-import pandasdmx as sdmx
-import pandas as pd
+# ECB Data Portal API endpoint for exchange rates
+url = f'https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?startPeriod={date_str}&endPeriod={date_str}&format=jsondata'
 
-def get_usd_exchange_rate():
-    # Connect to the ECB data source
-    ecb = sdmx.Request('ECB')
-    
-    # Retrieve exchange rates data from ECB
-    data_response = ecb.data(resource_id='EXR', 
-                             key={'CURRENCY': 'USD', 'FREQ': 'D', 'CURRENCY_DENOM': 'EUR'},
-                             params={'startPeriod': '2020-01-01'})  # Adjust startPeriod as needed
+# Make the request
+response = requests.get(url)
+data = response.json()
 
-    # Parse the data to a pandas DataFrame
-    data_series = data_response.to_pandas()
-
-    # Filter for daily USD exchange rates against EUR
-    usd_exchange_rate = data_series[['EUR/USD']].reset_index()
-
-    # Rename columns for clarity
-    usd_exchange_rate.columns = ['Date', 'Exchange Rate']
-
-    return usd_exchange_rate
-
-# Get the USD exchange rate DataFrame and display it
-usd_exchange_rate_df = get_usd_exchange_rate()
-print(usd_exchange_rate_df)
+# Extract the exchange rate
+try:
+    rate = data['dataSets'][0]['series']['0:0:0:0:0']['observations']['0'][0]
+    print(f"USD to EUR exchange rate on {date_str}: {rate}")
+except KeyError:
+    print(f"No exchange rate data available for {date_str}")
