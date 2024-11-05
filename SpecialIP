@@ -1,12 +1,33 @@
-import pyautogui
-import time
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Nov  5 09:41:50 2024
 
-def track_mouse_position(duration=10):
-    start_time = time.time()
-    while time.time() - start_time < duration:
-        x, y = pyautogui.position()  # Get the current position of the mouse
-        print(f"Mouse Position: X={x}, Y={y}")
-        time.sleep(0.1)  # Adjust the delay to control the frequency of updates
+@author: edena
+"""
 
-# Run the function to track mouse position for 10 seconds
-track_mouse_position()
+import pandasdmx as sdmx
+import pandas as pd
+
+def get_usd_exchange_rate():
+    # Connect to the ECB data source
+    ecb = sdmx.Request('ECB')
+    
+    # Retrieve exchange rates data from ECB
+    data_response = ecb.data(resource_id='EXR', 
+                             key={'CURRENCY': 'USD', 'FREQ': 'D', 'CURRENCY_DENOM': 'EUR'},
+                             params={'startPeriod': '2020-01-01'})  # Adjust startPeriod as needed
+
+    # Parse the data to a pandas DataFrame
+    data_series = data_response.to_pandas()
+
+    # Filter for daily USD exchange rates against EUR
+    usd_exchange_rate = data_series[['EUR/USD']].reset_index()
+
+    # Rename columns for clarity
+    usd_exchange_rate.columns = ['Date', 'Exchange Rate']
+
+    return usd_exchange_rate
+
+# Get the USD exchange rate DataFrame and display it
+usd_exchange_rate_df = get_usd_exchange_rate()
+print(usd_exchange_rate_df)
