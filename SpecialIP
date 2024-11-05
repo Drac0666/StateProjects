@@ -2,16 +2,24 @@ import time
 import win32com.client
 import win32gui
 import win32con
-import win32api
+
+def bring_teams_to_foreground():
+    def enum_windows_callback(hwnd, _):
+        if "microsoft teams" in win32gui.GetWindowText(hwnd).lower():
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)  # Restore if minimized
+            win32gui.SetForegroundWindow(hwnd)  # Bring to front
+            return False  # Stop after finding the first match
+        return True
+
+    win32gui.EnumWindows(enum_windows_callback, None)
 
 def send_teams_message(chat_name, message):
-    # Open Microsoft Teams (assuming it’s already running)
+    bring_teams_to_foreground()
+    
     shell = win32com.client.Dispatch("WScript.Shell")
-    shell.AppActivate("Microsoft Teams")
     time.sleep(1)
 
     # Find the chat by name and open it
-    # This uses the TAB key to navigate, so the chat must be in the recent list or easy to access.
     shell.SendKeys("^+f")  # Ctrl + Shift + F for search
     time.sleep(0.5)
     shell.SendKeys(chat_name)  # Type the chat name
