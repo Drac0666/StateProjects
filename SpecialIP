@@ -1,39 +1,19 @@
-import time
-import win32com.client
 import win32gui
-import win32con
 
-def bring_teams_to_foreground():
+def list_open_windows():
+    windows = []
+
     def enum_windows_callback(hwnd, _):
-        if "microsoft teams" in win32gui.GetWindowText(hwnd).lower():
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)  # Restore if minimized
-            win32gui.SetForegroundWindow(hwnd)  # Bring to front
-            return False  # Stop after finding the first match
-        return True
+        if win32gui.IsWindowVisible(hwnd):  # Only list visible windows
+            window_text = win32gui.GetWindowText(hwnd)
+            if window_text:  # Only include windows with a title
+                windows.append(window_text)
 
     win32gui.EnumWindows(enum_windows_callback, None)
-
-def send_teams_message(chat_name, message):
-    bring_teams_to_foreground()
     
-    shell = win32com.client.Dispatch("WScript.Shell")
-    time.sleep(1)
+    # Display all found windows
+    for window in windows:
+        print(window)
 
-    # Find the chat by name and open it
-    shell.SendKeys("^+f")  # Ctrl + Shift + F for search
-    time.sleep(0.5)
-    shell.SendKeys(chat_name)  # Type the chat name
-    time.sleep(1)
-    shell.SendKeys("{ENTER}")  # Enter to open the chat
-    time.sleep(1)
-
-    # Send the message
-    shell.SendKeys(message)
-    time.sleep(0.5)
-    shell.SendKeys("{ENTER}")  # Press Enter to send
-    print("Message sent")
-
-# Usage example
-chat_name = "Your Chat or Channel Name"
-message = "Hello from Python via win32api!"
-send_teams_message(chat_name, message)
+# Run the function to list all open windows
+list_open_windows()
