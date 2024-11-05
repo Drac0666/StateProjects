@@ -1,20 +1,26 @@
-import requests
-from datetime import datetime, timedelta
+import pandas as pd
 
-# Calculate yesterday's date
-yesterday = datetime.now() - timedelta(days=1)
-date_str = yesterday.strftime('%Y-%m-%d')
+# Sample DataFrame
+data = {
+    'Name': ['Alice', 'Bob', 'Charlie', 'David'],
+    'Book Value': [1000000, 2500000, 3500000, 4200000]
+}
+df = pd.DataFrame(data)
 
-# ECB Data Portal API endpoint for exchange rates
-url = f'https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?startPeriod={date_str}&endPeriod={date_str}&format=jsondata'
+# Apply styling to format the "Book Value" column and style the header
+styled_df = (
+    df.style
+    .format({"Book Value": "{:,.2f}"})  # Adds commas and two decimal places
+    .set_table_styles(
+        [
+            {
+                'selector': 'thead th',  # Targets the header row
+                'props': [('background-color', 'darkblue'),  # Dark blue background
+                          ('color', 'white')]  # White font color
+            }
+        ]
+    )
+)
 
-# Make the request
-response = requests.get(url)
-data = response.json()
-
-# Extract the exchange rate
-try:
-    rate = data['dataSets'][0]['series']['0:0:0:0:0']['observations']['0'][0]
-    print(f"USD to EUR exchange rate on {date_str}: {rate}")
-except KeyError:
-    print(f"No exchange rate data available for {date_str}")
+# Display the styled DataFrame (e.g., in Jupyter Notebook)
+styled_df
