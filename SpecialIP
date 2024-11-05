@@ -1,26 +1,31 @@
-from datetime import datetime
+import time
+import win32com.client
+import win32gui
+import win32con
+import win32api
 
-def recognize_date_pattern(date_string):
-    patterns = [
-        "%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y",
-        "%Y.%m.%d", "%d.%m.%Y", "%m.%d.%Y", "%d %b %Y", "%d %B %Y",
-        "%b %d, %Y", "%B %d, %Y", "%d-%b-%Y", "%d-%B-%Y", "%Y %b %d",
-        "%Y %B %d", "%b %d %Y", "%B %d %Y", "%Y%m%d"
-    ]
-    
-    for pattern in patterns:
-        try:
-            # Try to parse date_string with the current pattern
-            datetime.strptime(date_string, pattern)
-            return f"Matched pattern: {pattern}"
-        except ValueError:
-            # If pattern doesn't match, move to the next one
-            continue
-    
-    # If no pattern matched, return an error message
-    return "Error: No matching date pattern found."
+def send_teams_message(chat_name, message):
+    # Open Microsoft Teams (assuming it’s already running)
+    shell = win32com.client.Dispatch("WScript.Shell")
+    shell.AppActivate("Microsoft Teams")
+    time.sleep(1)
 
-# Example usage
-date_string = "11-04-2024"  # Replace this with your date string
-result = recognize_date_pattern(date_string)
-print(result)
+    # Find the chat by name and open it
+    # This uses the TAB key to navigate, so the chat must be in the recent list or easy to access.
+    shell.SendKeys("^+f")  # Ctrl + Shift + F for search
+    time.sleep(0.5)
+    shell.SendKeys(chat_name)  # Type the chat name
+    time.sleep(1)
+    shell.SendKeys("{ENTER}")  # Enter to open the chat
+    time.sleep(1)
+
+    # Send the message
+    shell.SendKeys(message)
+    time.sleep(0.5)
+    shell.SendKeys("{ENTER}")  # Press Enter to send
+    print("Message sent")
+
+# Usage example
+chat_name = "Your Chat or Channel Name"
+message = "Hello from Python via win32api!"
+send_teams_message(chat_name, message)
