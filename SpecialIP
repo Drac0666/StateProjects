@@ -1,19 +1,61 @@
+import time
+import pytesseract
+import pyautogui
+from PIL import Image
 import win32gui
+import win32con
 
-def list_open_windows():
-    windows = []
+# Configure Tesseract path if necessary
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
+def bring_teams_to_foreground():
     def enum_windows_callback(hwnd, _):
-        if win32gui.IsWindowVisible(hwnd):  # Only list visible windows
-            window_text = win32gui.GetWindowText(hwnd)
-            if window_text:  # Only include windows with a title
-                windows.append(window_text)
+        if "microsoft teams" in win32gui.GetWindowText(hwnd).lower():
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)  # Restore if minimized
+            win32gui.SetForegroundWindow(hwnd)  # Bring to front
+            return False  # Stop after finding the first match
+        return True
 
     win32gui.EnumWindows(enum_windows_callback, None)
-    
-    # Display all found windows
-    for window in windows:
-        print(window)
 
-# Run the function to list all open windows
-list_open_windows()
+def find_and_click_chat(chat_name):
+    # Bring Teams to the foreground
+    bring_teams_to_foreground()
+    time.sleep(1)
+
+    # Capture screenshot of the screen
+    screenshot = pyautogui.screenshot()
+
+    # Use OCR to detect the chat name in the screenshot
+    ocr_result = pytesseract.image_to_data(screenshot, output_type=pytesseract.Output.DICT)
+
+    # Iterate over the OCR results
+    for i, text in enumerate(ocr_result['text']):
+        if chat_name.lower() in text.lower():
+            # If chat name found, get the center of the detected text box
+            x = ocr_result['left'][i] + ocr_result['width'][i] // 2
+            y = ocr_result['top'][i] + ocr_result['height'][i] // 2
+
+            # Click at the chat location
+            pyautogui.click(x, y)
+            time.sleep(1)
+            return True
+    
+    print("Chat not found on screen.")
+    return False
+
+def send_teams_message(chat_name, message):
+    if find_and_click_chat(chat_name):
+        time.sleep(1)
+
+        # Type and send the message
+        pyautogui.write(message)
+        pyautogui.press('enter')
+        print("Message sent")
+    else:
+        print("Failed to locate chat")
+
+# Usage example
+chat_name = "Your Chat or Channel Name"
+message = "Hello from Python via OCR!"
+send_teams_message(chat_name, message)
