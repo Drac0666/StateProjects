@@ -1,19 +1,25 @@
 import pandas as pd
 import statsmodels.api as sm
 
-# Example DataFrame with a categorical and numeric column
-# 'Category' is categorical, and 'NumericValue' is numeric
-# Assume 'DQ' is the target variable
+# Example DataFrame with columns LTV, Bucket, and DQ
+data = {
+    'LTV': [0.8, 0.9, 0.75, 0.85, 0.6, 0.95],
+    'Bucket': ['Low', 'Medium', 'High', 'High', 'Low', 'Medium'],
+    'DQ': [0, 1, 0, 1, 0, 1]
+}
+df = pd.DataFrame(data)
 
-# One-hot encode the categorical column
-df_encoded = pd.get_dummies(df_filtered, columns=['Category'], drop_first=True)
+# One-hot encode the 'Bucket' column
+df_encoded = pd.get_dummies(df, columns=['Bucket'], drop_first=True)
 
-# Define predictor variables (X) and outcome variable (y)
-X = df_encoded.drop('DQ', axis=1)  # Drop DQ column from features
+# Define predictor variables (X) and target variable (y)
+X = df_encoded[['LTV', 'Bucket_Medium', 'Bucket_High']]
 X = sm.add_constant(X)  # Adding a constant for the intercept
-y = df_encoded['DQ']  # Target variable
+y = df_encoded['DQ']
 
 # Fit logistic regression model
 model = sm.Logit(y, X)
 result = model.fit()
+
+# Display the summary
 print(result.summary())
