@@ -1,25 +1,62 @@
 import pandas as pd
-from statsmodels.stats.proportion import proportions_ztest
+from scipy.stats import ttest_ind, proportions_ztest, mannwhitneyu
 
-# Assuming 'df' is your DataFrame with columns 'IssueDate' and 'DQ'
-# Convert IssueDate to datetime if it's not already
-df['IssueDate'] = pd.to_datetime(df['IssueDate'], errors='coerce')
+# Sample DataFrame
+# Assuming df has 'GroupColumn' (for dynamic grouping), 'DQ', and 'NumericColumn'
 
-# Group data based on IssueDate
-group1 = df[df['IssueDate'] < '2014']
-group2 = df[df['IssueDate'] >= '2014']
+# Step 1: Get unique values in the column you want to group by
+unique_values = df['GroupColumn'].unique()
 
-# Calculate the counts of DQ=1 in each group and the total observations
-count_dq1_group1 = group1['DQ'].sum()  # Count of DQ=1 for IssueDate < 2014
-count_dq1_group2 = group2['DQ'].sum()  # Count of DQ=1 for IssueDate >= 2014
+# Initialize an empty dictionary to store results
+results = []
 
-n_group1 = group1.shape[0]  # Total observations for IssueDate < 2014
-n_group2 = group2.shape[0]  # Total observations for IssueDate >= 2014
+# Step 2: Iterate over each pair of unique values
+for i, group1_val in enumerate(unique_values):
+    for j, group2_val in enumerate(unique_values):
+        if j <= i:
+            continue  # Skip redundant and self-comparisons
 
-# Perform two-proportion z-test
-count = [count_dq1_group1, count_dq1_group2]
-nobs = [n_group1, n_group2]
-stat, pval = proportions_ztest(count, nobs)
+        # Separate data for each group
+        group1 = df[df['GroupColumn'] == group1_val]
+        group2 = df[df['GroupColumn'] == group2_val]
 
-print("Z-Statistic:", stat)
-print("p-value:", pval)
+        # Part A: Proportion test for 'DQ' (binary outcome)
+        count_dq1_group1 = group1['DQ'].sum()
+        count_dq1_group2 = group2['DQ'].sum()
+        n_group1 = group1.shape[0]
+        n_group2 = group2.shape[0]
+
+        # Perform proportions z-test
+        if n_group1 > 0 and n_group2 > 0:
+            count = [count_dq1_group1, count_dq1_group2]
+            nobs = [n_group1, n_group2]
+            z_stat, p_val_z = proportions_ztest(count, nobs)
+        else:
+            z_stat, p_val_z = None, None  # Skip if any group has no observations
+
+        # Part B: T-test (or Mann-Whitney U) for 'NumericColumn' (numeric outcome)
+        group1_numeric = group1['NumericColumn']
+        group2_numeric = group2['NumericColumn']
+
+        if len(group1_numeric) > 0 and len(group2_numeric) > 0:
+            # Check normality assumption; use t-test if normal, Mann-Whitney U if not
+            t_stat, p_val_t = ttest_ind(group1_numeric, group2_numeric, equal_var=False)
+            u_stat, p_val_u = mannwhitneyu(group1_numeric, group2_numeric, alternative='two-sided')
+        else:
+            t_stat, p_val_t, u_stat, p_val_u = None, None, None, None
+
+        # Append results to the list
+        results.append({
+            'Group 1': group1_val,
+            'Group 2': group2_val,
+            'Z-Statistic (DQ)': z_stat,
+            'p-value (DQ)': p_val_z,
+            'T-Statistic (NumericColumn)': t_stat,
+            'p-value (T-test)': p_val_t,
+            'U-Statistic (NumericColumn)': u_stat,
+            'p-value (Mann-Whitney U)': p_val_u
+        })
+
+# Convert results to a DataFrame for easier viewing
+results_df = pd.DataFrame(results)
+import ace_tools as tools; tools.display_dataframe_to_user(name="Dynamic Group Test Results", dataframe=results_df)
