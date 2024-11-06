@@ -1,37 +1,11 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-# Load your data into a Pandas DataFrame
-df = pd.read_csv("your_data.csv")  # Replace with your file path
+# Assuming your filtered DataFrame is named df_filtered, with columns 'DQ' and 'Amortisation Value'
+# Step 1: Group by 'Amortisation Value' and count occurrences of DQ = 1
+amortisation_counts = df_filtered[df_filtered['DQ'] == 1].groupby('Amortisation Value').size().reset_index(name='Count')
 
-# 1. Descriptive Statistics:
-print(df.describe())  # Get summary statistics for all columns
+# Step 2: Sort values to see which Amortisation Values have the most DQ=1 occurrences
+amortisation_counts = amortisation_counts.sort_values(by='Count', ascending=False)
 
-# 2. Correlation Analysis:
-correlation_matrix = df.corr()
-print(correlation_matrix)  # Print the correlation matrix
-
-# 3. Visualizations:
-#   a. Scatter Plot:
-plt.scatter(df['LTV'], df['DQ'])
-plt.xlabel('LTV')
-plt.ylabel('DQ')
-plt.title('Scatter Plot of LTV vs DQ')
-plt.show()
-
-#   b. Box Plot:
-sns.boxplot(x='DQ', y='LTV', data=df)
-plt.title('Box Plot of LTV by DQ')
-plt.show()
-
-# 4. Statistical Tests:
-#   a. Pearson Correlation Coefficient:
-correlation_coefficient, p_value = pearsonr(df['LTV'], df['DQ'])
-print("Pearson Correlation Coefficient:", correlation_coefficient)
-print("p-value:", p_value)
-
-#   b. T-test (if DQ is binary):
-#     - Separate data into two groups based on DQ
-#     - Perform a t-test to compare the means of LTV between the two groups
+# Display the result
+import ace_tools as tools; tools.display_dataframe_to_user(name="Amortisation Value Counts with DQ=1", dataframe=amortisation_counts)
