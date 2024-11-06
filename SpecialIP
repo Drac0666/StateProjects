@@ -5,9 +5,13 @@ data = {
     'Deal ID': ['A', 'A', 'A', 'B', 'B', 'C', 'C', 'C', 'C'],
     'DQ': [1, 0, 1, 1, 1, 0, 1, 0, 1],
     'Current Balance': [100, 200, 150, 300, 400, 500, 600, 700, 800],
-    'IssueDateBucket': ['2013', '2015', '2012', '2014', '2011', '2016', '2013', '2015', '2014']
+    'IssueDateBucket': ['2013', '2015', '2012', '2014', '2011', '2016', '2013', '2015', '2014'],
+    'LTVBucket': ['75', '80', '75', '60', '75', '85', '75', '90', '75']
 }
 df = pd.DataFrame(data)
+
+# Add the 'Combined' column based on conditions
+df['Combined'] = df.apply(lambda row: 'YES' if row['IssueDateBucket'] < "2014" and row['LTVBucket'] == "75" else 'NO', axis=1)
 
 # Function to calculate the required metrics for each Deal ID group
 def calculate_metrics(group):
@@ -19,10 +23,4 @@ def calculate_metrics(group):
     
     return pd.Series({
         'Relative Current Balance Percentage (DQ == 1)': relative_balance_pct,
-        'Proportion of IssueDateBucket <= 2014': issue_date_proportion
-    })
-
-# Group by 'Deal ID' and apply the function
-result = df.groupby('Deal ID').apply(calculate_metrics).reset_index()
-
-print(result)
+        'Proportion of IssueDateBucket <= 2014': issue_date_proportio
