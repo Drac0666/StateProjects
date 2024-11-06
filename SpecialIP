@@ -1,5 +1,19 @@
-from sklearn.metrics import confusion_matrix
+import pandas as pd
+import statsmodels.api as sm
 
-# Print confusion matrix
-conf_matrix = confusion_matrix(y_test, y_pred)
-print("Confusion Matrix:\n", conf_matrix)
+# Example DataFrame with a categorical and numeric column
+# 'Category' is categorical, and 'NumericValue' is numeric
+# Assume 'DQ' is the target variable
+
+# One-hot encode the categorical column
+df_encoded = pd.get_dummies(df_filtered, columns=['Category'], drop_first=True)
+
+# Define predictor variables (X) and outcome variable (y)
+X = df_encoded.drop('DQ', axis=1)  # Drop DQ column from features
+X = sm.add_constant(X)  # Adding a constant for the intercept
+y = df_encoded['DQ']  # Target variable
+
+# Fit logistic regression model
+model = sm.Logit(y, X)
+result = model.fit()
+print(result.summary())
