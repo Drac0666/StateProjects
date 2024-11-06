@@ -1,62 +1,20 @@
-import pandas as pd
-from scipy.stats import ttest_ind, proportions_ztest, mannwhitneyu
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Sample DataFrame
-# Assuming df has 'GroupColumn' (for dynamic grouping), 'DQ', and 'NumericColumn'
+# Example column to plot
+column_name = 'NumericColumn'
 
-# Step 1: Get unique values in the column you want to group by
-unique_values = df['GroupColumn'].unique()
+# Histogram
+plt.figure(figsize=(10, 6))
+sns.histplot(df[column_name], kde=True)
+plt.title(f'Histogram and KDE for {column_name}')
+plt.xlabel(column_name)
+plt.ylabel('Frequency')
+plt.show()
 
-# Initialize an empty dictionary to store results
-results = []
-
-# Step 2: Iterate over each pair of unique values
-for i, group1_val in enumerate(unique_values):
-    for j, group2_val in enumerate(unique_values):
-        if j <= i:
-            continue  # Skip redundant and self-comparisons
-
-        # Separate data for each group
-        group1 = df[df['GroupColumn'] == group1_val]
-        group2 = df[df['GroupColumn'] == group2_val]
-
-        # Part A: Proportion test for 'DQ' (binary outcome)
-        count_dq1_group1 = group1['DQ'].sum()
-        count_dq1_group2 = group2['DQ'].sum()
-        n_group1 = group1.shape[0]
-        n_group2 = group2.shape[0]
-
-        # Perform proportions z-test
-        if n_group1 > 0 and n_group2 > 0:
-            count = [count_dq1_group1, count_dq1_group2]
-            nobs = [n_group1, n_group2]
-            z_stat, p_val_z = proportions_ztest(count, nobs)
-        else:
-            z_stat, p_val_z = None, None  # Skip if any group has no observations
-
-        # Part B: T-test (or Mann-Whitney U) for 'NumericColumn' (numeric outcome)
-        group1_numeric = group1['NumericColumn']
-        group2_numeric = group2['NumericColumn']
-
-        if len(group1_numeric) > 0 and len(group2_numeric) > 0:
-            # Check normality assumption; use t-test if normal, Mann-Whitney U if not
-            t_stat, p_val_t = ttest_ind(group1_numeric, group2_numeric, equal_var=False)
-            u_stat, p_val_u = mannwhitneyu(group1_numeric, group2_numeric, alternative='two-sided')
-        else:
-            t_stat, p_val_t, u_stat, p_val_u = None, None, None, None
-
-        # Append results to the list
-        results.append({
-            'Group 1': group1_val,
-            'Group 2': group2_val,
-            'Z-Statistic (DQ)': z_stat,
-            'p-value (DQ)': p_val_z,
-            'T-Statistic (NumericColumn)': t_stat,
-            'p-value (T-test)': p_val_t,
-            'U-Statistic (NumericColumn)': u_stat,
-            'p-value (Mann-Whitney U)': p_val_u
-        })
-
-# Convert results to a DataFrame for easier viewing
-results_df = pd.DataFrame(results)
-import ace_tools as tools; tools.display_dataframe_to_user(name="Dynamic Group Test Results", dataframe=results_df)
+# Box Plot
+plt.figure(figsize=(8, 4))
+sns.boxplot(x=df[column_name])
+plt.title(f'Box Plot for {column_name}')
+plt.xlabel(column_name)
+plt.show()
