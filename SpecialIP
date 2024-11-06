@@ -1,62 +1,6 @@
-import pandas as pd
-from itertools import combinations
+result['ISIN'] = result['ISIN'].apply(lambda x: ', '.join(x))
 
-# Sample data
-data = {
-    'Deal ID': ['A', 'A', 'A', 'B', 'B', 'C', 'C', 'C', 'C'],
-    'DQ': [1, 0, 1, 1, 1, 0, 1, 0, 1],
-    'Current Balance': [100, 200, 150, 300, 400, 500, 600, 700, 800],
-    'LTV': [65, 75, 60, 80, 50, 70, 55, 90, 60],
-    'Amortization': ['IO', 'Full', 'IO', 'IO', 'Full', 'IO', 'Full', 'IO', 'IO'],
-    'GrossCoupon Bucket': ['Bucket 3', 'Bucket 1', 'Bucket 3', 'Bucket 2', 'Bucket 3', 'Bucket 2', 'Bucket 3', 'Bucket 1', 'Bucket 3'],
-    'IssueDateBucket': ['2013', '2015', '2012', '2014', '2011', '2016', '2013', '2015', '2014']
-}
-df = pd.DataFrame(data)
+# Copy result to clipboard
+result.to_clipboard(index=False)
 
-# Define the conditions as lambda functions
-conditions = {
-    'LTV < 70': lambda df: df['LTV'] < 70,
-    'Amortization == IO': lambda df: df['Amortization'] == 'IO',
-    'GrossCoupon Bucket == Bucket 3': lambda df: df['GrossCoupon Bucket'] == 'Bucket 3',
-    'IssueDateBucket < 2014': lambda df: df['IssueDateBucket'] < '2014'
-}
-
-# Function to calculate Current Balance for DQ == 1 under each combination of conditions by Deal ID
-results = []
-
-# Group by 'Deal ID'
-for deal_id, group in df.groupby('Deal ID'):
-    # Check individual and combination conditions within each Deal ID
-    for i in range(1, len(conditions) + 1):
-        for combo in combinations(conditions.keys(), i):
-            # Apply the combined conditions
-            combined_condition = group['DQ'] == 1
-            for condition_name in combo:
-                combined_condition &= conditions[condition_name](group)
-            
-            # Calculate the sum of Current Balance for DQ == 1 under this combination
-            current_balance_sum = group.loc[combined_condition, 'Current Balance'].sum()
-            
-            # Save the results
-            results.append({
-                'Deal ID': deal_id,
-                'Conditions': ' & '.join(combo),
-                'Current Balance (DQ == 1)': current_balance_sum
-            })
-
-# Convert results to DataFrame for easier viewing
-results_df = pd.DataFrame(results)
-
-# Filter out rows where Current Balance (DQ == 1) is 0
-filtered_results_df = results_df[results_df['Current Balance (DQ == 1)'] > 0]
-
-# Sort by 'Deal ID' and 'Current Balance (DQ == 1)' in descending order, then keep top 3 per 'Deal ID'
-top_results_df = (
-    filtered_results_df.sort_values(['Deal ID', 'Current Balance (DQ == 1)'], ascending=[True, False])
-    .groupby('Deal ID')
-    .head(3)
-    .reset_index(drop=True)
-)
-
-# Display top 3 results per Deal ID with Current Balance > 0
-print(top_results_df)
+print("Data has been copied to clipboard.")
