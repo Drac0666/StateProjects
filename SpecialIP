@@ -4,5 +4,8 @@ import pandas as pd
 # Create 5 quantile-based buckets
 df['GrossCoupon_Bucket'] = pd.qcut(df['Gross Coupon'], q=5, labels=['Bucket 1', 'Bucket 2', 'Bucket 3', 'Bucket 4', 'Bucket 5'])
 
-# Display the distribution of data in each bucket
-print(df['GrossCoupon_Bucket'].value_counts())
+# Group by the bucket and get the min and max values within each bucket
+bucket_summary = df.groupby('GrossCoupon_Bucket')['Gross Coupon'].agg(['min', 'max']).reset_index()
+
+# Display the summary table
+print(bucket_summary)
