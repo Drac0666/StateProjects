@@ -4,13 +4,25 @@ import pandas as pd
 data = {
     'Deal ID': ['A', 'A', 'A', 'B', 'B', 'C', 'C', 'C', 'C'],
     'DQ': [1, 0, 1, 1, 1, 0, 1, 0, 1],
-    'Current Balance': [100, 200, 150, 300, 400, 500, 600, 700, 800]
+    'Current Balance': [100, 200, 150, 300, 400, 500, 600, 700, 800],
+    'IssueDateBucket': ['2013', '2015', '2012', '2014', '2011', '2016', '2013', '2015', '2014']
 }
 df = pd.DataFrame(data)
 
-# Group by 'Deal ID' and calculate the relative percentage of Current Balance where DQ == 1
-result = df.groupby('Deal ID').apply(
-    lambda x: x.loc[x['DQ'] == 1, 'Current Balance'].sum() / x['Current Balance'].sum() * 100
-).reset_index(name='Relative Current Balance Percentage (DQ == 1)')
+# Function to calculate the required metrics for each Deal ID group
+def calculate_metrics(group):
+    # Calculate the relative percentage of Current Balance where DQ == 1
+    relative_balance_pct = group.loc[group['DQ'] == 1, 'Current Balance'].sum() / group['Current Balance'].sum() * 100
+    
+    # Calculate the proportion of rows with IssueDateBucket <= "2014"
+    issue_date_proportion = (group['IssueDateBucket'] <= "2014").sum() / len(group)
+    
+    return pd.Series({
+        'Relative Current Balance Percentage (DQ == 1)': relative_balance_pct,
+        'Proportion of IssueDateBucket <= 2014': issue_date_proportion
+    })
+
+# Group by 'Deal ID' and apply the function
+result = df.groupby('Deal ID').apply(calculate_metrics).reset_index()
 
 print(result)
