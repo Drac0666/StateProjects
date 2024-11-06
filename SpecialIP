@@ -1,9 +1,13 @@
-from scipy.stats import chi2_contingency
+import statsmodels.api as sm
 
-# Create a contingency table
-contingency_table = pd.crosstab(df_filtered['Amortisation Value'], df_filtered['DQ'])
+# Prepare the data
+X = df_filtered[['Amortisation Value']]
+X = sm.add_constant(X)  # Adding a constant term for the intercept
+y = df_filtered['DQ']
 
-# Perform the Chi-Square test
-chi2, p, dof, expected = chi2_contingency(contingency_table)
-print("Chi-Square Statistic:", chi2)
-print("p-value:", p)
+# Fit logistic regression model
+model = sm.Logit(y, X)
+result = model.fit()
+
+# Print the summary of the logistic regression
+print(result.summary())
