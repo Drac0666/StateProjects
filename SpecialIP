@@ -1,10 +1,13 @@
 import pandas as pd
 
 # Assuming your DataFrame is named df
-# Explode ISINs to separate rows
-result = df.groupby('Issue Year')['ISIN'].apply(lambda x: x.explode()).reset_index()
+# Group by 'Issue Year' and aggregate ISINs into lists
+grouped_df = df.groupby('Issue Year')['ISIN'].apply(list).reset_index()
 
-# Copy result to clipboard
+# Explode the ISINs column so each ISIN has its own row along with the Issue Year
+result = grouped_df.explode('ISIN').reset_index(drop=True)
+
+# Copy the result to clipboard
 result.to_clipboard(index=False)
 
 print("Data has been copied to clipboard.")
