@@ -21,25 +21,28 @@ conditions = {
     'IssueDateBucket < 2014': lambda df: df['IssueDateBucket'] < '2014'
 }
 
-# Function to calculate Current Balance for DQ == 1 under each combination of conditions
+# Function to calculate Current Balance for DQ == 1 under each combination of conditions by Deal ID
 results = []
 
-# Check individual and combination conditions
-for i in range(1, len(conditions) + 1):
-    for combo in combinations(conditions.keys(), i):
-        # Apply the combined conditions
-        combined_condition = df['DQ'] == 1
-        for condition_name in combo:
-            combined_condition &= conditions[condition_name](df)
-        
-        # Calculate the sum of Current Balance for DQ == 1 under this combination
-        current_balance_sum = df.loc[combined_condition, 'Current Balance'].sum()
-        
-        # Save the results
-        results.append({
-            'Conditions': ' & '.join(combo),
-            'Current Balance (DQ == 1)': current_balance_sum
-        })
+# Group by 'Deal ID'
+for deal_id, group in df.groupby('Deal ID'):
+    # Check individual and combination conditions within each Deal ID
+    for i in range(1, len(conditions) + 1):
+        for combo in combinations(conditions.keys(), i):
+            # Apply the combined conditions
+            combined_condition = group['DQ'] == 1
+            for condition_name in combo:
+                combined_condition &= conditions[condition_name](group)
+            
+            # Calculate the sum of Current Balance for DQ == 1 under this combination
+            current_balance_sum = group.loc[combined_condition, 'Current Balance'].sum()
+            
+            # Save the results
+            results.append({
+                'Deal ID': deal_id,
+                'Conditions': ' & '.join(combo),
+                'Current Balance (DQ == 1)': current_balance_sum
+            })
 
 # Convert results to DataFrame for easier viewing
 results_df = pd.DataFrame(results)
