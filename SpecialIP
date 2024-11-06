@@ -1,11 +1,9 @@
-import pandas as pd
+from scipy.stats import chi2_contingency
 
-# Assuming your filtered DataFrame is named df_filtered, with columns 'DQ' and 'Amortisation Value'
-# Step 1: Group by 'Amortisation Value' and count occurrences of DQ = 1
-amortisation_counts = df_filtered[df_filtered['DQ'] == 1].groupby('Amortisation Value').size().reset_index(name='Count')
+# Create a contingency table
+contingency_table = pd.crosstab(df_filtered['Amortisation Value'], df_filtered['DQ'])
 
-# Step 2: Sort values to see which Amortisation Values have the most DQ=1 occurrences
-amortisation_counts = amortisation_counts.sort_values(by='Count', ascending=False)
-
-# Display the result
-import ace_tools as tools; tools.display_dataframe_to_user(name="Amortisation Value Counts with DQ=1", dataframe=amortisation_counts)
+# Perform the Chi-Square test
+chi2, p, dof, expected = chi2_contingency(contingency_table)
+print("Chi-Square Statistic:", chi2)
+print("p-value:", p)
