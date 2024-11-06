@@ -1,22 +1,8 @@
-import matplotlib.pyplot as plt
 import pandas as pd
 
-# Sample data preparation: Group by LTVBucket and count occurrences of DQ = 1
-bubble_data = df[df['DQ'] == 1].groupby('LTVBucket').size().reset_index(name='DQ_Count')
+# Assuming 'df' is your DataFrame and 'Gross Coupon' is the column you want to bucket
+# Create 5 quantile-based buckets
+df['GrossCoupon_Bucket'] = pd.qcut(df['Gross Coupon'], q=5, labels=['Bucket 1', 'Bucket 2', 'Bucket 3', 'Bucket 4', 'Bucket 5'])
 
-# Set bubble sizes (e.g., scale by a factor to increase visibility)
-bubble_data['Bubble_Size'] = bubble_data['DQ_Count'] * 100  # Adjust scaling factor as needed
-
-# Create the bubble chart
-plt.figure(figsize=(10, 6))
-plt.scatter(bubble_data['LTVBucket'], bubble_data['DQ_Count'], s=bubble_data['Bubble_Size'], alpha=0.6, edgecolors="w", linewidth=0.5)
-
-# Add labels and title
-plt.title('Bubble Chart of LTVBucket by DQ = 1 Count')
-plt.xlabel('LTVBucket')
-plt.ylabel('Count of DQ = 1')
-plt.xticks(rotation=45)
-plt.grid(True, linestyle='--', alpha=0.7)
-
-# Show plot
-plt.show()
+# Display the distribution of data in each bucket
+print(df['GrossCoupon_Bucket'].value_counts())
