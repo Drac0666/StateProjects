@@ -1,26 +1,37 @@
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Sample DataFrame
-data = {
-    'Name': ['Alice', 'Bob', 'Charlie', 'David'],
-    'Book Value': [1000000, 2500000, 3500000, 4200000]
-}
-df = pd.DataFrame(data)
+# Load your data into a Pandas DataFrame
+df = pd.read_csv("your_data.csv")  # Replace with your file path
 
-# Apply styling to format the "Book Value" column and style the header
-styled_df = (
-    df.style
-    .format({"Book Value": "{:,.2f}"})  # Adds commas and two decimal places
-    .set_table_styles(
-        [
-            {
-                'selector': 'thead th',  # Targets the header row
-                'props': [('background-color', 'darkblue'),  # Dark blue background
-                          ('color', 'white')]  # White font color
-            }
-        ]
-    )
-)
+# 1. Descriptive Statistics:
+print(df.describe())  # Get summary statistics for all columns
 
-# Display the styled DataFrame (e.g., in Jupyter Notebook)
-styled_df
+# 2. Correlation Analysis:
+correlation_matrix = df.corr()
+print(correlation_matrix)  # Print the correlation matrix
+
+# 3. Visualizations:
+#   a. Scatter Plot:
+plt.scatter(df['LTV'], df['DQ'])
+plt.xlabel('LTV')
+plt.ylabel('DQ')
+plt.title('Scatter Plot of LTV vs DQ')
+plt.show()
+
+#   b. Box Plot:
+sns.boxplot(x='DQ', y='LTV', data=df)
+plt.title('Box Plot of LTV by DQ')
+plt.show()
+
+# 4. Statistical Tests:
+#   a. Pearson Correlation Coefficient:
+correlation_coefficient, p_value = pearsonr(df['LTV'], df['DQ'])
+print("Pearson Correlation Coefficient:", correlation_coefficient)
+print("p-value:", p_value)
+
+#   b. T-test (if DQ is binary):
+#     - Separate data into two groups based on DQ
+#     - Perform a t-test to compare the means of LTV between the two groups
