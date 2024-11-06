@@ -1,12 +1,13 @@
 import pandas as pd
 
-# Assuming 'df' is your DataFrame and 'Gross Coupon' is the column you want to bucket
-# Define custom boundaries for the buckets (adjust these based on your requirements)
-bins = [df['Gross Coupon'].min(), 2, 4, 6, 8, df['Gross Coupon'].max()]  # Custom bin edges
-labels = ['Bucket 1', 'Bucket 2', 'Bucket 3', 'Bucket 4', 'Bucket 5']     # Custom labels
+# Sample data
+data = {
+    'Deal ID': ['A', 'A', 'A', 'B', 'B', 'C', 'C', 'C', 'C'],
+    'DQ': [1, 0, 1, 1, 1, 0, 1, 0, 1]
+}
+df = pd.DataFrame(data)
 
-# Create the custom buckets using pd.cut
-df['GrossCoupon_Bucket'] = pd.cut(df['Gross Coupon'], bins=bins, labels=labels, include_lowest=True)
+# Group by 'Deal ID' and calculate the relative frequency of DQ == 1
+result = df.groupby('Deal ID').apply(lambda x: (x['DQ'] == 1).sum() / len(x)).reset_index(name='Relative DQ Frequency')
 
-# Display the first few rows to verify
-print(df[['Gross Coupon', 'GrossCoupon_Bucket']])
+print(result)
