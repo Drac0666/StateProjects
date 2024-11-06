@@ -1,4 +1,8 @@
-result['ISIN'] = result['ISIN'].apply(lambda x: ', '.join(x))
+import pandas as pd
+
+# Assuming your DataFrame is named df
+# Explode ISINs to separate rows
+result = df.groupby('Issue Year')['ISIN'].apply(lambda x: x.explode()).reset_index()
 
 # Copy result to clipboard
 result.to_clipboard(index=False)
