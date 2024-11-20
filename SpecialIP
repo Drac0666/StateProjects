@@ -6,6 +6,7 @@ from glob import glob
 file_pattern = "TDR HFV *.xlsx"
 sector1_filter = "FRMBS"
 sector2_filter = "Britain"
+collateral_type_filter = "Buy to Let"
 
 # Placeholder for ColumnsList
 ColumnsList = ["ISIN", "Par", "Intrader par", "As of Date"]
@@ -18,7 +19,7 @@ except Exception as e:
     raise
 
 # Initialize an empty DataFrame to accumulate results
-DFTotal = pd.DataFrame(columns=ColumnsList)
+DFTotal = pd.DataFrame(columns=ColumnsList + ["Deal Name", "Group Collateral Type"])
 
 # Get a list of all matching Excel files in the current directory
 files = glob(file_pattern)
@@ -48,6 +49,9 @@ for file in files:
         # Merge with mapping data to add 'Deal Name' and 'Group Collateral Type'
         grouped_df = grouped_df.merge(mapping_df, on='ISIN', how='left')
         
+        # Filter merged data based on 'Group Collateral Type'
+        grouped_df = grouped_df[grouped_df['Group Collateral Type'] == collateral_type_filter]
+        
         # Add grouped data to the total DataFrame
         DFTotal = pd.concat([DFTotal, grouped_df], ignore_index=True)
         
@@ -57,7 +61,7 @@ for file in files:
         # Create a new filename for the processed file
         output_file = f"UK {suffix}.xlsx"
         
-        # Save the grouped DataFrame to a separate Excel file
+        # Save the filtered and grouped DataFrame to a separate Excel file
         grouped_df.to_excel(output_file, index=False)
         print(f"Processed file saved to: {output_file}")
         
