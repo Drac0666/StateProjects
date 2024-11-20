@@ -8,7 +8,10 @@ sector1_filter = "FRMBS"
 sector2_filter = "Britain"
 
 # Placeholder for ColumnsList
-ColumnsList = ["ISIN", "Par", "Intrader par"]  # Update this list as needed
+ColumnsList = ["ISIN", "Par", "Intrader par", "As of Date"]  # Include 'As of Date' here
+
+# Initialize an empty DataFrame to accumulate results
+DFTotal = pd.DataFrame(columns=ColumnsList)
 
 # Get a list of all matching Excel files in the current directory
 files = glob(file_pattern)
@@ -25,11 +28,18 @@ for file in files:
         # Select only specified columns
         filtered_df = filtered_df[ColumnsList]
         
-        # Group by ISIN and sum the 'Par' and 'Intrader par' columns
+        # Group by ISIN, sum the 'Par' and 'Intrader par', and keep the first 'As of Date'
         grouped_df = (
             filtered_df.groupby('ISIN', as_index=False)
-            .agg({'Par': 'sum', 'Intrader par': 'sum'})
+            .agg({
+                'Par': 'sum',
+                'Intrader par': 'sum',
+                'As of Date': 'first'  # Keep the first occurrence of 'As of Date'
+            })
         )
+        
+        # Add grouped data to the total DataFrame
+        DFTotal = pd.concat([DFTotal, grouped_df], ignore_index=True)
         
         # Extract the suffix from the original filename
         suffix = file.split("TDR HFV ")[1].replace(".xlsx", "")
@@ -37,9 +47,16 @@ for file in files:
         # Create a new filename for the processed file
         output_file = f"UK {suffix}.xlsx"
         
-        # Save the processed DataFrame to a new Excel file
+        # Save the grouped DataFrame to a separate Excel file
         grouped_df.to_excel(output_file, index=False)
         print(f"Processed file saved to: {output_file}")
         
     except Exception as e:
         print(f"Error processing file {file}: {e}")
+
+# Remove duplicates from the accumulated DataFrame based on ISIN
+DFTotal = DFTotal.drop_duplicates(subset='ISIN')
+
+# Export the final accumulated and deduplicated DataFrame to Excel
+DFTotal.to_excel("Unique.xlsx", index=False)
+print("Unique file saved as: Unique.xlsx")
