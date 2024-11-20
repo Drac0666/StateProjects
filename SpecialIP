@@ -1,76 +1,19 @@
-import os
 import pandas as pd
-from glob import glob
 
-# Define file pattern and filter conditions
-file_pattern = "TDR HFV *.xlsx"
-sector1_filter = "FRMBS"
-sector2_filter = "Britain"
-collateral_type_filter = "Buy to Let"
+# Example dataframe
+data = {
+    'UniqueKey': ['A', 'A', 'A', 'B', 'B', 'C'],
+    'DQ': [10, 20, 30, 5, 15, 25],
+    'TotalPar': [100, 100, 100, 200, 200, 300]
+}
+df = pd.DataFrame(data)
 
-# Placeholder for ColumnsList
-ColumnsList = ["ISIN", "Par", "Intrader par", "As of Date"]
+# Group by UniqueKey and calculate the required value
+result = (
+    df.groupby('UniqueKey')
+    .apply(lambda x: x['DQ'].sum() / x['TotalPar'].iloc[0])  # Sum DQ and divide by TotalPar
+    .reset_index(name='DQ_Sum_Per_TotalPar')
+)
 
-# Load the mapping data from "Mapping.xlsx"
-try:
-    mapping_df = pd.read_excel("Mapping.xlsx", usecols=["ISIN", "Deal Name", "Group Collateral Type"])
-except Exception as e:
-    print(f"Error loading Mapping.xlsx: {e}")
-    raise
-
-# Initialize an empty DataFrame to accumulate results
-DFTotal = pd.DataFrame(columns=ColumnsList + ["Deal Name", "Group Collateral Type"])
-
-# Get a list of all matching Excel files in the current directory
-files = glob(file_pattern)
-
-# Loop through each file
-for file in files:
-    try:
-        # Load the Excel file into a DataFrame
-        df = pd.read_excel(file)
-        
-        # Filter data based on conditions
-        filtered_df = df[(df['SECTOR1'] == sector1_filter) & (df['SECTOR2'] == sector2_filter)]
-        
-        # Select only specified columns
-        filtered_df = filtered_df[ColumnsList]
-        
-        # Group by ISIN, sum the 'Par' and 'Intrader par', and keep the first 'As of Date'
-        grouped_df = (
-            filtered_df.groupby('ISIN', as_index=False)
-            .agg({
-                'Par': 'sum',
-                'Intrader par': 'sum',
-                'As of Date': 'first'
-            })
-        )
-        
-        # Merge with mapping data to add 'Deal Name' and 'Group Collateral Type'
-        grouped_df = grouped_df.merge(mapping_df, on='ISIN', how='left')
-        
-        # Filter merged data based on 'Group Collateral Type'
-        grouped_df = grouped_df[grouped_df['Group Collateral Type'] == collateral_type_filter]
-        
-        # Add grouped data to the total DataFrame
-        DFTotal = pd.concat([DFTotal, grouped_df], ignore_index=True)
-        
-        # Extract the suffix from the original filename
-        suffix = file.split("TDR HFV ")[1].replace(".xlsx", "")
-        
-        # Create a new filename for the processed file
-        output_file = f"UK {suffix}.xlsx"
-        
-        # Save the filtered and grouped DataFrame to a separate Excel file
-        grouped_df.to_excel(output_file, index=False)
-        print(f"Processed file saved to: {output_file}")
-        
-    except Exception as e:
-        print(f"Error processing file {file}: {e}")
-
-# Remove duplicates from the accumulated DataFrame based on ISIN
-DFTotal = DFTotal.drop_duplicates(subset='ISIN')
-
-# Export the final accumulated and deduplicated DataFrame to Excel
-DFTotal.to_excel("Unique.xlsx", index=False)
-print("Unique file saved as: Unique.xlsx")
+# Display result
+print(result)
