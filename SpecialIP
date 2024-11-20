@@ -8,7 +8,14 @@ sector1_filter = "FRMBS"
 sector2_filter = "Britain"
 
 # Placeholder for ColumnsList
-ColumnsList = ["ISIN", "Par", "Intrader par", "As of Date"]  # Include 'As of Date' here
+ColumnsList = ["ISIN", "Par", "Intrader par", "As of Date"]
+
+# Load the mapping data from "Mapping.xlsx"
+try:
+    mapping_df = pd.read_excel("Mapping.xlsx", usecols=["ISIN", "Deal Name", "Group Collateral Type"])
+except Exception as e:
+    print(f"Error loading Mapping.xlsx: {e}")
+    raise
 
 # Initialize an empty DataFrame to accumulate results
 DFTotal = pd.DataFrame(columns=ColumnsList)
@@ -34,9 +41,12 @@ for file in files:
             .agg({
                 'Par': 'sum',
                 'Intrader par': 'sum',
-                'As of Date': 'first'  # Keep the first occurrence of 'As of Date'
+                'As of Date': 'first'
             })
         )
+        
+        # Merge with mapping data to add 'Deal Name' and 'Group Collateral Type'
+        grouped_df = grouped_df.merge(mapping_df, on='ISIN', how='left')
         
         # Add grouped data to the total DataFrame
         DFTotal = pd.concat([DFTotal, grouped_df], ignore_index=True)
