@@ -1,13 +1,45 @@
+import os
 import pandas as pd
+from glob import glob
 
-# Assuming your DataFrame is named df
-# Group by 'Issue Year' and aggregate ISINs into lists
-grouped_df = df.groupby('Issue Year')['ISIN'].apply(list).reset_index()
+# Define file pattern and filter conditions
+file_pattern = "TDR HFV *.xlsx"
+sector1_filter = "FRMBS"
+sector2_filter = "Britain"
 
-# Explode the ISINs column so each ISIN has its own row along with the Issue Year
-result = grouped_df.explode('ISIN').reset_index(drop=True)
+# Placeholder for ColumnsList
+ColumnsList = ["ISIN", "Par", "Intrader par"]  # Update this list as needed
 
-# Copy the result to clipboard
-result.to_clipboard(index=False)
+# Get a list of all matching Excel files in the current directory
+files = glob(file_pattern)
 
-print("Data has been copied to clipboard.")
+# Loop through each file
+for file in files:
+    try:
+        # Load the Excel file into a DataFrame
+        df = pd.read_excel(file)
+        
+        # Filter data based on conditions
+        filtered_df = df[(df['SECTOR1'] == sector1_filter) & (df['SECTOR2'] == sector2_filter)]
+        
+        # Select only specified columns
+        filtered_df = filtered_df[ColumnsList]
+        
+        # Group by ISIN and sum the 'Par' and 'Intrader par' columns
+        grouped_df = (
+            filtered_df.groupby('ISIN', as_index=False)
+            .agg({'Par': 'sum', 'Intrader par': 'sum'})
+        )
+        
+        # Extract the suffix from the original filename
+        suffix = file.split("TDR HFV ")[1].replace(".xlsx", "")
+        
+        # Create a new filename for the processed file
+        output_file = f"UK {suffix}.xlsx"
+        
+        # Save the processed DataFrame to a new Excel file
+        grouped_df.to_excel(output_file, index=False)
+        print(f"Processed file saved to: {output_file}")
+        
+    except Exception as e:
+        print(f"Error processing file {file}: {e}")
