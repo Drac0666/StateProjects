@@ -1,19 +1,15 @@
-import pandas as pd
+In the UK mortgage market, significant enhancements to underwriting standards have been implemented over the past decade, leading to improved loan performance. A pivotal change occurred in 2014 when the Bank of England's Financial Policy Committee (FPC) introduced two key recommendations:
 
-# Example dataframe
-data = {
-    'UniqueKey': ['A', 'A', 'A', 'B', 'B', 'C'],
-    'DQ': [10, 20, 30, 5, 15, 25],
-    'TotalPar': [100, 100, 100, 200, 200, 300]
-}
-df = pd.DataFrame(data)
+    Loan-to-Income (LTI) Flow Limit: This measure restricted lenders from extending more than 15% of their total new residential mortgages at LTI ratios of 4.5 or higher.
 
-# Group by UniqueKey and calculate the required value
-result = (
-    df.groupby('UniqueKey')
-    .apply(lambda x: x['DQ'].sum() / x['TotalPar'].iloc[0])  # Sum DQ and divide by TotalPar
-    .reset_index(name='DQ_Sum_Per_TotalPar')
-)
+    Affordability Test: This required lenders to assess whether borrowers could still afford their mortgages if, at any point over the first five years of the loan, their mortgage rate were to be 3 percentage points higher than the reversion rate specified at origination.
 
-# Display result
-print(result)
+These measures were designed to prevent excessive household indebtedness and ensure that borrowers could manage potential interest rate increases, thereby bolstering the resilience of both borrowers and lenders. The implementation of these standards contributed to a more stable mortgage market with better-performing loans.
+
+In June 2022, after regular reviews, the FPC decided to withdraw the affordability test, effective from August 1, 2022. The decision was based on the judgment that the LTI flow limit, alongside the broader affordability assessments required by the Financial Conduct Authority's Mortgage Conduct of Business rules, would continue to provide the necessary resilience to the financial system in a simpler and more predictable manner.
+Bank of England
+
+Additionally, the buy-to-let (BTL) sector experienced substantial improvements in underwriting standards following the global financial crisis. The Prudential Regulation Authority (PRA) introduced affordability requirements in 2016, which have been instrumental in enhancing loan performance within this segment.
+Bank of England
+
+These regulatory interventions have collectively strengthened the UK's mortgage underwriting framework, leading to better loan performance and increased financial stability.
