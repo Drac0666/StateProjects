@@ -1,29 +1,31 @@
-In the UK mortgage market, significant enhancements to underwriting standards have been implemented over the past decade, leading to improved loan performance. A pivotal change occurred in 2014 when the Bank of England's Financial Policy Committee (FPC) introduced two key recommendations:
+import pandas as pd
 
-    Loan-to-Income (LTI) Flow Limit: This measure restricted lenders from extending more than 15% of their total new residential mortgages at LTI ratios of 4.5 or higher.
+def dict_to_dataframe(input_dict):
+    """
+    Converts a dictionary into a pandas DataFrame.
 
-    Affordability Test: This required lenders to assess whether borrowers could still afford their mortgages if, at any point over the first five years of the loan, their mortgage rate were to be 3 percentage points higher than the reversion rate specified at origination.
+    Args:
+        input_dict (dict): Dictionary where keys are column names and values are lists of data.
 
-These measures were designed to prevent excessive household indebtedness and ensure that borrowers could manage potential interest rate increases, thereby bolstering the resilience of both borrowers and lenders. The implementation of these standards contributed to a more stable mortgage market with better-performing loans.
+    Returns:
+        pd.DataFrame: A pandas DataFrame constructed from the dictionary.
+    """
+    # Ensure all values are lists of the same length
+    max_len = max(len(v) if isinstance(v, list) else 1 for v in input_dict.values())
+    standardized_dict = {
+        k: v if isinstance(v, list) else [v] * max_len for k, v in input_dict.items()
+    }
 
-In June 2022, after regular reviews, the FPC decided to withdraw the affordability test, effective from August 1, 2022. The decision was based on the judgment that the LTI flow limit, alongside the broader affordability assessments required by the Financial Conduct Authority's Mortgage Conduct of Business rules, would continue to provide the necessary resilience to the financial system in a simpler and more predictable manner.
-Bank of England
+    # Convert dictionary to DataFrame
+    return pd.DataFrame(standardized_dict)
 
-Additionally, the buy-to-let (BTL) sector experienced substantial improvements in underwriting standards following the global financial crisis. The Prudential Regulation Authority (PRA) introduced affordability requirements in 2016, which have been instrumental in enhancing loan performance within this segment.
-Bank of England
+# Example usage
+data = {
+    "Column1": [1, 2, 3],
+    "Column2": ["A", "B", "C"],
+    "Column3": [True, False, True]
+}
 
-These regulatory interventions have collectively strengthened the UK's mortgage underwriting framework, leading to better loan performance and increased financial stability.
+df = dict_to_dataframe(data)
+print(df)
 
-
-
-
-The Financial Conduct Authority (FCA) has implemented several significant changes to underwriting standards in the UK mortgage market since 2014, aiming to improve the performance of loans and reduce the risk of defaults. These changes include:
-
-    Stricter affordability assessments: Lenders are now required to conduct more thorough affordability assessments, taking into account factors such as income stability, debt obligations, and potential interest rate changes. This helps ensure that borrowers can comfortably afford their mortgage payments even in adverse economic conditions.   
-
-Increased stress testing: Lenders are required to stress test borrowers' ability to repay their mortgage at higher interest rates. This helps to identify borrowers who may struggle to meet their obligations during periods of rising interest rates.  
-
-    Limits on high loan-to-income (LTI) mortgages: The FCA has imposed limits on the number of high LTI mortgages that lenders can offer. This helps to reduce the risk of lending to borrowers who may be overstretched financially.
-    Enhanced consumer protection measures: The FCA has introduced stricter rules on mortgage advice and sales practices, ensuring that consumers are provided with clear and accurate information about the products they are considering.
-
-These changes have contributed to a significant improvement in the performance of UK mortgage loans. Default rates have declined, and lenders have become more cautious in their lending practices. However, it is important to note that these changes have also made it more difficult for some borrowers to obtain mortgages, particularly those with lower incomes or less stable employment.
