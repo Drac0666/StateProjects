@@ -1,12 +1,15 @@
+# Define the columns to analyze
+columns_to_analyze = ['Current Balance', 'Loan Amount']  # Replace with your desired columns
+
 # Filter data for Buy to Let and Owner Occupied
 buy_to_let = tdf[tdf['Occupancy'] == 'BTL']
 owner_occupied = tdf[tdf['Occupancy'] == 'Owner Occupied']
 
 # Group by DQ status and calculate mean values for Buy to Let
-btl_aggregates = buy_to_let.groupby('DQ')[['Loan Amount', 'Property Value', 'Current Balance']].mean()
+btl_aggregates = buy_to_let.groupby('DQ')[columns_to_analyze].mean()
 
 # Group by DQ status and calculate mean values for Owner Occupied
-owner_aggregates = owner_occupied.groupby('DQ')[['Loan Amount', 'Property Value', 'Current Balance']].mean()
+owner_aggregates = owner_occupied.groupby('DQ')[columns_to_analyze].mean()
 
 # Display the aggregates
 print("Aggregated Data for Buy to Let:")
@@ -18,33 +21,33 @@ print(owner_aggregates)
 # Visualize with box plots for both sets of data
 plt.figure(figsize=(14, 10))
 
-# Buy to Let: Loan Amount vs DQ
+# Buy to Let: First Variable vs DQ
 plt.subplot(2, 2, 1)
-sns.boxplot(x='DQ', y='Loan Amount', data=buy_to_let)
-plt.title('Loan Amount by DQ Status (Buy to Let)')
+sns.boxplot(x='DQ', y=columns_to_analyze[0], data=buy_to_let)
+plt.title(f'{columns_to_analyze[0]} by DQ Status (Buy to Let)')
 plt.xlabel('DQ Status')
-plt.ylabel('Loan Amount')
+plt.ylabel(columns_to_analyze[0])
 
-# Buy to Let: Property Value vs DQ
+# Buy to Let: Second Variable vs DQ
 plt.subplot(2, 2, 2)
-sns.boxplot(x='DQ', y='Property Value', data=buy_to_let)
-plt.title('Property Value by DQ Status (Buy to Let)')
+sns.boxplot(x='DQ', y=columns_to_analyze[1], data=buy_to_let)
+plt.title(f'{columns_to_analyze[1]} by DQ Status (Buy to Let)')
 plt.xlabel('DQ Status')
-plt.ylabel('Property Value')
+plt.ylabel(columns_to_analyze[1])
 
-# Owner Occupied: Loan Amount vs DQ
+# Owner Occupied: First Variable vs DQ
 plt.subplot(2, 2, 3)
-sns.boxplot(x='DQ', y='Loan Amount', data=owner_occupied)
-plt.title('Loan Amount by DQ Status (Owner Occupied)')
+sns.boxplot(x='DQ', y=columns_to_analyze[0], data=owner_occupied)
+plt.title(f'{columns_to_analyze[0]} by DQ Status (Owner Occupied)')
 plt.xlabel('DQ Status')
-plt.ylabel('Loan Amount')
+plt.ylabel(columns_to_analyze[0])
 
-# Owner Occupied: Property Value vs DQ
+# Owner Occupied: Second Variable vs DQ
 plt.subplot(2, 2, 4)
-sns.boxplot(x='DQ', y='Property Value', data=owner_occupied)
-plt.title('Property Value by DQ Status (Owner Occupied)')
+sns.boxplot(x='DQ', y=columns_to_analyze[1], data=owner_occupied)
+plt.title(f'{columns_to_analyze[1]} by DQ Status (Owner Occupied)')
 plt.xlabel('DQ Status')
-plt.ylabel('Property Value')
+plt.ylabel(columns_to_analyze[1])
 
 plt.tight_layout()
 plt.show()
