@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Dec  5 11:14:01 2024
-
-@author: edena
-"""
-
 import pandas as pd
 
 # Sample data for demonstration
@@ -19,11 +12,18 @@ df = pd.DataFrame(data)
 # Group by 'Deal ID', 'DQ', and 'Occupancy', and sum 'Current Balance'
 grouped = df.groupby(['Deal ID', 'DQ', 'Occupancy'])['Current Balance'].sum().reset_index()
 
-# Pivot the table to make it easier to calculate defaulted BTL balance as a percentage
+# Pivot the table to make it easier to calculate percentages
 pivoted = grouped.pivot(index='Deal ID', columns=['DQ', 'Occupancy'], values='Current Balance').fillna(0)
 
-# Calculate the ratio of defaulted BTL Current Balance to total BTL Current Balance
-pivoted['BTL Defaulted Percentage'] = pivoted[(1, 'BTL')] / (pivoted[(0, 'BTL')] + pivoted[(1, 'BTL')]) * 100
+# Calculate the total Current Balance per deal
+pivoted['Total_Current_Balance'] = pivoted.sum(axis=1)
+
+# Calculate the percentage of BTL Current Balance that is defaulted
+pivoted['BTL_Defaulted_Percentage'] = pivoted[(1, 'BTL')] / (pivoted[(0, 'BTL')] + pivoted[(1, 'BTL')]) * 100
+
+# Calculate the percentage of DQ = 1 to total Current Balance
+pivoted['DQ_1_Percentage'] = pivoted[(1, 'BTL')] + pivoted[(1, 'Owner Occupied')]
+pivoted['DQ_1_Percentage'] = (pivoted['DQ_1_Percentage'] / pivoted['Total_Current_Balance']) * 100
 
 # Reset the column names for clarity
 pivoted.columns = ['_'.join(map(str, col)).strip() for col in pivoted.columns]
