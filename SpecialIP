@@ -1,32 +1,31 @@
 import pandas as pd
 
-# Sample data for demonstration
-data = {
-    'Deal ID': ['Deal1', 'Deal1', 'Deal1', 'Deal2', 'Deal2', 'Deal3', 'Deal3', 'Deal3'],
-    'DQ': [1, 0, 1, 1, 0, 0, 1, 1],
-    'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'BTL'],
-    'Property Code': ['Region1', 'Region1', 'Region2', 'Region2', 'Region3', 'Region3', 'Region3', 'Region1'],
-    'Current Balance': [100000, 150000, 50000, 200000, 100000, 300000, 100000, 50000]
-}
+# Sample dataframe with detailed NUTS codes
+data = {'NUTS_CODE': ['UKC12', 'UKC', 'UKD34', 'UKD', 'UKF12']}
 df = pd.DataFrame(data)
 
-# Group by 'Property Code', 'DQ', and 'Occupancy', and sum 'Current Balance'
-grouped = df.groupby(['Property Code', 'DQ', 'Occupancy'])['Current Balance'].sum().reset_index()
+# Mapping of NUTS 1 codes to NUTS 1 names
+nuts_mapping = {
+    'UKC': 'North East',
+    'UKD': 'North West',
+    'UKE': 'Yorkshire and The Humber',
+    'UKF': 'East Midlands',
+    'UKG': 'West Midlands',
+    'UKH': 'East of England',
+    'UKI': 'London',
+    'UKJ': 'South East',
+    'UKK': 'South West',
+    'UKL': 'Wales',
+    'UKM': 'Scotland',
+    'UKN': 'Northern Ireland',
+    'UKZ': 'Extra-Regio'
+}
 
-# Pivot to make it easier to analyze DQ = 1 by region and occupancy
-pivoted = grouped.pivot(index='Property Code', columns=['DQ', 'Occupancy'], values='Current Balance').fillna(0)
+# Extract main region codes (first three characters)
+df['Main_Region'] = df['NUTS_CODE'].str[:3]
 
-# Calculate total Current Balance per region
-pivoted['Total_Current_Balance'] = pivoted.sum(axis=1)
+# Map Main_Region to NUTS 1 Name
+df['NUTS_1_Name'] = df['Main_Region'].map(nuts_mapping)
 
-# Calculate the percentage of DQ = 1 for each region
-pivoted['DQ_1_Percentage'] = (
-    pivoted[(1, 'BTL')] + pivoted[(1, 'Owner Occupied')]
-) / pivoted['Total_Current_Balance'] * 100
-
-# Reset the column names for clarity
-pivoted.columns = ['_'.join(map(str, col)).strip() for col in pivoted.columns]
-pivoted = pivoted.reset_index()
-
-print("Final Results by Region:")
-print(pivoted)
+# Display the resulting dataframe
+print(df)
