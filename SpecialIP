@@ -1,65 +1,41 @@
-import geopandas as gpd
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Load the shapefile (replace 'NUTS_shapefile.shp' with your actual file)
-shapefile_path = "NUTS_shapefile.shp"
-nuts_gdf = gpd.read_file(shapefile_path)
-
-# Sample dataset with NUTS codes, DQ data, and Occupancy
+# Sample dataset with additional columns
 data = {
     'NUTS': ['NUTS1', 'NUTS2', 'NUTS3', 'NUTS2', 'NUTS1', 'NUTS3', 'NUTS1'],
     'DQ': [1, 0, 1, 1, 0, 0, 1],
     'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'Owner Occupied'],
+    'Loan Amount': [200000, 150000, 100000, 250000, 300000, 120000, 220000],
+    'Property Value': [500000, 400000, 350000, 600000, 700000, 380000, 550000],
     'Current Balance': [100000, 150000, 50000, 200000, 300000, 100000, 250000]
 }
 df = pd.DataFrame(data)
 
-# Aggregate data to calculate total Current Balance per NUTS and Occupancy
-total_balance = df.groupby(['NUTS', 'Occupancy'])['Current Balance'].sum().reset_index()
+# Group by DQ status and calculate mean values for selected columns
+aggregates = df.groupby('DQ')[['Loan Amount', 'Property Value', 'Current Balance']].mean()
 
-# Filter data to only include DQ = 1 and calculate the defaulted Current Balance
-dq_data = df[df['DQ'] == 1].groupby(['NUTS', 'Occupancy'])['Current Balance'].sum().reset_index()
-dq_data = dq_data.rename(columns={'Current Balance': 'Defaulted Balance'})
+# Display the aggregates
+print("Aggregated Data:")
+print(aggregates)
 
-# Merge total and defaulted balances to calculate percentages
-merged_data = pd.merge(total_balance, dq_data, on=['NUTS', 'Occupancy'], how='left')
-merged_data['Defaulted Balance'] = merged_data['Defaulted Balance'].fillna(0)
-merged_data['Percentage DQ=1'] = (merged_data['Defaulted Balance'] / merged_data['Current Balance']) * 100
+# Visualize with box plots to show distributions of selected columns by DQ status
+plt.figure(figsize=(12, 6))
 
-# Merge the data back with the shapefile GeoDataFrame
-merged_gdf = nuts_gdf.merge(merged_data, left_on='NUTS_CODE', right_on='NUTS', how='left')
+# Loan Amount vs DQ
+plt.subplot(1, 2, 1)
+sns.boxplot(x='DQ', y='Loan Amount', data=df)
+plt.title('Loan Amount by DQ Status')
+plt.xlabel('DQ Status')
+plt.ylabel('Loan Amount')
 
-# Create subplots for each Occupancy status
-fig, axes = plt.subplots(1, 2, figsize=(24, 12))  # Two subplots side by side
+# Property Value vs DQ
+plt.subplot(1, 2, 2)
+sns.boxplot(x='DQ', y='Property Value', data=df)
+plt.title('Property Value by DQ Status')
+plt.xlabel('DQ Status')
+plt.ylabel('Property Value')
 
-occupancies = ['BTL', 'Owner Occupied']
-for i, occupancy in enumerate(occupancies):
-    ax = axes[i]
-    occupancy_gdf = merged_gdf[merged_gdf['Occupancy'] == occupancy]
-    
-    # Plot the map
-    occupancy_gdf.plot(
-        column='Percentage DQ=1',  # Visualize Percentage DQ=1
-        cmap='Reds',               # Color scheme
-        legend=True,
-        ax=ax,
-        missing_kwds={"color": "lightgrey", "label": "No data"}
-    )
-    
-    # Add region annotations explicitly to the current axis
-    for idx, row in occupancy_gdf.iterrows():
-        if not pd.isnull(row['Percentage DQ=1']):  # Add names only for regions with data
-            ax.annotate(
-                text=row['NUTS_NAME'],  # Replace 'NUTS_NAME' with the actual column for region names in your shapefile
-                xy=(row.geometry.centroid.x, row.geometry.centroid.y),  # Region centroid
-                ha='center', fontsize=8, color='black'
-            )
-    
-    ax.set_title(f"Percentage of DQ = 1 for {occupancy}", fontsize=14)
-    ax.axis("off")
-
-# Add a main title for the figure
-plt.suptitle("DQ = 1 Percentage by Occupancy Status (BTL and Owner Occupied)", fontsize=16)
-
+plt.tight_layout()
 plt.show()
