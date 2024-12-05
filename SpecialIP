@@ -22,7 +22,7 @@ dq_data['DQ_1_Percentage'] = dq_data[1] / (dq_data[0] + dq_data[1]) * 100
 merged_gdf = nuts_gdf.merge(dq_data, left_on='NUTS_CODE', right_on='NUTS', how='left')
 
 # Plot the data using geopandas
-fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+fig, ax = plt.subplots(1, 1, figsize=(12, 10))
 merged_gdf.plot(
     column='DQ_1_Percentage',  # The column to visualize
     cmap='Reds',               # Color scheme
@@ -30,6 +30,15 @@ merged_gdf.plot(
     ax=ax,
     missing_kwds={"color": "lightgrey", "label": "No data"}
 )
+
+# Annotate region names
+for idx, row in merged_gdf.iterrows():
+    if not pd.isnull(row['DQ_1_Percentage']):  # Add names only for regions with data
+        plt.annotate(
+            text=row['NUTS_NAME'],  # Replace 'NUTS_NAME' with the actual column for region names in your shapefile
+            xy=(row.geometry.centroid.x, row.geometry.centroid.y),  # Region centroid
+            ha='center', fontsize=8, color='black'
+        )
 
 # Add titles and labels
 ax.set_title("Percentage of DQ = 1 by NUTS Region", fontsize=14)
