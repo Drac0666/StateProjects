@@ -37,6 +37,8 @@ occupancies = ['BTL', 'Owner Occupied']
 for i, occupancy in enumerate(occupancies):
     ax = axes[i]
     occupancy_gdf = merged_gdf[merged_gdf['Occupancy'] == occupancy]
+    
+    # Plot the map
     occupancy_gdf.plot(
         column='Percentage DQ=1',  # Visualize Percentage DQ=1
         cmap='Reds',               # Color scheme
@@ -44,6 +46,16 @@ for i, occupancy in enumerate(occupancies):
         ax=ax,
         missing_kwds={"color": "lightgrey", "label": "No data"}
     )
+    
+    # Add region annotations
+    for idx, row in occupancy_gdf.iterrows():
+        if not pd.isnull(row['Percentage DQ=1']):  # Add names only for regions with data
+            plt.annotate(
+                text=row['NUTS_NAME'],  # Replace 'NUTS_NAME' with the actual column for region names in your shapefile
+                xy=(row.geometry.centroid.x, row.geometry.centroid.y),  # Region centroid
+                ha='center', fontsize=8, color='black'
+            )
+    
     ax.set_title(f"Percentage of DQ = 1 for {occupancy}", fontsize=14)
     ax.axis("off")
 
@@ -51,4 +63,3 @@ for i, occupancy in enumerate(occupancies):
 plt.suptitle("DQ = 1 Percentage by Occupancy Status (BTL and Owner Occupied)", fontsize=16)
 
 plt.show()
-
