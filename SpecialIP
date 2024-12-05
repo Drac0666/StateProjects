@@ -47,10 +47,10 @@ for i, occupancy in enumerate(occupancies):
         missing_kwds={"color": "lightgrey", "label": "No data"}
     )
     
-    # Add region annotations
+    # Add region annotations explicitly to the current axis
     for idx, row in occupancy_gdf.iterrows():
         if not pd.isnull(row['Percentage DQ=1']):  # Add names only for regions with data
-            plt.annotate(
+            ax.annotate(
                 text=row['NUTS_NAME'],  # Replace 'NUTS_NAME' with the actual column for region names in your shapefile
                 xy=(row.geometry.centroid.x, row.geometry.centroid.y),  # Region centroid
                 ha='center', fontsize=8, color='black'
