@@ -1,48 +1,66 @@
+from sklearn.preprocessing import LabelEncoder
+
 # Define the columns to analyze
-columns_to_analyze = ['Current Balance', 'Loan Amount']  # Replace with your desired columns
+columns_to_analyze = ['Current Balance', 'Loan Amount']  # Replace with your numeric columns
+categorical_columns = ['Occupancy']  # Replace with your categorical columns
+
+# Encode categorical columns (if any)
+label_encoders = {}
+for col in categorical_columns:
+    le = LabelEncoder()
+    tdf[col + '_encoded'] = le.fit_transform(tdf[col])
+    label_encoders[col] = le  # Save the encoder for later decoding
 
 # Filter data for Buy to Let and Owner Occupied
 buy_to_let = tdf[tdf['Occupancy'] == 'BTL']
 owner_occupied = tdf[tdf['Occupancy'] == 'Owner Occupied']
 
-# Group by DQ status and calculate mean values for Buy to Let
+# Group by DQ status and calculate mean values for numeric columns
 btl_aggregates = buy_to_let.groupby('DQ')[columns_to_analyze].mean()
-
-# Group by DQ status and calculate mean values for Owner Occupied
 owner_aggregates = owner_occupied.groupby('DQ')[columns_to_analyze].mean()
 
+# Count occurrences of categorical values by DQ for aggregation
+categorical_summary_btl = buy_to_let.groupby('DQ')['Occupancy_encoded'].value_counts()
+categorical_summary_owner = owner_occupied.groupby('DQ')['Occupancy_encoded'].value_counts()
+
 # Display the aggregates
-print("Aggregated Data for Buy to Let:")
+print("Aggregated Numeric Data for Buy to Let:")
 print(btl_aggregates)
 
-print("\nAggregated Data for Owner Occupied:")
+print("\nAggregated Numeric Data for Owner Occupied:")
 print(owner_aggregates)
 
-# Visualize with box plots for both sets of data
+print("\nCategorical Summary for Buy to Let:")
+print(categorical_summary_btl)
+
+print("\nCategorical Summary for Owner Occupied:")
+print(categorical_summary_owner)
+
+# Visualize numeric columns with boxplots
 plt.figure(figsize=(14, 10))
 
-# Buy to Let: First Variable vs DQ
+# Buy to Let: First Numeric Variable vs DQ
 plt.subplot(2, 2, 1)
 sns.boxplot(x='DQ', y=columns_to_analyze[0], data=buy_to_let)
 plt.title(f'{columns_to_analyze[0]} by DQ Status (Buy to Let)')
 plt.xlabel('DQ Status')
 plt.ylabel(columns_to_analyze[0])
 
-# Buy to Let: Second Variable vs DQ
+# Buy to Let: Second Numeric Variable vs DQ
 plt.subplot(2, 2, 2)
 sns.boxplot(x='DQ', y=columns_to_analyze[1], data=buy_to_let)
 plt.title(f'{columns_to_analyze[1]} by DQ Status (Buy to Let)')
 plt.xlabel('DQ Status')
 plt.ylabel(columns_to_analyze[1])
 
-# Owner Occupied: First Variable vs DQ
+# Owner Occupied: First Numeric Variable vs DQ
 plt.subplot(2, 2, 3)
 sns.boxplot(x='DQ', y=columns_to_analyze[0], data=owner_occupied)
 plt.title(f'{columns_to_analyze[0]} by DQ Status (Owner Occupied)')
 plt.xlabel('DQ Status')
 plt.ylabel(columns_to_analyze[0])
 
-# Owner Occupied: Second Variable vs DQ
+# Owner Occupied: Second Numeric Variable vs DQ
 plt.subplot(2, 2, 4)
 sns.boxplot(x='DQ', y=columns_to_analyze[1], data=owner_occupied)
 plt.title(f'{columns_to_analyze[1]} by DQ Status (Owner Occupied)')
@@ -50,4 +68,13 @@ plt.xlabel('DQ Status')
 plt.ylabel(columns_to_analyze[1])
 
 plt.tight_layout()
+plt.show()
+
+# Visualize categorical data with bar plots
+plt.figure(figsize=(10, 6))
+sns.countplot(x='DQ', hue='Occupancy', data=tdf)
+plt.title('Categorical Distribution of Occupancy by DQ')
+plt.xlabel('DQ Status')
+plt.ylabel('Count')
+plt.legend(title='Occupancy')
 plt.show()
