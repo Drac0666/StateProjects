@@ -15,11 +15,20 @@ data = {
 }
 df = pd.DataFrame(data)
 
-# Aggregate DQ = 1 data by NUTS codes and Occupancy
-dq_data = df[df['DQ'] == 1].groupby(['NUTS', 'Occupancy'])['Current Balance'].sum().reset_index()
+# Aggregate data to calculate total Current Balance per NUTS and Occupancy
+total_balance = df.groupby(['NUTS', 'Occupancy'])['Current Balance'].sum().reset_index()
 
-# Merge the aggregated data with the shapefile GeoDataFrame
-merged_gdf = nuts_gdf.merge(dq_data, left_on='NUTS_CODE', right_on='NUTS', how='left')
+# Filter data to only include DQ = 1 and calculate the defaulted Current Balance
+dq_data = df[df['DQ'] == 1].groupby(['NUTS', 'Occupancy'])['Current Balance'].sum().reset_index()
+dq_data = dq_data.rename(columns={'Current Balance': 'Defaulted Balance'})
+
+# Merge total and defaulted balances to calculate percentages
+merged_data = pd.merge(total_balance, dq_data, on=['NUTS', 'Occupancy'], how='left')
+merged_data['Defaulted Balance'] = merged_data['Defaulted Balance'].fillna(0)
+merged_data['Percentage DQ=1'] = (merged_data['Defaulted Balance'] / merged_data['Current Balance']) * 100
+
+# Merge the data back with the shapefile GeoDataFrame
+merged_gdf = nuts_gdf.merge(merged_data, left_on='NUTS_CODE', right_on='NUTS', how='left')
 
 # Create subplots for each Occupancy status
 fig, axes = plt.subplots(1, 2, figsize=(24, 12))  # Two subplots side by side
@@ -29,7 +38,7 @@ for i, occupancy in enumerate(occupancies):
     ax = axes[i]
     occupancy_gdf = merged_gdf[merged_gdf['Occupancy'] == occupancy]
     occupancy_gdf.plot(
-        column='Current Balance',  # Visualize Current Balance
+        column='Percentage DQ=1',  # Visualize Percentage DQ=1
         cmap='Reds',               # Color scheme
         legend=True,
         ax=ax,
@@ -39,6 +48,7 @@ for i, occupancy in enumerate(occupancies):
     ax.axis("off")
 
 # Add a main title for the figure
-plt.suptitle("DQ = 1 by Occupancy Status (BTL and Owner Occupied)", fontsize=16)
+plt.suptitle("DQ = 1 Percentage by Occupancy Status (BTL and Owner Occupied)", fontsize=16)
 
 plt.show()
+
