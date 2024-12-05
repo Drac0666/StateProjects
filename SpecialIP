@@ -1,20 +1,5 @@
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-# Sample dataset with additional columns
-data = {
-    'NUTS': ['NUTS1', 'NUTS2', 'NUTS3', 'NUTS2', 'NUTS1', 'NUTS3', 'NUTS1'],
-    'DQ': [1, 0, 1, 1, 0, 0, 1],
-    'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'Owner Occupied'],
-    'Loan Amount': [200000, 150000, 100000, 250000, 300000, 120000, 220000],
-    'Property Value': [500000, 400000, 350000, 600000, 700000, 380000, 550000],
-    'Current Balance': [100000, 150000, 50000, 200000, 300000, 100000, 250000]
-}
-df = pd.DataFrame(data)
-
 # Group by DQ status and calculate mean values for selected columns
-aggregates = df.groupby('DQ')[['Loan Amount', 'Property Value', 'Current Balance']].mean()
+aggregates = tdf.groupby('DQ')[['Loan Amount', 'Property Value', 'Current Balance']].mean()
 
 # Display the aggregates
 print("Aggregated Data:")
@@ -25,14 +10,14 @@ plt.figure(figsize=(12, 6))
 
 # Loan Amount vs DQ
 plt.subplot(1, 2, 1)
-sns.boxplot(x='DQ', y='Loan Amount', data=df)
+sns.boxplot(x='DQ', y='Loan Amount', data=tdf)
 plt.title('Loan Amount by DQ Status')
 plt.xlabel('DQ Status')
 plt.ylabel('Loan Amount')
 
 # Property Value vs DQ
 plt.subplot(1, 2, 2)
-sns.boxplot(x='DQ', y='Property Value', data=df)
+sns.boxplot(x='DQ', y='Property Value', data=tdf)
 plt.title('Property Value by DQ Status')
 plt.xlabel('DQ Status')
 plt.ylabel('Property Value')
