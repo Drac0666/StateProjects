@@ -1,31 +1,38 @@
+import geopandas as gpd
 import pandas as pd
+import matplotlib.pyplot as plt
 
-# Sample dataframe with detailed NUTS codes
-data = {'NUTS_CODE': ['UKC12', 'UKC', 'UKD34', 'UKD', 'UKF12']}
+# Load the shapefile (replace 'NUTS_shapefile.shp' with your actual file)
+shapefile_path = "NUTS_shapefile.shp"
+nuts_gdf = gpd.read_file(shapefile_path)
+
+# Sample dataset with NUTS codes and DQ data
+data = {
+    'NUTS': ['NUTS1', 'NUTS2', 'NUTS3', 'NUTS2', 'NUTS1', 'NUTS3'],
+    'DQ': [1, 0, 1, 1, 0, 0],
+    'Current Balance': [100000, 150000, 50000, 200000, 300000, 100000]
+}
 df = pd.DataFrame(data)
 
-# Mapping of NUTS 1 codes to NUTS 1 names
-nuts_mapping = {
-    'UKC': 'North East',
-    'UKD': 'North West',
-    'UKE': 'Yorkshire and The Humber',
-    'UKF': 'East Midlands',
-    'UKG': 'West Midlands',
-    'UKH': 'East of England',
-    'UKI': 'London',
-    'UKJ': 'South East',
-    'UKK': 'South West',
-    'UKL': 'Wales',
-    'UKM': 'Scotland',
-    'UKN': 'Northern Ireland',
-    'UKZ': 'Extra-Regio'
-}
+# Aggregate DQ = 1 data by NUTS codes
+dq_data = df.groupby(['NUTS', 'DQ'])['Current Balance'].sum().unstack(fill_value=0).reset_index()
+dq_data['DQ_1_Percentage'] = dq_data[1] / (dq_data[0] + dq_data[1]) * 100
 
-# Extract main region codes (first three characters)
-df['Main_Region'] = df['NUTS_CODE'].str[:3]
+# Merge the aggregated data with the shapefile GeoDataFrame
+merged_gdf = nuts_gdf.merge(dq_data, left_on='NUTS_CODE', right_on='NUTS', how='left')
 
-# Map Main_Region to NUTS 1 Name
-df['NUTS_1_Name'] = df['Main_Region'].map(nuts_mapping)
+# Plot the data using geopandas
+fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+merged_gdf.plot(
+    column='DQ_1_Percentage',  # The column to visualize
+    cmap='Reds',               # Color scheme
+    legend=True,               # Add a legend
+    ax=ax,
+    missing_kwds={"color": "lightgrey", "label": "No data"}
+)
 
-# Display the resulting dataframe
-print(df)
+# Add titles and labels
+ax.set_title("Percentage of DQ = 1 by NUTS Region", fontsize=14)
+ax.axis("off")
+
+plt.show()
