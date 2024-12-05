@@ -2,32 +2,31 @@ import pandas as pd
 
 # Sample data for demonstration
 data = {
-    'Deal ID': ['Deal1', 'Deal1', 'Deal1', 'Deal2', 'Deal2', 'Deal3', 'Deal3'],
-    'DQ': [1, 0, 1, 1, 0, 0, 1],
-    'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'BTL', 'Owner Occupied', 'BTL', 'BTL'],
-    'Current Balance': [100000, 150000, 50000, 200000, 100000, 300000, 100000]
+    'Deal ID': ['Deal1', 'Deal1', 'Deal1', 'Deal2', 'Deal2', 'Deal3', 'Deal3', 'Deal3'],
+    'DQ': [1, 0, 1, 1, 0, 0, 1, 1],
+    'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'BTL'],
+    'Property Code': ['Region1', 'Region1', 'Region2', 'Region2', 'Region3', 'Region3', 'Region3', 'Region1'],
+    'Current Balance': [100000, 150000, 50000, 200000, 100000, 300000, 100000, 50000]
 }
 df = pd.DataFrame(data)
 
-# Group by 'Deal ID', 'DQ', and 'Occupancy', and sum 'Current Balance'
-grouped = df.groupby(['Deal ID', 'DQ', 'Occupancy'])['Current Balance'].sum().reset_index()
+# Group by 'Property Code', 'DQ', and 'Occupancy', and sum 'Current Balance'
+grouped = df.groupby(['Property Code', 'DQ', 'Occupancy'])['Current Balance'].sum().reset_index()
 
-# Pivot the table to make it easier to calculate percentages
-pivoted = grouped.pivot(index='Deal ID', columns=['DQ', 'Occupancy'], values='Current Balance').fillna(0)
+# Pivot to make it easier to analyze DQ = 1 by region and occupancy
+pivoted = grouped.pivot(index='Property Code', columns=['DQ', 'Occupancy'], values='Current Balance').fillna(0)
 
-# Calculate the total Current Balance per deal
+# Calculate total Current Balance per region
 pivoted['Total_Current_Balance'] = pivoted.sum(axis=1)
 
-# Calculate the percentage of BTL Current Balance that is defaulted
-pivoted['BTL_Defaulted_Percentage'] = pivoted[(1, 'BTL')] / (pivoted[(0, 'BTL')] + pivoted[(1, 'BTL')]) * 100
-
-# Calculate the percentage of DQ = 1 to total Current Balance
-pivoted['DQ_1_Percentage'] = pivoted[(1, 'BTL')] + pivoted[(1, 'Owner Occupied')]
-pivoted['DQ_1_Percentage'] = (pivoted['DQ_1_Percentage'] / pivoted['Total_Current_Balance']) * 100
+# Calculate the percentage of DQ = 1 for each region
+pivoted['DQ_1_Percentage'] = (
+    pivoted[(1, 'BTL')] + pivoted[(1, 'Owner Occupied')]
+) / pivoted['Total_Current_Balance'] * 100
 
 # Reset the column names for clarity
 pivoted.columns = ['_'.join(map(str, col)).strip() for col in pivoted.columns]
 pivoted = pivoted.reset_index()
 
-print("Final Results:")
+print("Final Results by Region:")
 print(pivoted)
