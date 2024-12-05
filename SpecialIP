@@ -1,31 +1,33 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec  5 11:14:01 2024
+
+@author: edena
+"""
+
 import pandas as pd
 
-def dict_to_dataframe(input_dict):
-    """
-    Converts a dictionary into a pandas DataFrame.
-
-    Args:
-        input_dict (dict): Dictionary where keys are column names and values are lists of data.
-
-    Returns:
-        pd.DataFrame: A pandas DataFrame constructed from the dictionary.
-    """
-    # Ensure all values are lists of the same length
-    max_len = max(len(v) if isinstance(v, list) else 1 for v in input_dict.values())
-    standardized_dict = {
-        k: v if isinstance(v, list) else [v] * max_len for k, v in input_dict.items()
-    }
-
-    # Convert dictionary to DataFrame
-    return pd.DataFrame(standardized_dict)
-
-# Example usage
+# Sample data for demonstration
 data = {
-    "Column1": [1, 2, 3],
-    "Column2": ["A", "B", "C"],
-    "Column3": [True, False, True]
+    'Deal ID': ['Deal1', 'Deal1', 'Deal1', 'Deal2', 'Deal2', 'Deal3', 'Deal3'],
+    'DQ': [1, 0, 1, 1, 0, 0, 1],
+    'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'BTL', 'Owner Occupied', 'BTL', 'BTL'],
+    'Current Balance': [100000, 150000, 50000, 200000, 100000, 300000, 100000]
 }
+df = pd.DataFrame(data)
 
-df = dict_to_dataframe(data)
-print(df)
+# Group by 'Deal ID', 'DQ', and 'Occupancy', and sum 'Current Balance'
+grouped = df.groupby(['Deal ID', 'DQ', 'Occupancy'])['Current Balance'].sum().reset_index()
 
+# Pivot the table to make it easier to calculate defaulted BTL balance as a percentage
+pivoted = grouped.pivot(index='Deal ID', columns=['DQ', 'Occupancy'], values='Current Balance').fillna(0)
+
+# Calculate the ratio of defaulted BTL Current Balance to total BTL Current Balance
+pivoted['BTL Defaulted Percentage'] = pivoted[(1, 'BTL')] / (pivoted[(0, 'BTL')] + pivoted[(1, 'BTL')]) * 100
+
+# Reset the column names for clarity
+pivoted.columns = ['_'.join(map(str, col)).strip() for col in pivoted.columns]
+pivoted = pivoted.reset_index()
+
+print("Final Results:")
+print(pivoted)
