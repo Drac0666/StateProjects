@@ -6,42 +6,39 @@ import matplotlib.pyplot as plt
 shapefile_path = "NUTS_shapefile.shp"
 nuts_gdf = gpd.read_file(shapefile_path)
 
-# Sample dataset with NUTS codes and DQ data
+# Sample dataset with NUTS codes, DQ data, and Occupancy
 data = {
-    'NUTS': ['NUTS1', 'NUTS2', 'NUTS3', 'NUTS2', 'NUTS1', 'NUTS3'],
-    'DQ': [1, 0, 1, 1, 0, 0],
-    'Current Balance': [100000, 150000, 50000, 200000, 300000, 100000]
+    'NUTS': ['NUTS1', 'NUTS2', 'NUTS3', 'NUTS2', 'NUTS1', 'NUTS3', 'NUTS1'],
+    'DQ': [1, 0, 1, 1, 0, 0, 1],
+    'Occupancy': ['BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'BTL', 'Owner Occupied', 'Owner Occupied'],
+    'Current Balance': [100000, 150000, 50000, 200000, 300000, 100000, 250000]
 }
 df = pd.DataFrame(data)
 
-# Aggregate DQ = 1 data by NUTS codes
-dq_data = df.groupby(['NUTS', 'DQ'])['Current Balance'].sum().unstack(fill_value=0).reset_index()
-dq_data['DQ_1_Percentage'] = dq_data[1] / (dq_data[0] + dq_data[1]) * 100
+# Aggregate DQ = 1 data by NUTS codes and Occupancy
+dq_data = df[df['DQ'] == 1].groupby(['NUTS', 'Occupancy'])['Current Balance'].sum().reset_index()
 
 # Merge the aggregated data with the shapefile GeoDataFrame
 merged_gdf = nuts_gdf.merge(dq_data, left_on='NUTS_CODE', right_on='NUTS', how='left')
 
-# Plot the data using geopandas
-fig, ax = plt.subplots(1, 1, figsize=(12, 10))
-merged_gdf.plot(
-    column='DQ_1_Percentage',  # The column to visualize
-    cmap='Reds',               # Color scheme
-    legend=True,               # Add a legend
-    ax=ax,
-    missing_kwds={"color": "lightgrey", "label": "No data"}
-)
+# Create subplots for each Occupancy status
+fig, axes = plt.subplots(1, 2, figsize=(24, 12))  # Two subplots side by side
 
-# Annotate region names
-for idx, row in merged_gdf.iterrows():
-    if not pd.isnull(row['DQ_1_Percentage']):  # Add names only for regions with data
-        plt.annotate(
-            text=row['NUTS_NAME'],  # Replace 'NUTS_NAME' with the actual column for region names in your shapefile
-            xy=(row.geometry.centroid.x, row.geometry.centroid.y),  # Region centroid
-            ha='center', fontsize=8, color='black'
-        )
+occupancies = ['BTL', 'Owner Occupied']
+for i, occupancy in enumerate(occupancies):
+    ax = axes[i]
+    occupancy_gdf = merged_gdf[merged_gdf['Occupancy'] == occupancy]
+    occupancy_gdf.plot(
+        column='Current Balance',  # Visualize Current Balance
+        cmap='Reds',               # Color scheme
+        legend=True,
+        ax=ax,
+        missing_kwds={"color": "lightgrey", "label": "No data"}
+    )
+    ax.set_title(f"Percentage of DQ = 1 for {occupancy}", fontsize=14)
+    ax.axis("off")
 
-# Add titles and labels
-ax.set_title("Percentage of DQ = 1 by NUTS Region", fontsize=14)
-ax.axis("off")
+# Add a main title for the figure
+plt.suptitle("DQ = 1 by Occupancy Status (BTL and Owner Occupied)", fontsize=16)
 
 plt.show()
