@@ -12,18 +12,29 @@ data = {
 df = pd.DataFrame(data)
 
 # Calculate total current balance per region
-region_totals = df.groupby("Main Region")["Current Balance"].transform("sum")
+region_totals = df.groupby("Main Region")["Current Balance"].sum().reset_index()
+region_totals.rename(columns={"Current Balance": "Total_Current_Balance"}, inplace=True)
 
 # Group by Main Region and Occupancy, calculate required metrics
 grouped = (
     df.groupby(["Main Region", "Occupancy"])
     .agg(
-        Avg_Current_Balance=("Current Balance", "mean"),
-        Contribution_to_Region_Current_Balance=("Current Balance", lambda x: (x.sum() / region_totals[x.index[0]]) * 100),
+        Avg_Original_Balance=("Original Balance", "mean"),
+        Contribution_to_Region_Current_Balance=("Current Balance", lambda x: (x.sum() / df.groupby("Main Region")["Current Balance"].transform("sum")[x.index[0]]) * 100),
         Avg_Orig_LTV=("Orig LTV", "mean"),
     )
     .reset_index()
 )
 
+# Pivot the data
+pivoted = grouped.pivot(index="Main Region", columns="Occupancy", values=["Avg_Original_Balance", "Contribution_to_Region_Current_Balance", "Avg_Orig_LTV"])
+
+# Flatten the MultiIndex columns
+pivoted.columns = ['_'.join(col).strip() for col in pivoted.columns.values]
+pivoted.reset_index(inplace=True)
+
+# Add Total Current Balance to the pivoted table
+result = pd.merge(pivoted, region_totals, on="Main Region")
+
 # Display the result
-print(grouped)
+print(result)
