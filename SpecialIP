@@ -12,34 +12,58 @@ data = {
 
 df = pd.DataFrame(data)
 
-# Calculate DQ percentages for Owner and Tenant separately
-dq_percentage = (
+# Group by Main Region and Occupancy to calculate DQ percentages and total balances
+occupancy_stats = (
     df.groupby(["Main Region", "Occupancy"])
-    .agg(DQ_Percentage=("DQ", lambda x: (x.sum() / len(x)) * 100))
-    .unstack()
+    .agg(
+        DQ_Count=("DQ", "sum"),
+        Total_Balance=("Current Balance", "sum"),
+    )
+    .reset_index()
 )
 
-# Create the DQ percentage string
-dq_percentage_str = dq_percentage.apply(
-    lambda row: f"Owner {row[('DQ_Percentage', 'Owner')]:.1f}% / Tenant {row[('DQ_Percentage', 'Tenant')]:.1f}%",
+# Calculate the regional total balance
+region_totals = occupancy_stats.groupby("Main Region").agg(
+    Region_Balance=("Total_Balance", "sum")
+).reset_index()
+
+# Merge region totals back to occupancy stats
+occupancy_stats = occupancy_stats.merge(region_totals, on="Main Region")
+
+# Calculate DQ percentages for each occupancy
+occupancy_stats["Weighted_DQ_Percentage"] = (
+    occupancy_stats["DQ_Count"] / occupancy_stats["Total_Balance"]
+) * occupancy_stats["Total_Balance"] / occupancy_stats["Region_Balance"] * 100
+
+# Group by Main Region to calculate overall weighted DQ percentage
+weighted_dq = occupancy_stats.groupby("Main Region").agg(
+    Avg_DQ_Percentage=("Weighted_DQ_Percentage", "sum")
+).reset_index()
+
+# Add DQ_Percentage_String
+dq_percentage_str = occupancy_stats.pivot(
+    index="Main Region", columns="Occupancy", values="Weighted_DQ_Percentage"
+).apply(
+    lambda row: f"Owner {row.get('Owner', 0):.1f}% / Tenant {row.get('Tenant', 0):.1f}%",
     axis=1,
 )
 
-# Calculate region-wise totals and averages
-region_totals = df.groupby("Main Region").agg(
+# Calculate region-wise averages and total contributions
+region_results = df.groupby("Main Region").agg(
     Avg_Original_Balance=("Original Balance", "mean"),
     Avg_Orig_LTV=("Orig LTV", "mean"),
     Total_Current_Balance=("Current Balance", "sum"),
 ).reset_index()
 
 # Calculate contribution to the total "Current Balance"
-total_current_balance = region_totals["Total_Current_Balance"].sum()
-region_totals["Contribution_to_Total"] = (
-    region_totals["Total_Current_Balance"] / total_current_balance * 100
+total_current_balance = region_results["Total_Current_Balance"].sum()
+region_results["Contribution_to_Total"] = (
+    region_results["Total_Current_Balance"] / total_current_balance * 100
 )
 
-# Add the DQ percentage string column
-region_totals["DQ_Percentage_String"] = region_totals["Main Region"].map(dq_percentage_str)
+# Merge results with weighted DQ and strings
+region_results = region_results.merge(weighted_dq, on="Main Region")
+region_results["DQ_Percentage_String"] = region_results["Main Region"].map(dq_percentage_str)
 
-# Display the result
-print(region_totals)
+# Display the final result
+print(region_results)
