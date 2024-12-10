@@ -6,64 +6,24 @@ data = {
     "Occupancy": ["Owner", "Tenant", "Owner", "Tenant", "Owner", "Tenant"],
     "Original Balance": [100000, 150000, 200000, 250000, 300000, 350000],
     "Orig LTV": [75, 80, 70, 85, 65, 90],
-    "DQ": [1, 0, 1, 1, 0, 0],
     "Current Balance": [90000, 140000, 180000, 240000, 290000, 340000],
 }
 
 df = pd.DataFrame(data)
 
-# Group by Main Region and Occupancy to calculate DQ percentages and total balances
-occupancy_stats = (
+# Calculate total current balance per region
+region_totals = df.groupby("Main Region")["Current Balance"].transform("sum")
+
+# Group by Main Region and Occupancy, calculate required metrics
+grouped = (
     df.groupby(["Main Region", "Occupancy"])
     .agg(
-        DQ_Count=("DQ", "sum"),
-        Total_Balance=("Current Balance", "sum"),
+        Avg_Current_Balance=("Current Balance", "mean"),
+        Contribution_to_Region_Current_Balance=("Current Balance", lambda x: (x.sum() / region_totals[x.index[0]]) * 100),
+        Avg_Orig_LTV=("Orig LTV", "mean"),
     )
     .reset_index()
 )
 
-# Calculate the regional total balance
-region_totals = occupancy_stats.groupby("Main Region").agg(
-    Region_Balance=("Total_Balance", "sum")
-).reset_index()
-
-# Merge region totals back to occupancy stats
-occupancy_stats = occupancy_stats.merge(region_totals, on="Main Region")
-
-# Calculate DQ percentages for each occupancy
-occupancy_stats["Weighted_DQ_Percentage"] = (
-    occupancy_stats["DQ_Count"] / occupancy_stats["Total_Balance"]
-) * occupancy_stats["Total_Balance"] / occupancy_stats["Region_Balance"] * 100
-
-# Group by Main Region to calculate overall weighted DQ percentage
-weighted_dq = occupancy_stats.groupby("Main Region").agg(
-    Avg_DQ_Percentage=("Weighted_DQ_Percentage", "sum")
-).reset_index()
-
-# Add DQ_Percentage_String
-dq_percentage_str = occupancy_stats.pivot(
-    index="Main Region", columns="Occupancy", values="Weighted_DQ_Percentage"
-).apply(
-    lambda row: f"Owner {row.get('Owner', 0):.1f}% / Tenant {row.get('Tenant', 0):.1f}%",
-    axis=1,
-)
-
-# Calculate region-wise averages and total contributions
-region_results = df.groupby("Main Region").agg(
-    Avg_Original_Balance=("Original Balance", "mean"),
-    Avg_Orig_LTV=("Orig LTV", "mean"),
-    Total_Current_Balance=("Current Balance", "sum"),
-).reset_index()
-
-# Calculate contribution to the total "Current Balance"
-total_current_balance = region_results["Total_Current_Balance"].sum()
-region_results["Contribution_to_Total"] = (
-    region_results["Total_Current_Balance"] / total_current_balance * 100
-)
-
-# Merge results with weighted DQ and strings
-region_results = region_results.merge(weighted_dq, on="Main Region")
-region_results["DQ_Percentage_String"] = region_results["Main Region"].map(dq_percentage_str)
-
-# Display the final result
-print(region_results)
+# Display the result
+print(grouped)
