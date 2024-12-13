@@ -1,58 +1,56 @@
 import random
 import numpy as np
+import pandas as pd
 
-def monte_carlo_var(currencies_num, paths, data_points, rate_changes):
+def monte_carlo_var(paths, rate_changes):
     # Initialize variables
-    results_time = np.zeros((currencies_num, 2))
-    path_results = np.zeros((currencies_num, paths + 1))
-    results_var = np.zeros((currencies_num, 5, 2))
+    path_results = np.zeros((paths, 2))
+    results_var = np.zeros((5, 2))
 
-    for n in range(currencies_num):
-        # Populate rate history
-        data = rate_changes[n]  # Assume rate_changes is a list of lists with historical rates
+    # Convert rate_changes to numpy array for faster access
+    data = rate_changes.to_numpy()
+    data_points = len(data)
 
-        for k in range(paths):
-            # Produce rate change for one path
-            new_product = 1
-            for j in range(21):
-                new_day = int(random.random() * data_points - 0.5) + 1
-                new_rate = data[new_day]
-                new_product *= new_rate
-            path_results[k, 0] = new_product  # Monthly path result
+    for k in range(paths):
+        # Produce rate change for one path
+        new_product = 1
+        for j in range(21):
+            new_day = int(random.random() * data_points - 0.5) + 1
+            new_rate = data[new_day - 1]
+            new_product *= new_rate
+        path_results[k, 0] = new_product  # Monthly path result
 
-            for j in range(21, 252):
-                new_day = int(random.random() * data_points - 0.5) + 1
-                new_rate = data[new_day]
-                new_product *= new_rate
-            path_results[k, 1] = new_product  # Annual path result
+        for j in range(21, 252):
+            new_day = int(random.random() * data_points - 0.5) + 1
+            new_rate = data[new_day - 1]
+            new_product *= new_rate
+        path_results[k, 1] = new_product  # Annual path result
 
-        # Sort the 5% lowest results
-        for i in range(1, paths // 20):
-            for j in range(paths - i):
-                if path_results[j, 0] < path_results[j + 1, 0]:
-                    path_results[j, 0], path_results[j + 1, 0] = path_results[j + 1, 0], path_results[j, 0]
+    # Sort the 5% lowest results
+    for i in range(1, paths // 20):
+        for j in range(paths - i):
+            if path_results[j, 0] < path_results[j + 1, 0]:
+                path_results[j, 0], path_results[j + 1, 0] = path_results[j + 1, 0], path_results[j, 0]
 
-        # Sort the 5% highest results
-        for i in range(1, paths // 20):
-            for j in range(paths - i):
-                if path_results[j, 0] > path_results[j + 1, 0]:
-                    path_results[j, 0], path_results[j + 1, 0] = path_results[j + 1, 0], path_results[j, 0]
+    # Sort the 5% highest results
+    for i in range(1, paths // 20):
+        for j in range(paths - i):
+            if path_results[j, 0] > path_results[j + 1, 0]:
+                path_results[j, 0], path_results[j + 1, 0] = path_results[j + 1, 0], path_results[j, 0]
 
-        # Compute VaR results
-        for k in range(2):
-            results_var[n, 0, k] = path_results[paths // 100, k]  # 99% VaR
-            results_var[n, 1, k] = path_results[paths // 200, k]  # 99.5% VaR
-            results_var[n, 2, k] = path_results[paths // 1000, k]  # 99.9% VaR
-            results_var[n, 3, k] = path_results[paths // 2000, k]  # 99.95% VaR
-            results_var[n, 4, k] = path_results[paths // 10000, k]  # 99.98% VaR
+    # Compute VaR results
+    for k in range(2):
+        results_var[0, k] = path_results[paths // 100, k]  # 99% VaR
+        results_var[1, k] = path_results[paths // 200, k]  # 99.5% VaR
+        results_var[2, k] = path_results[paths // 1000, k]  # 99.9% VaR
+        results_var[3, k] = path_results[paths // 2000, k]  # 99.95% VaR
+        results_var[4, k] = path_results[paths // 10000, k]  # 99.98% VaR
 
     return results_var
 
 # Example usage:
-currencies_num = 10
 paths = 1000
-data_points = 252
-rate_changes = [[random.uniform(0.9, 1.1) for _ in range(data_points)] for _ in range(currencies_num)]
+rate_changes = pd.Series([random.uniform(0.9, 1.1) for _ in range(252)])
 
-results_var = monte_carlo_var(currencies_num, paths, data_points, rate_changes)
+results_var = monte_carlo_var(paths, rate_changes)
 print(results_var)
