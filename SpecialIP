@@ -2,45 +2,36 @@ import pandas as pd
 import numpy as np
 import random
 
-# Load data from Excel file
-file_path = "path_to_your_excel_file.xlsx"  # Replace with your file path
-sheet_name = "rate_change"  # Replace with your sheet name
-data = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
-
-# Convert data to NumPy array for faster computation
-rate_changes = data.to_numpy()
+# Assuming you already have the pandas Series for daily rate changes
+# Replace this with your actual Series data
+rate_changes = pd.Series(np.random.randn(252))  # Example data, replace with your input Series
 
 # Parameters
-currencies_num = rate_changes.shape[1] - 1  # Number of currencies (columns minus one for headers)
-data_points = rate_changes.shape[0]  # Number of daily data points
+data_points = len(rate_changes)  # Number of daily data points
 paths = 100  # Number of Monte Carlo paths to simulate
 
 # Results storage
 path_results = np.zeros((2, paths))
 
-# Simulation
-for n in range(currencies_num):
-    # Extract rate history for the currency
-    currency_data = rate_changes[:, n + 1]  # Assuming first column is an index or date
+# Monte Carlo Simulation
+for i in range(paths):
+    new_product = 1
 
-    for i in range(paths):
-        new_product = 1
-        
-        # Simulate monthly path (first 21 days)
-        for j in range(21):
-            new_day = random.randint(0, data_points - 1)  # Randomly select a day
-            new_rate = currency_data[new_day]
-            new_product *= new_rate
-        
-        path_results[0, i] = new_product  # Store result for monthly path
+    # Simulate monthly path (first 21 days)
+    for j in range(21):
+        new_day = random.randint(0, data_points - 1)  # Randomly select a day
+        new_rate = rate_changes.iloc[new_day]
+        new_product *= new_rate
 
-        # Simulate annual path (next 230 days)
-        for j in range(22, 252):
-            new_day = random.randint(0, data_points - 1)
-            new_rate = currency_data[new_day]
-            new_product *= new_rate
-        
-        path_results[1, i] = new_product  # Store result for annual path
+    path_results[0, i] = new_product  # Store result for monthly path
+
+    # Simulate annual path (next 230 days)
+    for j in range(22, 252):
+        new_day = random.randint(0, data_points - 1)
+        new_rate = rate_changes.iloc[new_day]
+        new_product *= new_rate
+
+    path_results[1, i] = new_product  # Store result for annual path
 
 # Sort and identify the 5% lowest results
 sorted_monthly = np.sort(path_results[0, :])[:int(0.05 * paths)]  # Lowest 5% monthly
