@@ -1,39 +1,58 @@
-import pandas as pd
-import numpy as np
 import random
+import numpy as np
 
-# Assuming you already have the pandas Series for daily rate changes
-# Replace this with your actual Series data
-rate_changes = pd.Series(np.random.randn(252))  # Example data, replace with your input Series
+def monte_carlo_var(currencies_num, paths, data_points, rate_changes):
+    # Initialize variables
+    results_time = np.zeros((currencies_num, 2))
+    path_results = np.zeros((currencies_num, paths + 1))
+    results_var = np.zeros((currencies_num, 5, 2))
 
-# Parameters
-data_points = len(rate_changes)  # Number of daily data points
-paths = 10000  # Number of Monte Carlo paths to simulate
+    for n in range(currencies_num):
+        # Populate rate history
+        data = rate_changes[n]  # Assume rate_changes is a list of lists with historical rates
 
-# Results storage
-path_results_long = np.zeros(paths)  # Long positions
-path_results_short = np.zeros(paths)  # Short positions
+        for k in range(paths):
+            # Produce rate change for one path
+            new_product = 1
+            for j in range(21):
+                new_day = int(random.random() * data_points - 0.5) + 1
+                new_rate = data[new_day]
+                new_product *= new_rate
+            path_results[k, 0] = new_product  # Monthly path result
 
-# Monte Carlo Simulation
-for i in range(paths):
-    new_product_long = 1  # For long positions
-    new_product_short = 1  # For short positions
+            for j in range(21, 252):
+                new_day = int(random.random() * data_points - 0.5) + 1
+                new_rate = data[new_day]
+                new_product *= new_rate
+            path_results[k, 1] = new_product  # Annual path result
 
-    # Simulate monthly path (first 21 days)
-    for j in range(21):
-        new_day = random.randint(0, data_points - 1)  # Randomly select a day
-        new_rate = rate_changes.iloc[new_day]
-        new_product_long *= (1 + new_rate)  # Long position gain
-        new_product_short *= (1 - new_rate)  # Short position loss
+        # Sort the 5% lowest results
+        for i in range(1, paths // 20):
+            for j in range(paths - i):
+                if path_results[j, 0] < path_results[j + 1, 0]:
+                    path_results[j, 0], path_results[j + 1, 0] = path_results[j + 1, 0], path_results[j, 0]
 
-    path_results_long[i] = new_product_long - 1  # Store result for long position (returns)
-    path_results_short[i] = 1 - new_product_short  # Store result for short position (losses)
+        # Sort the 5% highest results
+        for i in range(1, paths // 20):
+            for j in range(paths - i):
+                if path_results[j, 0] > path_results[j + 1, 0]:
+                    path_results[j, 0], path_results[j + 1, 0] = path_results[j + 1, 0], path_results[j, 0]
 
-# Calculate 99% VaR (long and short positions)
-VaR_99_long = np.percentile(path_results_long, 1)  # 1st percentile for 99% worst-case (long position)
-VaR_99_short = np.percentile(path_results_short, 99)  # 99th percentile for 99% worst-case (short position)
+        # Compute VaR results
+        for k in range(2):
+            results_var[n, 0, k] = path_results[paths // 100, k]  # 99% VaR
+            results_var[n, 1, k] = path_results[paths // 200, k]  # 99.5% VaR
+            results_var[n, 2, k] = path_results[paths // 1000, k]  # 99.9% VaR
+            results_var[n, 3, k] = path_results[paths // 2000, k]  # 99.95% VaR
+            results_var[n, 4, k] = path_results[paths // 10000, k]  # 99.98% VaR
 
-# Output results
-print("99% VaR (Worst-Case Scenario):")
-print(f"Long Position VaR: {VaR_99_long}")
-print(f"Short Position VaR: {VaR_99_short}")
+    return results_var
+
+# Example usage:
+currencies_num = 10
+paths = 1000
+data_points = 252
+rate_changes = [[random.uniform(0.9, 1.1) for _ in range(data_points)] for _ in range(currencies_num)]
+
+results_var = monte_carlo_var(currencies_num, paths, data_points, rate_changes)
+print(results_var)
