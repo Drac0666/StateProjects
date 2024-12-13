@@ -1,24 +1,49 @@
-Sub FindFormulaResult()
-    Dim ws As Worksheet
-    Dim searchValue As Variant
-    Dim foundCell As Range
-    Dim rowNum As Long
-    
-    ' Set the worksheet (change "Sheet1" to your sheet name)
-    Set ws = ThisWorkbook.Sheets("Sheet1")
-    
-    ' Set the value to search for (a date in this case)
-    searchValue = DateValue("9/19/2024") ' Convert the date string to a date type
-    
-    ' Search for the value in Column A, including formula results
-    Set foundCell = ws.Columns("A").Find(What:=searchValue, LookIn:=xlFormulas, LookAt:=xlWhole)
-    
-    ' Check if the value is found
-    If Not foundCell Is Nothing Then
-        ' Get the row number
-        rowNum = foundCell.Row
-        MsgBox "Value '" & searchValue & "' found in row: " & rowNum
-    Else
-        MsgBox "Value '" & searchValue & "' not found in Column A."
-    End If
-End Sub
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def monte_carlo_var(data, num_simulations=10000, confidence_level=0.99):
+    """
+    Perform Monte Carlo simulation to calculate 99% VaR.
+
+    Parameters:
+        data (pd.Series): Historical daily FX rate changes (log returns preferred).
+        num_simulations (int): Number of Monte Carlo simulations to run.
+        confidence_level (float): Confidence level for VaR (e.g., 0.99).
+
+    Returns:
+        float: The 99% Value at Risk (VaR).
+    """
+    # Calculate historical mean and standard deviation of the returns
+    mu = data.mean()
+    sigma = data.std()
+
+    # Simulate future changes using normal distribution
+    simulated_changes = np.random.normal(mu, sigma, num_simulations)
+
+    # Calculate the 99% percentile (VaR)
+    var_99 = -np.percentile(simulated_changes, (1 - confidence_level) * 100)
+
+    return var_99
+
+# Load historical FX rate changes from input.xlsx
+file_path = "input.xlsx"
+df = pd.read_excel(file_path)
+
+# Take the first 3800 rows as input for simulation
+fx_changes = df.iloc[:3800].squeeze()
+
+# Run Monte Carlo simulation for 99% VaR
+var_99 = monte_carlo_var(fx_changes)
+
+# Display results
+print(f"99% Value at Risk (VaR): {var_99:.6f}")
+
+# Plot simulated distribution
+plt.hist(np.random.normal(fx_changes.mean(), fx_changes.std(), 10000), bins=50, alpha=0.7)
+plt.axvline(-var_99, color='r', linestyle='dashed', linewidth=1.5, label=f'99% VaR: {var_99:.6f}')
+plt.title("Monte Carlo Simulation - 99% VaR")
+plt.xlabel("Simulated FX Changes")
+plt.ylabel("Frequency")
+plt.legend()
+plt.show()
