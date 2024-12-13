@@ -8,36 +8,32 @@ rate_changes = pd.Series(np.random.randn(252))  # Example data, replace with you
 
 # Parameters
 data_points = len(rate_changes)  # Number of daily data points
-paths = 10000  # Number of Monte Carlo paths to simulate (higher for better accuracy)
+paths = 10000  # Number of Monte Carlo paths to simulate
 
 # Results storage
-path_results = np.zeros((2, paths))
+path_results_long = np.zeros(paths)  # Long positions
+path_results_short = np.zeros(paths)  # Short positions
 
 # Monte Carlo Simulation
 for i in range(paths):
-    new_product = 1
+    new_product_long = 1  # For long positions
+    new_product_short = 1  # For short positions
 
     # Simulate monthly path (first 21 days)
     for j in range(21):
         new_day = random.randint(0, data_points - 1)  # Randomly select a day
         new_rate = rate_changes.iloc[new_day]
-        new_product *= new_rate
+        new_product_long *= (1 + new_rate)  # Long position gain
+        new_product_short *= (1 - new_rate)  # Short position loss
 
-    path_results[0, i] = new_product  # Store result for monthly path
+    path_results_long[i] = new_product_long - 1  # Store result for long position (returns)
+    path_results_short[i] = 1 - new_product_short  # Store result for short position (losses)
 
-    # Simulate annual path (next 230 days)
-    for j in range(22, 252):
-        new_day = random.randint(0, data_points - 1)
-        new_rate = rate_changes.iloc[new_day]
-        new_product *= new_rate
-
-    path_results[1, i] = new_product  # Store result for annual path
-
-# Calculate 99% Value at Risk (VaR)
-VaR_99_monthly = np.percentile(path_results[0, :], 1)  # 1st percentile for 99% worst-case
-VaR_99_annual = np.percentile(path_results[1, :], 1)  # 1st percentile for 99% worst-case
+# Calculate 99% VaR (long and short positions)
+VaR_99_long = np.percentile(path_results_long, 1)  # 1st percentile for 99% worst-case (long position)
+VaR_99_short = np.percentile(path_results_short, 99)  # 99th percentile for 99% worst-case (short position)
 
 # Output results
 print("99% VaR (Worst-Case Scenario):")
-print(f"Monthly VaR: {VaR_99_monthly}")
-print(f"Annual VaR: {VaR_99_annual}")
+print(f"Long Position VaR: {VaR_99_long}")
+print(f"Short Position VaR: {VaR_99_short}")
