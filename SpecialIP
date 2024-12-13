@@ -1,40 +1,24 @@
-import pandas as pd
-
-# Sample DataFrame structure
-data = {
-    "Main Region": ["Region1", "Region1", "Region2", "Region2", "Region3", "Region3"],
-    "Occupancy": ["Owner", "Tenant", "Owner", "Tenant", "Owner", "Tenant"],
-    "Original Balance": [100000, 150000, 200000, 250000, 300000, 350000],
-    "Orig LTV": [75, 80, 70, 85, 65, 90],
-    "Current Balance": [90000, 140000, 180000, 240000, 290000, 340000],
-}
-
-df = pd.DataFrame(data)
-
-# Calculate total current balance per region
-region_totals = df.groupby("Main Region")["Current Balance"].sum().reset_index()
-region_totals.rename(columns={"Current Balance": "Total_Current_Balance"}, inplace=True)
-
-# Group by Main Region and Occupancy, calculate required metrics
-grouped = (
-    df.groupby(["Main Region", "Occupancy"])
-    .agg(
-        Avg_Original_Balance=("Original Balance", "mean"),
-        Contribution_to_Region_Current_Balance=("Current Balance", lambda x: (x.sum() / df.groupby("Main Region")["Current Balance"].transform("sum")[x.index[0]]) * 100),
-        Avg_Orig_LTV=("Orig LTV", "mean"),
-    )
-    .reset_index()
-)
-
-# Pivot the data
-pivoted = grouped.pivot(index="Main Region", columns="Occupancy", values=["Avg_Original_Balance", "Contribution_to_Region_Current_Balance", "Avg_Orig_LTV"])
-
-# Flatten the MultiIndex columns
-pivoted.columns = ['_'.join(col).strip() for col in pivoted.columns.values]
-pivoted.reset_index(inplace=True)
-
-# Add Total Current Balance to the pivoted table
-result = pd.merge(pivoted, region_totals, on="Main Region")
-
-# Display the result
-print(result)
+Sub FindFormulaResult()
+    Dim ws As Worksheet
+    Dim searchValue As Variant
+    Dim foundCell As Range
+    Dim rowNum As Long
+    
+    ' Set the worksheet (change "Sheet1" to your sheet name)
+    Set ws = ThisWorkbook.Sheets("Sheet1")
+    
+    ' Set the value to search for (a date in this case)
+    searchValue = DateValue("9/19/2024") ' Convert the date string to a date type
+    
+    ' Search for the value in Column A, including formula results
+    Set foundCell = ws.Columns("A").Find(What:=searchValue, LookIn:=xlFormulas, LookAt:=xlWhole)
+    
+    ' Check if the value is found
+    If Not foundCell Is Nothing Then
+        ' Get the row number
+        rowNum = foundCell.Row
+        MsgBox "Value '" & searchValue & "' found in row: " & rowNum
+    Else
+        MsgBox "Value '" & searchValue & "' not found in Column A."
+    End If
+End Sub
