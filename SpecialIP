@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def monte_carlo_var(data, num_simulations=10000, confidence_level=0.99):
+def monte_carlo_var(data, num_simulations=1000000, confidence_level=0.99, days=1):
     """
     Perform Monte Carlo simulation to calculate 99% VaR.
 
@@ -10,6 +10,7 @@ def monte_carlo_var(data, num_simulations=10000, confidence_level=0.99):
         data (pd.Series): Historical daily FX rate changes (log returns preferred).
         num_simulations (int): Number of Monte Carlo simulations to run.
         confidence_level (float): Confidence level for VaR (e.g., 0.99).
+        days (int): Number of trading days for the VaR horizon (e.g., 21 for 1 month).
 
     Returns:
         float: The 99% Value at Risk (VaR).
@@ -18,8 +19,12 @@ def monte_carlo_var(data, num_simulations=10000, confidence_level=0.99):
     mu = data.mean()
     sigma = data.std()
 
+    # Adjust mean and standard deviation for the given time horizon
+    mu_adj = mu * days
+    sigma_adj = sigma * np.sqrt(days)
+
     # Simulate future changes using normal distribution
-    simulated_changes = np.random.normal(mu, sigma, num_simulations)
+    simulated_changes = np.random.normal(mu_adj, sigma_adj, num_simulations)
 
     # Calculate the 99% percentile (VaR)
     var_99 = -np.percentile(simulated_changes, (1 - confidence_level) * 100)
@@ -33,17 +38,17 @@ df = pd.read_excel(file_path)
 # Take the first 3800 rows as input for simulation
 fx_changes = df.iloc[:3800].squeeze()
 
-# Run Monte Carlo simulation for 99% VaR
-var_99 = monte_carlo_var(fx_changes)
+# Run Monte Carlo simulation for 1-month (21 trading days) 99% VaR
+var_99_1month = monte_carlo_var(fx_changes, days=21)
 
 # Display results
-print(f"99% Value at Risk (VaR): {var_99:.6f}")
+print(f"1-Month 99% Value at Risk (VaR): {var_99_1month:.6f}")
 
 # Plot simulated distribution
-plt.hist(np.random.normal(fx_changes.mean(), fx_changes.std(), 10000), bins=50, alpha=0.7)
-plt.axvline(-var_99, color='r', linestyle='dashed', linewidth=1.5, label=f'99% VaR: {var_99:.6f}')
-plt.title("Monte Carlo Simulation - 99% VaR")
-plt.xlabel("Simulated FX Changes")
+plt.hist(np.random.normal(fx_changes.mean() * 21, fx_changes.std() * np.sqrt(21), 10000), bins=50, alpha=0.7)
+plt.axvline(-var_99_1month, color='r', linestyle='dashed', linewidth=1.5, label=f'1-Month 99% VaR: {var_99_1month:.6f}')
+plt.title("Monte Carlo Simulation - 1-Month 99% VaR")
+plt.xlabel("Simulated FX Changes (1-Month)")
 plt.ylabel("Frequency")
 plt.legend()
 plt.show()
