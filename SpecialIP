@@ -1,54 +1,54 @@
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
+import random
 
-def monte_carlo_var(data, num_simulations=1000000, confidence_level=0.99, days=1):
-    """
-    Perform Monte Carlo simulation to calculate 99% VaR.
+# Load data from Excel file
+file_path = "path_to_your_excel_file.xlsx"  # Replace with your file path
+sheet_name = "rate_change"  # Replace with your sheet name
+data = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
 
-    Parameters:
-        data (pd.Series): Historical daily FX rate changes (log returns preferred).
-        num_simulations (int): Number of Monte Carlo simulations to run.
-        confidence_level (float): Confidence level for VaR (e.g., 0.99).
-        days (int): Number of trading days for the VaR horizon (e.g., 21 for 1 month).
+# Convert data to NumPy array for faster computation
+rate_changes = data.to_numpy()
 
-    Returns:
-        float: The 99% Value at Risk (VaR).
-    """
-    # Calculate historical mean and standard deviation of the returns
-    mu = data.mean()
-    sigma = data.std()
+# Parameters
+currencies_num = rate_changes.shape[1] - 1  # Number of currencies (columns minus one for headers)
+data_points = rate_changes.shape[0]  # Number of daily data points
+paths = 100  # Number of Monte Carlo paths to simulate
 
-    # Adjust mean and standard deviation for the given time horizon
-    mu_adj = mu * days
-    sigma_adj = sigma * np.sqrt(days)
+# Results storage
+path_results = np.zeros((2, paths))
 
-    # Simulate future changes using normal distribution
-    simulated_changes = np.random.normal(mu_adj, sigma_adj, num_simulations)
+# Simulation
+for n in range(currencies_num):
+    # Extract rate history for the currency
+    currency_data = rate_changes[:, n + 1]  # Assuming first column is an index or date
 
-    # Calculate the 99% percentile (VaR)
-    var_99 = -np.percentile(simulated_changes, (1 - confidence_level) * 100)
+    for i in range(paths):
+        new_product = 1
+        
+        # Simulate monthly path (first 21 days)
+        for j in range(21):
+            new_day = random.randint(0, data_points - 1)  # Randomly select a day
+            new_rate = currency_data[new_day]
+            new_product *= new_rate
+        
+        path_results[0, i] = new_product  # Store result for monthly path
 
-    return var_99
+        # Simulate annual path (next 230 days)
+        for j in range(22, 252):
+            new_day = random.randint(0, data_points - 1)
+            new_rate = currency_data[new_day]
+            new_product *= new_rate
+        
+        path_results[1, i] = new_product  # Store result for annual path
 
-# Load historical FX rate changes from input.xlsx
-file_path = "input.xlsx"
-df = pd.read_excel(file_path)
+# Sort and identify the 5% lowest results
+sorted_monthly = np.sort(path_results[0, :])[:int(0.05 * paths)]  # Lowest 5% monthly
+sorted_annual = np.sort(path_results[1, :])[:int(0.05 * paths)]  # Lowest 5% annual
 
-# Take the first 3800 rows as input for simulation
-fx_changes = df.iloc[:3800].squeeze()
+# Output results
+print("Lowest 5% of monthly path results:")
+print(sorted_monthly)
 
-# Run Monte Carlo simulation for 1-month (21 trading days) 99% VaR
-var_99_1month = monte_carlo_var(fx_changes, days=21)
-
-# Display results
-print(f"1-Month 99% Value at Risk (VaR): {var_99_1month:.6f}")
-
-# Plot simulated distribution
-plt.hist(np.random.normal(fx_changes.mean() * 21, fx_changes.std() * np.sqrt(21), 10000), bins=50, alpha=0.7)
-plt.axvline(-var_99_1month, color='r', linestyle='dashed', linewidth=1.5, label=f'1-Month 99% VaR: {var_99_1month:.6f}')
-plt.title("Monte Carlo Simulation - 1-Month 99% VaR")
-plt.xlabel("Simulated FX Changes (1-Month)")
-plt.ylabel("Frequency")
-plt.legend()
-plt.show()
+print("\nLowest 5% of annual path results:")
+print(sorted_annual)
