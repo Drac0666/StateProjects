@@ -8,7 +8,7 @@ rate_changes = pd.Series(np.random.randn(252))  # Example data, replace with you
 
 # Parameters
 data_points = len(rate_changes)  # Number of daily data points
-paths = 100  # Number of Monte Carlo paths to simulate
+paths = 10000  # Number of Monte Carlo paths to simulate (higher for better accuracy)
 
 # Results storage
 path_results = np.zeros((2, paths))
@@ -33,13 +33,11 @@ for i in range(paths):
 
     path_results[1, i] = new_product  # Store result for annual path
 
-# Sort and identify the 5% lowest results
-sorted_monthly = np.sort(path_results[0, :])[:int(0.05 * paths)]  # Lowest 5% monthly
-sorted_annual = np.sort(path_results[1, :])[:int(0.05 * paths)]  # Lowest 5% annual
+# Calculate 99% Value at Risk (VaR)
+VaR_99_monthly = np.percentile(path_results[0, :], 1)  # 1st percentile for 99% worst-case
+VaR_99_annual = np.percentile(path_results[1, :], 1)  # 1st percentile for 99% worst-case
 
 # Output results
-print("Lowest 5% of monthly path results:")
-print(sorted_monthly)
-
-print("\nLowest 5% of annual path results:")
-print(sorted_annual)
+print("99% VaR (Worst-Case Scenario):")
+print(f"Monthly VaR: {VaR_99_monthly}")
+print(f"Annual VaR: {VaR_99_annual}")
