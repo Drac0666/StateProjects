@@ -1,12 +1,19 @@
-def reorder_columns(df):
+def propagate_values(df):
     """
-    Reorders the DataFrame so that the last columns become the first ones.
+    Propagates values from left to right when a value is found, followed by 'NA'.
+    This continues until a new value appears.
 
     Parameters:
     df (pd.DataFrame): Input DataFrame.
 
     Returns:
-    pd.DataFrame: Reordered DataFrame.
+    pd.DataFrame: Updated DataFrame with propagated values.
     """
-    reordered_columns = ['Key'] + df.columns[1:][::-1].tolist()
-    return df[reordered_columns]
+    for index, row in df.iterrows():
+        last_value = None
+        for col in df.columns[1:]:  # Skip 'Key' column
+            if row[col] and row[col] != 'NA':
+                last_value = row[col]
+            elif row[col] == 'NA' and last_value is not None:
+                df.at[index, col] = last_value
+    return df
