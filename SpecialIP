@@ -1,8 +1,6 @@
-import plotly.graph_objects as go
-
-def plot_row_vs_dates(df, row_key):
+def clean_and_plot_row_vs_dates(df, row_key):
     """
-    Plots a specific row (by Key) against the column headers (dates) interactively using Plotly.
+    Cleans row_key by checking if it's numeric and removing commas, then plots it against the column headers (dates).
 
     Parameters:
     df (pd.DataFrame): Input DataFrame with dates as columns.
@@ -14,23 +12,19 @@ def plot_row_vs_dates(df, row_key):
     if row_key not in df['Key'].values:
         raise ValueError(f"Row with Key '{row_key}' not found in the DataFrame.")
     
-    row = df[df['Key'] == row_key].iloc[0, 1:]  # Exclude the 'Key' column
+    # Clean row_key if numeric and remove commas
+    cleaned_row_key = row_key.replace(',', '') if row_key.replace(',', '').isnumeric() else row_key
+    
+    row = df[df['Key'] == cleaned_row_key].iloc[0, 1:]  # Exclude the 'Key' column
     dates = row.index
     values = pd.to_numeric(row.values, errors='coerce')  # Convert to numeric for plotting
-
-    # Create interactive plot using Plotly
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=dates, 
-        y=values, 
-        mode='lines+markers',
-        name=row_key
-    ))
-    fig.update_layout(
-        title=f"Interactive Plot for {row_key} Over Dates",
-        xaxis_title="Dates",
-        yaxis_title="Values",
-        xaxis=dict(tickangle=45),
-        template="plotly",
-    )
-    fig.show()
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, values, marker='o')
+    plt.title(f"Values for {cleaned_row_key} Over Dates")
+    plt.xlabel("Dates")
+    plt.ylabel("Values")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
