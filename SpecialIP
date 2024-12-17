@@ -1,16 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Dec 17 16:22:25 2024
-
-@author: edena
-"""
-
-import pandas as pd
-
 def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value', count_column_name='Count of |'):
     """
     Converts a dictionary into a DataFrame with two columns: keys and values.
-    Keeps only non-empty values between '||' and adds a column for the count of '|'.
+    Adds a column for the count of '|', without removing empty values.
 
     Parameters:
     data_dict (dict): The dictionary to be converted.
@@ -19,16 +10,14 @@ def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value
     count_column_name (str): Name of the column for the count of '|' in the string.
 
     Returns:
-    pd.DataFrame: A DataFrame with columns for keys, cleaned values, and count of '|'.
+    pd.DataFrame: A DataFrame with columns for keys, original values, and count of '|'.
     """
     cleaned_data = []
     
     for key, value in data_dict.items():
         if isinstance(value, str):
-            # Extract non-empty values between '||'
-            extracted_values = [v for v in value.split('|') if v.strip()]
             count_pipes = value.count('|')  # Count the number of '|' in the string
-            cleaned_data.append((key, '|'.join(extracted_values), count_pipes))
+            cleaned_data.append((key, value, count_pipes))
         else:
             cleaned_data.append((key, value, 0))
 
@@ -52,7 +41,7 @@ def create_dataframe_from_key(data_dict, target_key='DATE_YYYYMM'):
         raise ValueError(f"Key '{target_key}' not found in the dictionary.")
     
     # Split the target key values
-    target_values = [v.strip() for v in data_dict[target_key].split('|') if v.strip()]
+    target_values = [v for v in data_dict[target_key].split('|')]
     num_columns = len(target_values)
 
     # Initialize a dictionary for the DataFrame
@@ -63,14 +52,12 @@ def create_dataframe_from_key(data_dict, target_key='DATE_YYYYMM'):
     # Process each key in the dictionary
     for key, value in data_dict.items():
         if isinstance(value, str):
-            split_values = [v.strip() for v in value.split('|') if v.strip()]
-            if len(split_values) == num_columns:
-                df_data['Key'].append(key)
-                for i in range(num_columns):
+            split_values = value.split('|')
+            df_data['Key'].append(key)
+            for i in range(num_columns):
+                if i < len(split_values):
                     df_data[f'Column_{i+1}'].append(split_values[i])
-            else:
-                df_data['Key'].append(key)
-                for i in range(num_columns):
+                else:
                     df_data[f'Column_{i+1}'].append(None)
         else:
             df_data['Key'].append(key)
@@ -78,16 +65,3 @@ def create_dataframe_from_key(data_dict, target_key='DATE_YYYYMM'):
                 df_data[f'Column_{i+1}'].append(None)
 
     return pd.DataFrame(df_data)
-
-# Example usage
-data = {
-    'DATE_YYYYMM': '202406|202407|202408',
-    'Test1': '1.1|2.2|3.3',
-    'Test2': '4.4|5.5|6.6',
-    'Test3': '7.7|8.8|9.9',
-    'Mismatch': '10.1|11.1'
-}
-
-result_df = create_dataframe_from_key(data, target_key='DATE_YYYYMM')
-print("Resulting DataFrame:")
-print(result_df)
