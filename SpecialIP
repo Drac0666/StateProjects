@@ -1,67 +1,36 @@
-def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value', count_column_name='Count of |'):
+ef set_date_column_as_header(df, date_key='DATE_YYYYMM'):
     """
-    Converts a dictionary into a DataFrame with two columns: keys and values.
-    Adds a column for the count of '|', without removing empty values.
+    Transforms a DataFrame by setting values of a specific key (DATE_YYYYMM) as column headers.
 
     Parameters:
-    data_dict (dict): The dictionary to be converted.
-    key_column_name (str): Name of the column for dictionary keys.
-    value_column_name (str): Name of the column for dictionary values.
-    count_column_name (str): Name of the column for the count of '|' in the string.
+    df (pd.DataFrame): Input DataFrame with Key column.
+    date_key (str): The key used to determine the new columns.
 
     Returns:
-    pd.DataFrame: A DataFrame with columns for keys, original values, and count of '|'.
+    pd.DataFrame: Transformed DataFrame where DATE_YYYYMM values are the column headers.
     """
-    cleaned_data = []
-    
-    for key, value in data_dict.items():
-        if isinstance(value, str):
-            count_pipes = value.count('|')  # Count the number of '|' in the string
-            cleaned_data.append((key, value, count_pipes))
-        else:
-            cleaned_data.append((key, value, 0))
+    # Extract the row where Key == date_key
+    date_row = df[df['Key'] == date_key].iloc[0]
+    new_columns = date_row[1:].values  # Skip 'Key' column
 
-    # Create a DataFrame from the cleaned data
-    df = pd.DataFrame(cleaned_data, columns=[key_column_name, value_column_name, count_column_name])
+    # Drop the row containing DATE_YYYYMM and reset index
+    df = df[df['Key'] != date_key].reset_index(drop=True)
+    df.columns = ['Key'] + list(new_columns)
     return df
 
-def create_dataframe_from_key(data_dict, target_key='DATE_YYYYMM'):
-    """
-    Creates a new DataFrame where each value from the target key becomes a column.
-    Other keys with matching '|' counts have their values assigned to respective columns.
+# Example usage
+data = {
+    'DATE_YYYYMM': '202406|202407|202408',
+    'Test1': '1.1|2.2|3.3',
+    'Test2': '4.4|5.5|6.6',
+    'Test3': '7.7|8.8|9.9',
+    'Mismatch': '10.1|11.1'
+}
 
-    Parameters:
-    data_dict (dict): Input dictionary containing data.
-    target_key (str): The key whose values will determine the new columns.
+result_df = create_dataframe_from_key(data, target_key='DATE_YYYYMM')
+print("Resulting DataFrame:")
+print(result_df)
 
-    Returns:
-    pd.DataFrame: A DataFrame where values from target_key become columns, and other keys align with these columns.
-    """
-    if target_key not in data_dict:
-        raise ValueError(f"Key '{target_key}' not found in the dictionary.")
-    
-    # Split the target key values
-    target_values = [v for v in data_dict[target_key].split('|')]
-    num_columns = len(target_values)
-
-    # Initialize a dictionary for the DataFrame
-    df_data = {'Key': []}
-    for i in range(1, num_columns + 1):
-        df_data[f'Column_{i}'] = []
-
-    # Process each key in the dictionary
-    for key, value in data_dict.items():
-        if isinstance(value, str):
-            split_values = value.split('|')
-            df_data['Key'].append(key)
-            for i in range(num_columns):
-                if i < len(split_values):
-                    df_data[f'Column_{i+1}'].append(split_values[i])
-                else:
-                    df_data[f'Column_{i+1}'].append(None)
-        else:
-            df_data['Key'].append(key)
-            for i in range(num_columns):
-                df_data[f'Column_{i+1}'].append(None)
-
-    return pd.DataFrame(df_data)
+final_df = set_date_column_as_header(result_df, date_key='DATE_YYYYMM')
+print("\nTransformed DataFrame with DATE_YYYYMM as columns:")
+print(final_df)
