@@ -1,4 +1,4 @@
-def propagate_values(df):
+ef propagate_values(df):
     """
     Propagates values from left to right when a value is found, followed by 'NA'.
     This continues until a new value appears.
@@ -17,3 +17,28 @@ def propagate_values(df):
             elif row[col] == 'NA' and last_value is not None:
                 df.at[index, col] = last_value
     return df
+
+# Example usage
+data = {
+    'DATE_YYYYMM': '202406|202407|202408',
+    'Test1': '1.1|NA|3.3',
+    'Test2': '4.4|NA|6.6',
+    'Test3': '7.7|8.8|NA',
+    'Mismatch': '10.1|11.1'
+}
+
+result_df = create_dataframe_from_key(data, target_key='DATE_YYYYMM')
+print("Resulting DataFrame:")
+print(result_df)
+
+final_df = set_date_column_as_header(result_df, date_key='DATE_YYYYMM')
+print("\nTransformed DataFrame with DATE_YYYYMM as columns:")
+print(final_df)
+
+reordered_df = reorder_columns(final_df)
+print("\nReordered DataFrame:")
+print(reordered_df)
+
+propagated_df = propagate_values(reordered_df)
+print("\nDataFrame after propagating values:")
+print(propagated_df)
