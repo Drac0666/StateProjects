@@ -1,39 +1,21 @@
-import pandas as pd
 
-# Sample data
-data = {
-    "ISIN": ["ISIN1", "ISIN1", "ISIN2", "ISIN2", "ISIN3", "ISIN3", "ISIN4", "ISIN4", "ISIN5", "ISIN5"],
-    "As of Date": [
-        "2022-11", "2022-12", "2022-11", "2022-12",
-        "2023-01", "2023-02", "2022-11", "2022-12", "2023-01", "2023-02"
-    ],
-    "Par": [5000, 6000, 4000, 8000, 3000, 3500, 4500, 5500, 2000, 2500],
-    "Deal Name": ["ABS1", "ABS1", "ABS2", "ABS2", "ABS3", "ABS3", "ABS4", "ABS4", "ABS5", "ABS5"],
-    "Vintage": [2004, 2004, 2006, 2006, 2005, 2005, 2007, 2007, 2008, 2008],
-    "Tranche": ["A2b", "A2b", "A", "A", "B", "B", "C", "C", "D", "D"]
-}
+def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value'):
+    """
+    Converts a dictionary into a DataFrame with two columns: keys and values.
 
-# Load data into DataFrame
-df = pd.DataFrame(data)
+    Parameters:
+    data_dict (dict): The dictionary to be converted.
+    key_column_name (str): Name of the column for dictionary keys.
+    value_column_name (str): Name of the column for dictionary values.
 
-# Group by ISIN and Vintage to remove duplicate rows
-unique_data = df[["ISIN", "Vintage"]].drop_duplicates()
+    Returns:
+    pd.DataFrame: A DataFrame with two columns for keys and values.
+    """
+    # Create a DataFrame from the dictionary
+    df = pd.DataFrame(list(data_dict.items()), columns=[key_column_name, value_column_name])
+    return df
 
-# Pivot table to set Vintages as columns and ISINs as rows
-pivot_vintage = unique_data.pivot_table(
-    index=pd.RangeIndex(start=1, stop=len(unique_data["ISIN"].unique()) + 1),  # Rows (sequential index)
-    columns="Vintage",  
-    values="ISIN",
-    aggfunc=lambda x: ', '.join(x),  # Join ISINs (if multiple exist)
-    fill_value=""
-)
-
-# Reset column names for clarity
-pivot_vintage.columns.name = None  # Remove column name
-pivot_vintage.index.name = None    # Remove index name
-
-# Display the pivot table
-print(pivot_vintage)
-
-# Save results to Excel (optional)
-pivot_vintage.to_excel("vintage_as_columns.xlsx", index=False)
+# Example usage
+data = {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+result_df = dict_to_dataframe(data)
+print(result_df)
