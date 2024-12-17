@@ -1,17 +1,18 @@
 import pandas as pd
 
-def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value'):
+def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value', count_column_name='Count of |'):
     """
     Converts a dictionary into a DataFrame with two columns: keys and values.
-    Keeps only non-empty values between '||'.
+    Keeps only non-empty values between '||' and adds a column for the count of '|'.
 
     Parameters:
     data_dict (dict): The dictionary to be converted.
     key_column_name (str): Name of the column for dictionary keys.
     value_column_name (str): Name of the column for dictionary values.
+    count_column_name (str): Name of the column for the count of '|' in the string.
 
     Returns:
-    pd.DataFrame: A DataFrame with two columns for keys and cleaned values.
+    pd.DataFrame: A DataFrame with columns for keys, cleaned values, and count of '|'.
     """
     cleaned_data = []
     
@@ -19,12 +20,13 @@ def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value
         if isinstance(value, str):
             # Extract non-empty values between '||'
             extracted_values = [v for v in value.split('|') if v.strip()]
-            cleaned_data.append((key, '|'.join(extracted_values)))
+            count_pipes = value.count('|')  # Count the number of '|' in the string
+            cleaned_data.append((key, '|'.join(extracted_values), count_pipes))
         else:
-            cleaned_data.append((key, value))
+            cleaned_data.append((key, value, 0))
 
     # Create a DataFrame from the cleaned data
-    df = pd.DataFrame(cleaned_data, columns=[key_column_name, value_column_name])
+    df = pd.DataFrame(cleaned_data, columns=[key_column_name, value_column_name, count_column_name])
     return df
 
 # Example usage
