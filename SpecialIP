@@ -1,3 +1,5 @@
+import plotly.graph_objects as go
+
 def plot_row_vs_dates(df, row_key):
     """
     Plots a specific row (by Key) against the column headers (dates) interactively using Plotly.
