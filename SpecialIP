@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
 
-# Sample data with more diversity
+# Sample data
 data = {
     "ISIN": ["ISIN1", "ISIN1", "ISIN2", "ISIN2", "ISIN3", "ISIN3", "ISIN4", "ISIN4", "ISIN5", "ISIN5"],
     "As of Date": [
@@ -17,18 +16,24 @@ data = {
 # Load data into DataFrame
 df = pd.DataFrame(data)
 
-# Pivot table creation
-pivot_table = pd.pivot_table(
-    df,
-    values="Par",                  # Values to aggregate (sum of Par)
-    index=["As of Date"],          # Rows: As of Date
-    columns=["Vintage", "Deal Name", "ISIN", "Tranche"],  # Multi-level Columns
-    aggfunc="sum",                 # Aggregation function
-    fill_value=0                   # Fill NaN values with 0
+# Group by ISIN and Vintage to remove duplicate rows
+unique_data = df[["ISIN", "Vintage"]].drop_duplicates()
+
+# Pivot table to set Vintages as columns and ISINs as rows
+pivot_vintage = unique_data.pivot_table(
+    index=pd.RangeIndex(start=1, stop=len(unique_data["ISIN"].unique()) + 1),  # Rows (sequential index)
+    columns="Vintage",  
+    values="ISIN",
+    aggfunc=lambda x: ', '.join(x),  # Join ISINs (if multiple exist)
+    fill_value=""
 )
 
-# Display the pivot table
-print(pivot_table)
+# Reset column names for clarity
+pivot_vintage.columns.name = None  # Remove column name
+pivot_vintage.index.name = None    # Remove index name
 
-# Save to Excel (optional)
-pivot_table.to_excel("pivot_table_output.xlsx", merge_cells=True)
+# Display the pivot table
+print(pivot_vintage)
+
+# Save results to Excel (optional)
+pivot_vintage.to_excel("vintage_as_columns.xlsx", index=False)
