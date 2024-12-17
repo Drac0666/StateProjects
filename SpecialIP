@@ -1,22 +1,30 @@
-ef propagate_values(df):
+def plot_row_vs_dates(df, row_key):
     """
-    Propagates values from left to right when a value is found, followed by 'NA'.
-    This continues until a new value appears.
+    Plots a specific row (by Key) against the column headers (dates).
 
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
+    df (pd.DataFrame): Input DataFrame with dates as columns.
+    row_key (str): The value in the Key column corresponding to the row to be plotted.
 
     Returns:
-    pd.DataFrame: Updated DataFrame with propagated values.
+    None
     """
-    for index, row in df.iterrows():
-        last_value = None
-        for col in df.columns[1:]:  # Skip 'Key' column
-            if row[col] and row[col] != 'NA':
-                last_value = row[col]
-            elif row[col] == 'NA' and last_value is not None:
-                df.at[index, col] = last_value
-    return df
+    if row_key not in df['Key'].values:
+        raise ValueError(f"Row with Key '{row_key}' not found in the DataFrame.")
+    
+    row = df[df['Key'] == row_key].iloc[0, 1:]  # Exclude the 'Key' column
+    dates = row.index
+    values = pd.to_numeric(row.values, errors='coerce')  # Convert to numeric for plotting
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, values, marker='o')
+    plt.title(f"Values for {row_key} Over Dates")
+    plt.xlabel("Dates")
+    plt.ylabel("Values")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 # Example usage
 data = {
@@ -28,17 +36,11 @@ data = {
 }
 
 result_df = create_dataframe_from_key(data, target_key='DATE_YYYYMM')
-print("Resulting DataFrame:")
-print(result_df)
-
 final_df = set_date_column_as_header(result_df, date_key='DATE_YYYYMM')
-print("\nTransformed DataFrame with DATE_YYYYMM as columns:")
-print(final_df)
+propagated_df = propagate_values(final_df)
 
-reordered_df = reorder_columns(final_df)
-print("\nReordered DataFrame:")
-print(reordered_df)
-
-propagated_df = propagate_values(reordered_df)
-print("\nDataFrame after propagating values:")
+print("\nFinal DataFrame:")
 print(propagated_df)
+
+# Plot a specific row
+plot_row_vs_dates(propagated_df, row_key='Test1')
