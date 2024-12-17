@@ -1,7 +1,9 @@
+import pandas as pd
 
 def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value'):
     """
     Converts a dictionary into a DataFrame with two columns: keys and values.
+    Keeps only non-empty values between '||'.
 
     Parameters:
     data_dict (dict): The dictionary to be converted.
@@ -9,13 +11,28 @@ def dict_to_dataframe(data_dict, key_column_name='Key', value_column_name='Value
     value_column_name (str): Name of the column for dictionary values.
 
     Returns:
-    pd.DataFrame: A DataFrame with two columns for keys and values.
+    pd.DataFrame: A DataFrame with two columns for keys and cleaned values.
     """
-    # Create a DataFrame from the dictionary
-    df = pd.DataFrame(list(data_dict.items()), columns=[key_column_name, value_column_name])
+    cleaned_data = []
+    
+    for key, value in data_dict.items():
+        if isinstance(value, str):
+            # Extract non-empty values between '||'
+            extracted_values = [v for v in value.split('|') if v.strip()]
+            cleaned_data.append((key, '|'.join(extracted_values)))
+        else:
+            cleaned_data.append((key, value))
+
+    # Create a DataFrame from the cleaned data
+    df = pd.DataFrame(cleaned_data, columns=[key_column_name, value_column_name])
     return df
 
 # Example usage
-data = {'a': 1, 'b': 2, 'c': 3, 'd': 4}
+data = {
+    'Test1': '|1.1|||NA|1.3',
+    'Test2': '||2.5|NA||3.7|',
+    'Test3': '|NA||',
+    'Test4': '|5.0||6.1|'
+}
 result_df = dict_to_dataframe(data)
 print(result_df)
