@@ -1,22 +1,16 @@
-ef set_date_column_as_header(df, date_key='DATE_YYYYMM'):
+def reorder_columns(df):
     """
-    Transforms a DataFrame by setting values of a specific key (DATE_YYYYMM) as column headers.
+    Reorders the DataFrame so that the last columns become the first ones.
 
     Parameters:
-    df (pd.DataFrame): Input DataFrame with Key column.
-    date_key (str): The key used to determine the new columns.
+    df (pd.DataFrame): Input DataFrame.
 
     Returns:
-    pd.DataFrame: Transformed DataFrame where DATE_YYYYMM values are the column headers.
+    pd.DataFrame: Reordered DataFrame.
     """
-    # Extract the row where Key == date_key
-    date_row = df[df['Key'] == date_key].iloc[0]
-    new_columns = date_row[1:].values  # Skip 'Key' column
-
-    # Drop the row containing DATE_YYYYMM and reset index
-    df = df[df['Key'] != date_key].reset_index(drop=True)
-    df.columns = ['Key'] + list(new_columns)
-    return df
+    columns = df.columns.tolist()
+    reordered_columns = columns[-1:] + columns[:-1]
+    return df[reordered_columns]
 
 # Example usage
 data = {
@@ -34,3 +28,7 @@ print(result_df)
 final_df = set_date_column_as_header(result_df, date_key='DATE_YYYYMM')
 print("\nTransformed DataFrame with DATE_YYYYMM as columns:")
 print(final_df)
+
+reordered_df = reorder_columns(final_df)
+print("\nReordered DataFrame:")
+print(reordered_df)
