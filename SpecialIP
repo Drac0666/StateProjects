@@ -1,6 +1,6 @@
 def plot_row_vs_dates(df, row_key):
     """
-    Plots a specific row (by Key) against the column headers (dates).
+    Plots a specific row (by Key) against the column headers (dates) interactively using Plotly.
 
     Parameters:
     df (pd.DataFrame): Input DataFrame with dates as columns.
@@ -15,32 +15,20 @@ def plot_row_vs_dates(df, row_key):
     row = df[df['Key'] == row_key].iloc[0, 1:]  # Exclude the 'Key' column
     dates = row.index
     values = pd.to_numeric(row.values, errors='coerce')  # Convert to numeric for plotting
-    
-    plt.figure(figsize=(10, 6))
-    plt.plot(dates, values, marker='o')
-    plt.title(f"Values for {row_key} Over Dates")
-    plt.xlabel("Dates")
-    plt.ylabel("Values")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
 
-# Example usage
-data = {
-    'DATE_YYYYMM': '202406|202407|202408',
-    'Test1': '1.1|NA|3.3',
-    'Test2': '4.4|NA|6.6',
-    'Test3': '7.7|8.8|NA',
-    'Mismatch': '10.1|11.1'
-}
-
-result_df = create_dataframe_from_key(data, target_key='DATE_YYYYMM')
-final_df = set_date_column_as_header(result_df, date_key='DATE_YYYYMM')
-propagated_df = propagate_values(final_df)
-
-print("\nFinal DataFrame:")
-print(propagated_df)
-
-# Plot a specific row
-plot_row_vs_dates(propagated_df, row_key='Test1')
+    # Create interactive plot using Plotly
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=dates, 
+        y=values, 
+        mode='lines+markers',
+        name=row_key
+    ))
+    fig.update_layout(
+        title=f"Interactive Plot for {row_key} Over Dates",
+        xaxis_title="Dates",
+        yaxis_title="Values",
+        xaxis=dict(tickangle=45),
+        template="plotly",
+    )
+    fig.show()
