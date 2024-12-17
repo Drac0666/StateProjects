@@ -8,27 +8,5 @@ def reorder_columns(df):
     Returns:
     pd.DataFrame: Reordered DataFrame.
     """
-    columns = df.columns.tolist()
-    reordered_columns = columns[-1:] + columns[:-1]
+    reordered_columns = ['Key'] + df.columns[1:][::-1].tolist()
     return df[reordered_columns]
-
-# Example usage
-data = {
-    'DATE_YYYYMM': '202406|202407|202408',
-    'Test1': '1.1|2.2|3.3',
-    'Test2': '4.4|5.5|6.6',
-    'Test3': '7.7|8.8|9.9',
-    'Mismatch': '10.1|11.1'
-}
-
-result_df = create_dataframe_from_key(data, target_key='DATE_YYYYMM')
-print("Resulting DataFrame:")
-print(result_df)
-
-final_df = set_date_column_as_header(result_df, date_key='DATE_YYYYMM')
-print("\nTransformed DataFrame with DATE_YYYYMM as columns:")
-print(final_df)
-
-reordered_df = reorder_columns(final_df)
-print("\nReordered DataFrame:")
-print(reordered_df)
