@@ -22,12 +22,35 @@ def find_column_with_spx(file_path, sheet_name):
     except Exception as e:
         return f"Error: {str(e)}"
 
+def find_last_non_empty_row(file_path, sheet_name, spx_column):
+    try:
+        # Load the workbook
+        workbook = load_workbook(file_path, data_only=True)
+
+        # Access the specified sheet
+        sheet = workbook[sheet_name]
+
+        # Iterate from the bottom up in the specified column to find the last non-empty row
+        for row in range(sheet.max_row, 0, -1):  # Start from the bottom row
+            if sheet.cell(row=row, column=spx_column).value is not None:
+                return row  # Return the row number
+
+        # If no non-empty row is found
+        return None
+
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 # Example usage
 file_path = "your_file.xlsx"  # Replace with your file path
 sheet_name = "Sheet1"  # Replace with your sheet name
 
-column_number = find_column_with_spx(file_path, sheet_name)
-if column_number:
-    print(f"'SPX' is found in column number {column_number}.")
+spx_column = find_column_with_spx(file_path, sheet_name)
+if spx_column:
+    last_row = find_last_non_empty_row(file_path, sheet_name, spx_column)
+    if last_row:
+        print(f"The last non-empty row in column {spx_column} is {last_row}.")
+    else:
+        print("No non-empty rows found in the specified column.")
 else:
     print("'SPX' was not found in the first row of the specified worksheet.")
