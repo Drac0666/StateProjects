@@ -1,30 +1,29 @@
-def clean_and_plot_row_vs_dates(df, row_key):
-    """
-    Cleans row_key by checking if it's numeric and removing commas, then plots it against the column headers (dates).
+from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 
-    Parameters:
-    df (pd.DataFrame): Input DataFrame with dates as columns.
-    row_key (str): The value in the Key column corresponding to the row to be plotted.
+# Database connection details
+db_host = "x.gan"
+db_service_name = "TDR"
+db_username = "your_username"  # Replace with your username
+db_password = "your_password"  # Replace with your password
 
-    Returns:
-    None
-    """
-    if row_key not in df['Key'].values:
-        raise ValueError(f"Row with Key '{row_key}' not found in the DataFrame.")
-    
-    # Clean row_key if numeric and remove commas
-    cleaned_row_key = row_key.replace(',', '') if row_key.replace(',', '').isnumeric() else row_key
-    
-    row = df[df['Key'] == cleaned_row_key].iloc[0, 1:]  # Exclude the 'Key' column
-    dates = row.index
-    values = pd.to_numeric(row.values, errors='coerce')  # Convert to numeric for plotting
-    
-    plt.figure(figsize=(10, 6))
-    plt.plot(dates, values, marker='o')
-    plt.title(f"Values for {cleaned_row_key} Over Dates")
-    plt.xlabel("Dates")
-    plt.ylabel("Values")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+# Connection string for Oracle database using cx_Oracle connector
+connection_string = (
+    f"oracle+cx_oracle://{db_username}:{db_password}@"
+    f"{db_host}/?service_name={db_service_name}"
+)
+
+try:
+    # Create an SQLAlchemy engine
+    engine = create_engine(connection_string)
+
+    # Test the connection
+    with engine.connect() as connection:
+        print("Connected to Oracle database successfully.")
+
+except SQLAlchemyError as e:
+    print("Error while connecting to Oracle database:", e)
+finally:
+    if 'engine' in locals():
+        engine.dispose()
+        print("Connection closed.")
