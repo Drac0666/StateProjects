@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import SQLAlchemyError
 
 # Database connection details
@@ -17,12 +17,36 @@ try:
     # Create an SQLAlchemy engine
     engine = create_engine(connection_string)
 
-    # Test the connection
+    # Test the connection and inspect metadata
     with engine.connect() as connection:
         print("Connected to Oracle database successfully.")
 
+        # Create an inspector to fetch metadata
+        inspector = inspect(engine)
+
+        # List all schemas
+        schemas = inspector.get_schema_names()
+        print("Schemas available:")
+        for schema in schemas:
+            print(f" - {schema}")
+
+        # List tables in the default schema
+        default_schema = db_username.upper()  # Usually, the username is the default schema
+        tables = inspector.get_table_names(schema=default_schema)
+        print(f"\nTables in schema '{default_schema}':")
+        for table in tables:
+            print(f" - {table}")
+
+        # Optionally, describe columns for a specific table
+        if tables:
+            print(f"\nColumns in table '{tables[0]}':")
+            columns = inspector.get_columns(tables[0], schema=default_schema)
+            for column in columns:
+                print(f" - {column['name']} ({column['type']})")
+
 except SQLAlchemyError as e:
     print("Error while connecting to Oracle database:", e)
+
 finally:
     if 'engine' in locals():
         engine.dispose()
