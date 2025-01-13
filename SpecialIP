@@ -1,1 +1,18 @@
-df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
+from openpyxl import Workbook
+from openpyxl.styles import NamedStyle
+
+# Create a workbook and add a worksheet
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "ExampleSheet"
+
+# Add a value to a specific cell
+cell = sheet.cell(row=1, column=1, value="2024-12-31")
+
+# Set the cell to be treated as a date
+cell.number_format = "yyyy-mm-dd"  # This applies the desired date format
+
+# Save the workbook
+file_path = "example.xlsx"
+workbook.save(file_path)
+print(f"Saved to {file_path}")
