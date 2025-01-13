@@ -1,56 +1,33 @@
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import SQLAlchemyError
+from openpyxl import load_workbook
 
-# Database connection details
-db_host = "x.gan"
-db_service_name = "TDR"
-db_username = "your_username"  # Replace with your username
-db_password = "your_password"  # Replace with your password
+def find_column_with_spx(file_path, sheet_name):
+    try:
+        # Load the workbook
+        workbook = load_workbook(file_path, data_only=True)
 
-# Connection string for Oracle database using cx_Oracle connector
-connection_string = (
-    f"oracle+cx_oracle://{db_username}:{db_password}@"
-    f"{db_host}/?service_name={db_service_name}"
-)
+        # Access the specified sheet
+        if sheet_name not in workbook.sheetnames:
+            raise ValueError(f"Sheet '{sheet_name}' not found in the workbook.")
+        
+        sheet = workbook[sheet_name]
 
-try:
-    # Create an SQLAlchemy engine
-    engine = create_engine(connection_string)
+        # Iterate through the first row to find the column with "SPX"
+        for col in sheet.iter_cols(min_row=1, max_row=1, min_col=1):
+            if col[0].value == "SPX":
+                return col[0].column  # Return the column index (1-based)
 
-    # Test the connection and inspect metadata
-    with engine.connect() as connection:
-        print("Connected to Oracle database successfully.")
+        # If "SPX" is not found
+        return None
 
-        # Create an inspector to fetch metadata
-        inspector = inspect(engine)
+    except Exception as e:
+        return f"Error: {str(e)}"
 
-        # Check if 'mdd' table exists
-        default_schema = db_username.upper()  # Default schema is typically the username
-        tables = inspector.get_table_names(schema=default_schema)
+# Example usage
+file_path = "your_file.xlsx"  # Replace with your file path
+sheet_name = "Sheet1"  # Replace with your sheet name
 
-        if "mdd" in tables:
-            print(f"Table 'mdd' exists in schema '{default_schema}'.")
-
-            # Fetch column details
-            print("Columns in 'mdd':")
-            columns = inspector.get_columns("mdd", schema=default_schema)
-            for column in columns:
-                print(f" - {column['name']} ({column['type']})")
-
-            # Optionally, preview the first few rows of the table
-            print("\nPreviewing data from 'mdd':")
-            query = text("SELECT * FROM mdd FETCH FIRST 10 ROWS ONLY")
-            result = connection.execute(query)
-            for row in result:
-                print(row)
-
-        else:
-            print(f"Table 'mdd' does not exist in schema '{default_schema}'.")
-
-except SQLAlchemyError as e:
-    print("Error while connecting to Oracle database:", e)
-
-finally:
-    if 'engine' in locals():
-        engine.dispose()
-        print("Connection closed.")
+column_number = find_column_with_spx(file_path, sheet_name)
+if column_number:
+    print(f"'SPX' is found in column number {column_number}.")
+else:
+    print("'SPX' was not found in the first row of the specified worksheet.")
