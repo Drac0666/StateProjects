@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 # Database connection details
@@ -24,25 +24,28 @@ try:
         # Create an inspector to fetch metadata
         inspector = inspect(engine)
 
-        # List all schemas
-        schemas = inspector.get_schema_names()
-        print("Schemas available:")
-        for schema in schemas:
-            print(f" - {schema}")
-
-        # List tables in the default schema
-        default_schema = db_username.upper()  # Usually, the username is the default schema
+        # Check if 'mdd' table exists
+        default_schema = db_username.upper()  # Default schema is typically the username
         tables = inspector.get_table_names(schema=default_schema)
-        print(f"\nTables in schema '{default_schema}':")
-        for table in tables:
-            print(f" - {table}")
 
-        # Optionally, describe columns for a specific table
-        if tables:
-            print(f"\nColumns in table '{tables[0]}':")
-            columns = inspector.get_columns(tables[0], schema=default_schema)
+        if "mdd" in tables:
+            print(f"Table 'mdd' exists in schema '{default_schema}'.")
+
+            # Fetch column details
+            print("Columns in 'mdd':")
+            columns = inspector.get_columns("mdd", schema=default_schema)
             for column in columns:
                 print(f" - {column['name']} ({column['type']})")
+
+            # Optionally, preview the first few rows of the table
+            print("\nPreviewing data from 'mdd':")
+            query = text("SELECT * FROM mdd FETCH FIRST 10 ROWS ONLY")
+            result = connection.execute(query)
+            for row in result:
+                print(row)
+
+        else:
+            print(f"Table 'mdd' does not exist in schema '{default_schema}'.")
 
 except SQLAlchemyError as e:
     print("Error while connecting to Oracle database:", e)
