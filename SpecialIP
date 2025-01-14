@@ -1,69 +1,48 @@
 import pandas as pd
+import numpy as np
 
-# Sample DataFrame creation (Replace this with your Excel file path)
-data = {
-    "CUSIP": ["12345", "67890", "11223"],
-    "GROUP": ["||1|2|\"Pooled\"|\"RAKE\"|", "||1|2|\"TRUST\"|", "||1|2|3|4|"],
-    "LTV": ["||10|20|30|40|", "||15|25|35|", "||5|10|15|20|"],
-    "Column2": ["||A|B|C|D|", "||E|F|G|", "||H|I|J|K|"],
-    "Column3": ["X-3.6%|K-15%|F-2.5%", "X-5%|F-4.2%", "K-10%|X-2.3%"]
-}
-df = pd.DataFrame(data)
+def monte_carlo_paths():
+    input_path = r"\\malpw1024\CreditOffice\Treasury Risk Team\FX Risk\FX Simulations\FX VaR Tool\input.xlsx"
 
-# Function to process the GROUP column and corresponding values from multiple columns
-def process_group_values(row):
-    if pd.isna(row['GROUP']):
-        return row['LTV'].split('|')[-2] if '|' in row['LTV'] else row['LTV'], \
-               row['Column2'].split('|')[-2] if '|' in row['Column2'] else row['Column2'], \
-               extract_f_value(row['Column3'], -1)
+    # Load input data
+    input_workbook = pd.ExcelFile(input_path)
+    rates_input = input_workbook.parse("rates input")
+    parameters = input_workbook.parse("parameters")
+    rate_change = input_workbook.parse("rate_change")
 
-    try:
-        group_parts = row['GROUP'].split('|')
-        ltv_parts = row['LTV'].split('|')
-        col2_parts = row['Column2'].split('|')
-        col3_parts = row['Column3'].split('|')
-    except AttributeError:
-        return "Recheck data - Invalid format", "Recheck data - Invalid format", "Recheck data - Invalid format"
+    search_date = pd.to_datetime("2002-01-02")
+    found_point = rates_input[rates_input.iloc[:, 0] == search_date]
 
-    try:
-        if '"Pooled"' in group_parts:
-            index = group_parts.index('"Pooled"')
-        elif '"TRUST"' in group_parts:
-            index = group_parts.index('"TRUST"')
-        else:
-            return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'], -1)
+    if found_point.empty:
+        print(f"Value {search_date} not found in Column A.")
+        return
 
-        return (
-            ltv_parts[index] if index < len(ltv_parts) else "Recheck data - Total?",
-            col2_parts[index] if index < len(col2_parts) else "Recheck data - Total?",
-            extract_f_value(row['Column3'], index)
-        )
-    except IndexError:
-        return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'], -1)
+    data_points = found_point.index[0]
+    data = rate_change.iloc[:data_points, 1:].to_numpy()
 
-# Function to extract the value next to "F" in Column3 using the same logic
-# If the index is valid, search for "F" at that index; otherwise, search in the entire column
-# Ensure only the value next to "F" is returned, removing any extra content
+    currencies_num = int(parameters.iloc[0, 1])
+    paths = int(parameters.iloc[1, 1])
 
-def extract_f_value(col3, index):
-    try:
-        parts = col3.split('|')
-        if index >= 0 and index < len(parts):
-            part = parts[index]
-            if 'F-' in part:
-                return part.split('F-')[1].split()[0]  # Extract only the first portion after "F-"
-        for part in parts:
-            if 'F-' in part:
-                return part.split('F-')[1].split()[0]  # Extract only the first portion after "F-"
-        return "0?"
-    except Exception:
-        return "0?"
+    results_var = np.zeros((2, 6, currencies_num, 2))
 
-# Apply the function to create new columns
-df[['X_LTV', 'X_Column2', 'X_Column3']] = df.apply(lambda row: pd.Series(process_group_values(row)), axis=1)
+    for n in range(currencies_num):
+        path_results = np.zeros((paths,))
 
-# Save to Excel (Replace with desired file path)
-df.to_excel("output.xlsx", index=False)
+        # Simulate paths
+        for i in range(paths):
+            new_product = np.prod(np.random.choice(data[:, n], 20) * np.random.random(20) + 0.5)
+            new_product *= np.prod(np.random.choice(data[:, n], 232))
+            path_results[i] = new_product
 
-# Display the resulting DataFrame
-print(df)
+        # Sort and calculate VaR
+        path_results.sort()
+        for level, percentile in enumerate([0.99, 0.995, 0.999, 0.9995, 0.9998, 0.95]):
+            lower_idx = int((1 - percentile) * paths)
+            upper_idx = int(percentile * paths) - 1
+            results_var[0, level, n, 0] = path_results[lower_idx]  # Long VaR
+            results_var[0, level, n, 1] = path_results[upper_idx]  # Short VaR
+
+    print("Monte Carlo simulation completed.")
+
+# Call the function
+monte_carlo_paths()
