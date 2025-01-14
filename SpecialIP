@@ -147,3 +147,41 @@ process_excel_button.pack(pady=20)
 
 # Run the GUI application
 app.mainloop()
+
+
+import pandas as pd
+
+# Sample DataFrame creation (Replace this with your Excel file path)
+data = {
+    "CUSIP": ["12345", "67890", "11223"],
+    "GROUP": ["||1|2|\"Pooled\"|\"RAKE\"|", "||1|2|\"TRUST\"|", "||1|2|3|4|"],
+    "LTV": ["||10|20|30|40|", "||15|25|35|", "||5|10|15|20|"]
+}
+df = pd.DataFrame(data)
+
+# Function to process the GROUP and LTV columns
+def process_group_ltv(row):
+    group_parts = row['GROUP'].split('|')
+    ltv_parts = row['LTV'].split('|')
+
+    try:
+        if '"Pooled"' in group_parts:
+            index = group_parts.index('"Pooled"')
+            return ltv_parts[index]
+        elif '"TRUST"' in group_parts:
+            index = group_parts.index('"TRUST"')
+            return ltv_parts[index]
+        else:
+            return "Recheck data - Total?"
+    except IndexError:
+        return "Recheck data - Total?"
+
+# Apply the function to create the new column 'X'
+df['X'] = df.apply(process_group_ltv, axis=1)
+
+# Save to Excel (Replace with desired file path)
+df.to_excel("output.xlsx", index=False)
+
+# Display the resulting DataFrame
+print(df)
+
