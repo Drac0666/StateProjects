@@ -13,12 +13,13 @@ df = pd.DataFrame(data)
 # Function to process the GROUP column and corresponding values from multiple columns
 def process_group_values(row):
     if not row['GROUP']:
-        return row['LTV'], row['Column2'], extract_f_value(row['Column3'])
+        return row['LTV'], row['Column2'], extract_f_value(row['Column3'], -1)
 
     try:
         group_parts = row['GROUP'].split('|')
         ltv_parts = row['LTV'].split('|')
         col2_parts = row['Column2'].split('|')
+        col3_parts = row['Column3'].split('|')
     except AttributeError:
         return "Recheck data - Invalid format", "Recheck data - Invalid format", "Recheck data - Invalid format"
 
@@ -28,20 +29,26 @@ def process_group_values(row):
         elif '"TRUST"' in group_parts:
             index = group_parts.index('"TRUST"')
         else:
-            return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'])
+            return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'], -1)
 
         return (
             ltv_parts[index] if index < len(ltv_parts) else "Recheck data - Total?",
             col2_parts[index] if index < len(col2_parts) else "Recheck data - Total?",
-            extract_f_value(row['Column3'])
+            extract_f_value(row['Column3'], index)
         )
     except IndexError:
-        return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'])
+        return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'], -1)
 
-# Function to extract the value next to "F" in Column3
-def extract_f_value(col3):
+# Function to extract the value next to "F" in Column3 using the same logic
+# If the index is invalid (-1), fall back to looking for "F" directly
+
+def extract_f_value(col3, index):
     try:
         parts = col3.split('|')
+        if index >= 0 and index < len(parts):
+            part = parts[index]
+            if part.startswith('F-'):
+                return part.split('-')[1]
         for part in parts:
             if part.startswith('F-'):
                 return part.split('-')[1]
