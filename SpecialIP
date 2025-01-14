@@ -1,60 +1,29 @@
 import numpy as np
-import pandas as pd
+import plotly.graph_objects as go
+from plotly.io import write_image
 
-def monte_carlo_paths(input_path="input.xlsx", output_path="output.xlsx", search_date="1/2/2002"):
-  """
-  Simulates currency exchange rate paths using Monte Carlo simulation.
+# Generate random numbers
+np.random.seed(42)  # For reproducibility
+x = np.arange(1, 101)  # X-axis: 1 to 100
+y = np.random.randint(1, 100, size=100)  # Y-axis: Random numbers
 
-  Args:
-    input_path: Path to the input Excel file containing historical data.
-    output_path: Path to the output Excel file (not used in this implementation).
-    search_date: Date to find the starting point for historical data (format: "DD/MM/YYYY").
-  """
+# Create a line plot using Plotly
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name='Random Line'))
 
-  # Read data from Excel (replace with your preferred method)
-  data = pd.read_excel(input_path, sheet_name="rate_change")
-  currencies_num = pd.read_excel(input_path, sheet_name="parameters").loc[0, "currencies_num"]
-  paths = pd.read_excel(input_path, sheet_name="parameters").loc[1, "Paths"]
+# Customize layout
+fig.update_layout(
+    title='Random Number Line Plot',
+    xaxis_title='X-Axis',
+    yaxis_title='Y-Axis',
+    template='plotly_white'
+)
 
-  # Find starting point for historical data
-  data_points = data[data["Date"] == search_date].index[0] + 1
+# Show the plot (optional)
+# fig.show()
 
-  # Loop through each currency
-  for currency in range(currencies_num):
-    start_time = np.datetime64("now")
+# Export the plot to PNG using Orca
+output_path = "random_line_plot.png"
+write_image(fig, output_path)
 
-    # Populate rate history
-    historical_rates = data.iloc[data_points:, currency + 1].values
-
-    # Simulate paths
-    path_results = np.zeros((2, paths))
-    for i in range(paths):
-      new_product = 1
-      for _ in range(20):
-        # Sample a historical day
-        day = int(np.random.rand() * data_points)
-        new_rate = historical_rates[day] * np.random.rand() + 0.5
-        new_product *= new_rate
-      for _ in range(22, 253):
-        # Sample a random day (adjusted for 1-based indexing)
-        new_day = int(np.random.rand() * data_points) + 0.5 + 1
-        new_rate = historical_rates[new_day - 1]
-        new_product *= new_rate
-      path_results[0, i] = new_product  # Monthly path result
-      path_results[1, i] = new_product  # Annual path result
-
-    # Calculate VaR (replace with your preferred method for sorting and percentile calculation)
-    for percentile in [1, 0.5, 0.1, 0.05, 0.02, 0.005, 5]:
-      low_quantile = int(percentile * paths / 100)
-      high_quantile = paths - low_quantile
-      results_var = np.percentile(path_results, [low_quantile, high_quantile], axis=1)
-
-    # Print results (assuming results_var is the desired output)
-    print(f"Currency {currency + 1} VaR Results:")
-    print(results_var)
-
-    end_time = np.datetime64("now")
-    print(f"Time elapsed: {end_time - start_time}")
-
-# Example usage
-monte_carlo_paths()
+print(f"Plot saved as {output_path}")
