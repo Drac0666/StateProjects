@@ -12,8 +12,10 @@ df = pd.DataFrame(data)
 
 # Function to process the GROUP column and corresponding values from multiple columns
 def process_group_values(row):
-    if not row['GROUP']:
-        return row['LTV'], row['Column2'], extract_f_value(row['Column3'], -1)
+    if pd.isna(row['GROUP']):
+        return row['LTV'].split('|')[-2] if '|' in row['LTV'] else row['LTV'], \
+               row['Column2'].split('|')[-2] if '|' in row['Column2'] else row['Column2'], \
+               extract_f_value(row['Column3'], -1)
 
     try:
         group_parts = row['GROUP'].split('|')
@@ -41,16 +43,18 @@ def process_group_values(row):
 
 # Function to extract the value next to "F" in Column3 using the same logic
 # If the index is valid, search for "F" at that index; otherwise, search in the entire column
+# Ensure only the value next to "F" is returned, removing any extra content
+
 def extract_f_value(col3, index):
     try:
         parts = col3.split('|')
         if index >= 0 and index < len(parts):
             part = parts[index]
             if 'F-' in part:
-                return part.split('F-')[1]
+                return part.split('F-')[1].split()[0]  # Extract only the first portion after "F-"
         for part in parts:
             if 'F-' in part:
-                return part.split('F-')[1]
+                return part.split('F-')[1].split()[0]  # Extract only the first portion after "F-"
         return "0?"
     except Exception:
         return "0?"
