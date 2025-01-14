@@ -40,18 +40,17 @@ def process_group_values(row):
         return "Recheck data - Total?", "Recheck data - Total?", extract_f_value(row['Column3'], -1)
 
 # Function to extract the value next to "F" in Column3 using the same logic
-# If the index is invalid (-1), fall back to looking for "F" directly
-
+# If the index is valid, search for "F" at that index; otherwise, search in the entire column
 def extract_f_value(col3, index):
     try:
         parts = col3.split('|')
         if index >= 0 and index < len(parts):
             part = parts[index]
-            if part.startswith('F-'):
-                return part.split('-')[1]
+            if 'F-' in part:
+                return part.split('F-')[1]
         for part in parts:
-            if part.startswith('F-'):
-                return part.split('-')[1]
+            if 'F-' in part:
+                return part.split('F-')[1]
         return "0?"
     except Exception:
         return "0?"
