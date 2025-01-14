@@ -1,48 +1,60 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def monte_carlo_paths():
-    input_path = r"\\malpw1024\CreditOffice\Treasury Risk Team\FX Risk\FX Simulations\FX VaR Tool\input.xlsx"
+def monte_carlo_paths(input_path="input.xlsx", output_path="output.xlsx", search_date="1/2/2002"):
+  """
+  Simulates currency exchange rate paths using Monte Carlo simulation.
 
-    # Load input data
-    input_workbook = pd.ExcelFile(input_path)
-    rates_input = input_workbook.parse("rates input")
-    parameters = input_workbook.parse("parameters")
-    rate_change = input_workbook.parse("rate_change")
+  Args:
+    input_path: Path to the input Excel file containing historical data.
+    output_path: Path to the output Excel file (not used in this implementation).
+    search_date: Date to find the starting point for historical data (format: "DD/MM/YYYY").
+  """
 
-    search_date = pd.to_datetime("2002-01-02")
-    found_point = rates_input[rates_input.iloc[:, 0] == search_date]
+  # Read data from Excel (replace with your preferred method)
+  data = pd.read_excel(input_path, sheet_name="rate_change")
+  currencies_num = pd.read_excel(input_path, sheet_name="parameters").loc[0, "currencies_num"]
+  paths = pd.read_excel(input_path, sheet_name="parameters").loc[1, "Paths"]
 
-    if found_point.empty:
-        print(f"Value {search_date} not found in Column A.")
-        return
+  # Find starting point for historical data
+  data_points = data[data["Date"] == search_date].index[0] + 1
 
-    data_points = found_point.index[0]
-    data = rate_change.iloc[:data_points, 1:].to_numpy()
+  # Loop through each currency
+  for currency in range(currencies_num):
+    start_time = np.datetime64("now")
 
-    currencies_num = int(parameters.iloc[0, 1])
-    paths = int(parameters.iloc[1, 1])
+    # Populate rate history
+    historical_rates = data.iloc[data_points:, currency + 1].values
 
-    results_var = np.zeros((2, 6, currencies_num, 2))
+    # Simulate paths
+    path_results = np.zeros((2, paths))
+    for i in range(paths):
+      new_product = 1
+      for _ in range(20):
+        # Sample a historical day
+        day = int(np.random.rand() * data_points)
+        new_rate = historical_rates[day] * np.random.rand() + 0.5
+        new_product *= new_rate
+      for _ in range(22, 253):
+        # Sample a random day (adjusted for 1-based indexing)
+        new_day = int(np.random.rand() * data_points) + 0.5 + 1
+        new_rate = historical_rates[new_day - 1]
+        new_product *= new_rate
+      path_results[0, i] = new_product  # Monthly path result
+      path_results[1, i] = new_product  # Annual path result
 
-    for n in range(currencies_num):
-        path_results = np.zeros((paths,))
+    # Calculate VaR (replace with your preferred method for sorting and percentile calculation)
+    for percentile in [1, 0.5, 0.1, 0.05, 0.02, 0.005, 5]:
+      low_quantile = int(percentile * paths / 100)
+      high_quantile = paths - low_quantile
+      results_var = np.percentile(path_results, [low_quantile, high_quantile], axis=1)
 
-        # Simulate paths
-        for i in range(paths):
-            new_product = np.prod(np.random.choice(data[:, n], 20) * np.random.random(20) + 0.5)
-            new_product *= np.prod(np.random.choice(data[:, n], 232))
-            path_results[i] = new_product
+    # Print results (assuming results_var is the desired output)
+    print(f"Currency {currency + 1} VaR Results:")
+    print(results_var)
 
-        # Sort and calculate VaR
-        path_results.sort()
-        for level, percentile in enumerate([0.99, 0.995, 0.999, 0.9995, 0.9998, 0.95]):
-            lower_idx = int((1 - percentile) * paths)
-            upper_idx = int(percentile * paths) - 1
-            results_var[0, level, n, 0] = path_results[lower_idx]  # Long VaR
-            results_var[0, level, n, 1] = path_results[upper_idx]  # Short VaR
+    end_time = np.datetime64("now")
+    print(f"Time elapsed: {end_time - start_time}")
 
-    print("Monte Carlo simulation completed.")
-
-# Call the function
+# Example usage
 monte_carlo_paths()
