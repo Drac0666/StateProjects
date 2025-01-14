@@ -4,35 +4,43 @@ import pandas as pd
 data = {
     "CUSIP": ["12345", "67890", "11223"],
     "GROUP": ["||1|2|\"Pooled\"|\"RAKE\"|", "||1|2|\"TRUST\"|", "||1|2|3|4|"],
-    "LTV": ["||10|20|30|40|", "||15|25|35|", "||5|10|15|20|"]
+    "LTV": ["||10|20|30|40|", "||15|25|35|", "||5|10|15|20|"],
+    "Column2": ["||A|B|C|D|", "||E|F|G|", "||H|I|J|K|"],
+    "Column3": ["||X|Y|Z|W|", "||P|Q|R|", "||L|M|N|O|"]
 }
 df = pd.DataFrame(data)
 
-# Function to process the GROUP and LTV columns
-def process_group_ltv(row):
+# Function to process the GROUP column and corresponding values from multiple columns
+def process_group_values(row):
     if not row['GROUP']:
-        return row['LTV']
+        return row['LTV'], row['Column2'], row['Column3']
 
     try:
         group_parts = row['GROUP'].split('|')
         ltv_parts = row['LTV'].split('|')
+        col2_parts = row['Column2'].split('|')
+        col3_parts = row['Column3'].split('|')
     except AttributeError:
-        return "Recheck data - Invalid format"
+        return "Recheck data - Invalid format", "Recheck data - Invalid format", "Recheck data - Invalid format"
 
     try:
         if '"Pooled"' in group_parts:
             index = group_parts.index('"Pooled"')
-            return ltv_parts[index]
         elif '"TRUST"' in group_parts:
             index = group_parts.index('"TRUST"')
-            return ltv_parts[index]
         else:
-            return "Recheck data - Total?"
-    except IndexError:
-        return "Recheck data - Total?"
+            return "Recheck data - Total?", "Recheck data - Total?", "Recheck data - Total?"
 
-# Apply the function to create the new column 'X'
-df['X'] = df.apply(process_group_ltv, axis=1)
+        return (
+            ltv_parts[index] if index < len(ltv_parts) else "Recheck data - Total?",
+            col2_parts[index] if index < len(col2_parts) else "Recheck data - Total?",
+            col3_parts[index] if index < len(col3_parts) else "Recheck data - Total?",
+        )
+    except IndexError:
+        return "Recheck data - Total?", "Recheck data - Total?", "Recheck data - Total?"
+
+# Apply the function to create new columns
+df[['X_LTV', 'X_Column2', 'X_Column3']] = df.apply(lambda row: pd.Series(process_group_values(row)), axis=1)
 
 # Save to Excel (Replace with desired file path)
 df.to_excel("output.xlsx", index=False)
