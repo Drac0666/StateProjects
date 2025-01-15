@@ -1,14 +1,16 @@
-# Reset index to prepare for final DataFrame transformation
+# Reset index to prepare for final transformation
 transformed_quantiles_df = transformed_quantiles.reset_index()
 
-# Rename the columns after resetting the index
+# Rename columns for clarity
+transformed_quantiles_df.columns.name = None  # Remove the MultiIndex column name if present
 transformed_quantiles_df.columns = ['Quantile'] + list(transformed_quantiles.columns)
 
-# Pivot for better readability (quantiles as rows, currencies as columns)
-pivot_df = transformed_quantiles_df.pivot(index='Quantile', columns=None)
+# Pivot for better readability
+pivot_df = transformed_quantiles_df.pivot(index='Quantile', columns='Currency', values='Transformed Value')
 
-# Rename index for clarity
+# Rename index and columns for clarity
 pivot_df.index.name = 'Quantile'
+pivot_df.columns.name = 'Currency'
 
 # Display the final DataFrame
 pivot_df
