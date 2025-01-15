@@ -62,3 +62,19 @@ sorted_results_df = results_df.apply(lambda col: col.sort_values().reset_index(d
 
 # Display the sorted DataFrame
 sorted_results_df
+
+
+
+# Extract original currency column names from the DataFrame
+currency_columns = [col for col in sorted_results_df.columns if 'Monthly_' in col or 'Annual_' in col]
+
+# Calculate 99.9th percentile for each currency column
+percentile_values = sorted_results_df[currency_columns].quantile(0.999)
+
+# Create a new DataFrame to display the results
+percentile_df = percentile_values.reset_index()
+percentile_df.columns = ['Currency', '99.9th Percentile Value']
+
+# Display the result
+percentile_df
+
