@@ -1,26 +1,34 @@
+import numpy as np
 import pandas as pd
 
-# Sample DataFrame
-data = {
-    'Date': ['2025-01-10', '2025-01-11', '2025-01-12', '2025-01-13'],
-    'USD': [1.0, 1.1, 1.2, 1.3],
-    'GBP': [0.8, 0.82, 0.81, 0.83],
-    'PLN': [4.0, 4.1, 4.05, 4.2],
-    'CAD': [1.25, 1.27, 1.26, 1.28],
-    'CHF': [0.9, 0.91, 0.92, 0.93]
-}
-df = pd.DataFrame(data)
+def monte_carlo_paths_numpy(data, paths):
+    """Correctly calculates Monte Carlo paths with NumPy."""
 
-# Ensure Date is sorted (if not already sorted)
-df['Date'] = pd.to_datetime(df['Date'])
-df = df.sort_values('Date')
+    if not isinstance(data, (pd.Series, np.ndarray)):
+        print("Error: data must be a pandas Series or numpy array.")
+        return None
+        
+    if isinstance(data, pd.Series):
+        data = data.values
+        
+    data_len = len(data)
+    if data_len == 0:
+        print("Error: data cannot be empty.")
+        return None
 
-# Calculate rate changes as T / T-1
-currency_columns = ['USD', 'GBP', 'PLN', 'CAD', 'CHF']
-df_rate_changes = df[['Date']].copy()  # Copy Date column
-df_rate_changes[currency_columns] = df[currency_columns].div(df[currency_columns].shift(1))
+    path_results = np.ones((2, paths))
 
-print("Original DataFrame:")
-print(df)
-print("\nDataFrame with Rate Changes (T / T-1):")
-print(df_rate_changes)
+    # Monthly paths (Vectorized)
+    random_indices = np.random.randint(0, data_len, size=(paths, 20))
+    monthly_rates = data[random_indices]
+    path_results[0, :] = np.prod(monthly_rates, axis=1)
+
+    # Annual paths (Iterating through paths, continuing from monthly)
+    for i in range(paths):
+        annual_product = path_results[0, i]  # Start with monthly product
+        for _ in range(252 - 20):
+            point = np.random.randint(0, data_len)
+            annual_product *= data[point]
+        path_results[1, i] = annual_product
+
+    return path_results
