@@ -8,20 +8,21 @@ all_quantiles = sorted(right_tail_quantiles + left_tail_quantiles)
 # Calculate quantiles for each currency column
 quantile_values = sorted_results_df[currency_columns].quantile(all_quantiles, interpolation='nearest')
 
-# Add transformed quantile values to indicate the left and right tails
-quantile_values_transformed = quantile_values.reset_index()
-quantile_values_transformed['Transformed Quantile'] = quantile_values_transformed['index'].apply(
-    lambda q: q - 1 if q >= 0.5 else 1 - q
+# Apply transformations: 1 - value for left tail, value - 1 for right tail
+transformed_quantiles = quantile_values.apply(
+    lambda value: 1 - value if value < 1 else value - 1
 )
 
-# Create a DataFrame with transformed quantiles
-quantile_df = quantile_values_transformed.pivot(
-    index='Transformed Quantile', columns='level_1', values=0
-)
+# Convert the results into a DataFrame
+transformed_quantiles_df = transformed_quantiles.reset_index()
+transformed_quantiles_df.columns = ['Quantile', 'Currency', 'Transformed Value']
 
-# Rename columns for clarity (if necessary)
-quantile_df.columns.name = 'Currency'
-quantile_df.index.name = 'Transformed Quantile'
+# Rearrange into a pivot table for readability
+pivot_df = transformed_quantiles_df.pivot(index='Quantile', columns='Currency', values='Transformed Value')
 
-# Display the result
-quantile_df
+# Rename indices and columns for clarity
+pivot_df.index.name = 'Quantile'
+pivot_df.columns.name = 'Currency'
+
+# Display the transformed quantiles DataFrame
+pivot_df
