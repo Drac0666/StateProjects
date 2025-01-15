@@ -2,16 +2,18 @@ import numpy as np
 import pandas as pd
 
 def monte_carlo_paths_numpy(data, paths):
-    """Correctly calculates Monte Carlo paths with NumPy."""
+    """Calculates Monte Carlo paths using NumPy."""
 
     if not isinstance(data, (pd.Series, np.ndarray)):
         print("Error: data must be a pandas Series or numpy array.")
         return None
         
     if isinstance(data, pd.Series):
-        data = data.values
-        
-    data_len = len(data)
+        data_array = data.to_numpy()  # Convert data to NumPy array
+    else:
+        data_array = data
+
+    data_len = len(data_array)
     if data_len == 0:
         print("Error: data cannot be empty.")
         return None
@@ -19,8 +21,8 @@ def monte_carlo_paths_numpy(data, paths):
     path_results = np.ones((2, paths))
 
     # Monthly paths (Vectorized)
-    random_indices = np.random.randint(0, data_len, size=(paths, 20))
-    monthly_rates = data[random_indices]
+    monthly_random_indicies = np.random.randint(0, data_len, size=(paths, 20))
+    monthly_rates = data_array[monthly_random_indicies]
     path_results[0, :] = np.prod(monthly_rates, axis=1)
 
     # Annual paths (Iterating through paths, continuing from monthly)
@@ -28,7 +30,7 @@ def monte_carlo_paths_numpy(data, paths):
         annual_product = path_results[0, i]  # Start with monthly product
         for _ in range(252 - 20):
             point = np.random.randint(0, data_len)
-            annual_product *= data[point]
+            annual_product *= data_array[point]
         path_results[1, i] = annual_product
 
     return path_results
