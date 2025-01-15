@@ -1,1 +1,17 @@
-all_quantiles = sorted(right_tail_quantiles + left_tail_quantiles)
+import pandas as pd
+
+# Load the Excel file
+input_file = "input_file.xlsx"  # Replace with your actual input file
+output_file = "output_file.xlsx"  # Replace with your desired output file
+
+# Read the input data
+data = pd.read_excel(input_file, sheet_name=0)
+
+# Melt the DataFrame to reshape it from wide to long format
+melted = pd.melt(
+    data,
+    id_vars=["Column Indicating Metrics"],  # Replace with the actual column name holding metrics like "99% Long VaR"
+    var_name="Currency",
+    value_name=" "}
+
+ reshaping later user
