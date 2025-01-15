@@ -1,36 +1,23 @@
 import numpy as np
-import pandas as pd
 
-def monte_carlo_paths_numpy(data, paths):
-    """Calculates Monte Carlo paths using NumPy."""
+# Assuming `data` is a pandas DataFrame or Series
+data_array = data.to_numpy()  # Convert to NumPy array for faster indexing
+num_data_points = len(data_array)
 
-    if not isinstance(data, (pd.Series, np.ndarray)):
-        print("Error: data must be a pandas Series or numpy array.")
-        return None
-        
-    if isinstance(data, pd.Series):
-        data_array = data.to_numpy()  # Convert data to NumPy array
-    else:
-        data_array = data
+# Preallocate results array for paths
+path_results = np.zeros((2, paths))
 
-    data_len = len(data_array)
-    if data_len == 0:
-        print("Error: data cannot be empty.")
-        return None
+# Generate all random indices for the loops in advance
+monthly_random_indices = np.random.randint(0, num_data_points, (paths, 20))
+annual_random_indices = np.random.randint(0, num_data_points, (paths, 231))  # 253 - 22 = 231
 
-    path_results = np.ones((2, paths))
+for i in range(paths):
+    # Monthly Path Result
+    monthly_rates = data_array[monthly_random_indices[i]]
+    monthly_product = np.prod(monthly_rates)  # Product for the monthly period
+    path_results[0, i] = monthly_product
 
-    # Monthly paths (Vectorized)
-    monthly_random_indicies = np.random.randint(0, data_len, size=(paths, 20))
-    monthly_rates = data_array[monthly_random_indicies]
-    path_results[0, :] = np.prod(monthly_rates, axis=1)
-
-    # Annual paths (Iterating through paths, continuing from monthly)
-    for i in range(paths):
-        annual_product = path_results[0, i]  # Start with monthly product
-        for _ in range(252 - 20):
-            point = np.random.randint(0, data_len)
-            annual_product *= data_array[point]
-        path_results[1, i] = annual_product
-
-    return path_results
+    # Annual Path Result (continuing from monthly product)
+    annual_rates = data_array[annual_random_indices[i]]
+    annual_product = monthly_product * np.prod(annual_rates)  # Continue from monthly
+    path_results[1, i] = annual_product
