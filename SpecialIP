@@ -1,16 +1,17 @@
-# Reset index to prepare for final transformation
-transformed_quantiles_df = transformed_quantiles.reset_index()
+# Define a dictionary to map quantile values to custom labels
+quantile_labels = {
+    0.001: 'Left 0.1%',
+    0.005: 'Left 0.5%',
+    0.010: 'Left 1%',
+    0.950: 'Right 5%',
+    0.990: 'Right 1%',
+    0.995: 'Right 0.5%',
+    0.999: 'Right 0.1%',
+    0.9999: 'Right 0.01%'
+}
 
-# Rename columns for clarity
-transformed_quantiles_df.columns.name = None  # Remove the MultiIndex column name if present
-transformed_quantiles_df.columns = ['Quantile'] + list(transformed_quantiles.columns)
+# Apply the custom labels to the 'Quantile' index
+pivot_df = pivot_df.rename(index=quantile_labels)
 
-# Pivot for better readability
-pivot_df = transformed_quantiles_df.pivot(index='Quantile', columns='Currency', values='Transformed Value')
-
-# Rename index and columns for clarity
-pivot_df.index.name = 'Quantile'
-pivot_df.columns.name = 'Currency'
-
-# Display the final DataFrame
+# Display the relabeled DataFrame
 pivot_df
