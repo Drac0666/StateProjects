@@ -1,80 +1,19 @@
-import numpy as np
+# Define the quantiles for the right tail and their complements for the left tail
+quantiles = [0.95, 0.99, 0.995, 0.999, 0.9999]
+left_tail_quantiles = [1 - q for q in quantiles]
 
-# Convert the DataFrame to a NumPy array for faster indexing
-data_array = data.values  # Assuming `data` is a pandas DataFrame with 5 columns
-num_data_points, num_columns = data_array.shape
+# Combine all quantiles
+all_quantiles = sorted(quantiles + left_tail_quantiles)
 
-# Preallocate results array for paths and columns
-path_results = np.zeros((2, paths, num_columns))  # Shape: (monthly/annual, paths, columns)
+# Calculate the quantiles for each currency column
+quantile_values = sorted_results_df[currency_columns].quantile(all_quantiles, interpolation='nearest')
 
-# Generate all random indices for the loops in advance
-monthly_random_indices = np.random.randint(0, num_data_points, (paths, 20))
-annual_random_indices = np.random.randint(0, num_data_points, (paths, 231))  # 253 - 22 = 231
+# Convert the quantiles into a DataFrame
+quantile_df = quantile_values.reset_index()
+quantile_df.columns = ['Quantile', 'Currency', 'Value']
 
-# Perform the simulation for each column
-for col in range(num_columns):
-    column_data = data_array[:, col]  # Extract the column for simulation
-
-    for i in range(paths):
-        # Monthly Path Result
-        monthly_rates = column_data[monthly_random_indices[i]]
-        monthly_product = np.prod(monthly_rates)  # Product for the monthly period
-        path_results[0, i, col] = monthly_product
-
-        # Annual Path Result (continuing from monthly product)
-        annual_rates = column_data[annual_random_indices[i]]
-        annual_product = monthly_product * np.prod(annual_rates)  # Continue from monthly
-        path_results[1, i, col] = annual_product
-import pandas as pd
-
-# Define column names for the results
-monthly_columns = [f"Monthly_Col_{col+1}" for col in range(num_columns)]
-annual_columns = [f"Annual_Col_{col+1}" for col in range(num_columns)]
-
-# Flatten the results and create a DataFrame
-monthly_results = pd.DataFrame(path_results[0], columns=monthly_columns)
-annual_results = pd.DataFrame(path_results[1], columns=annual_columns)
-
-# Combine the results into a single DataFrame
-results_df = pd.concat([monthly_results, annual_results], axis=1)
-
-# Optional: Add a path index for identification
-results_df.index.name = "Path_ID"
-
-# Sort each column individually from lowest to highest
-sorted_results_df = results_df.apply(lambda col: col.sort_values().reset_index(drop=True), axis=0)
-
-# Display sorted DataFrame
-sorted_results_df
-
-# Use the original DataFrame column names for both monthly and annual results
-original_columns = data.columns  # Get the original column names
-
-# Create DataFrames for Monthly and Annual results with appropriate column names
-monthly_results = pd.DataFrame(path_results[0], columns=[f"Monthly_{col}" for col in original_columns])
-annual_results = pd.DataFrame(path_results[1], columns=[f"Annual_{col}" for col in original_columns])
-
-# Combine the results into a single DataFrame
-results_df = pd.concat([monthly_results, annual_results], axis=1)
-
-# Sort each column individually from lowest to highest and reset index
-sorted_results_df = results_df.apply(lambda col: col.sort_values().reset_index(drop=True), axis=0)
-
-# Display the sorted DataFrame
-sorted_results_df
-
-
-
-# Extract original currency column names from the DataFrame
-currency_columns = [col for col in sorted_results_df.columns if 'Monthly_' in col or 'Annual_' in col]
-
-# Calculate 99.9th percentile for each currency column
-percentile_values = sorted_results_df[currency_columns].quantile(0.999)
-
-# Create a new DataFrame to display the results
-percentile_df = percentile_values.reset_index()
-percentile_df.columns = ['Currency', '99.9th Percentile Value']
+# Rearrange the DataFrame for better readability
+quantile_df = quantile_df.pivot(index='Quantile', columns='Currency', values='Value')
 
 # Display the result
-percentile_df
-
+quantile_df
