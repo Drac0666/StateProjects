@@ -47,3 +47,18 @@ sorted_results_df = results_df.apply(lambda col: col.sort_values().reset_index(d
 # Display sorted DataFrame
 sorted_results_df
 
+# Use the original DataFrame column names for both monthly and annual results
+original_columns = data.columns  # Get the original column names
+
+# Create DataFrames for Monthly and Annual results with appropriate column names
+monthly_results = pd.DataFrame(path_results[0], columns=[f"Monthly_{col}" for col in original_columns])
+annual_results = pd.DataFrame(path_results[1], columns=[f"Annual_{col}" for col in original_columns])
+
+# Combine the results into a single DataFrame
+results_df = pd.concat([monthly_results, annual_results], axis=1)
+
+# Sort each column individually from lowest to highest and reset index
+sorted_results_df = results_df.apply(lambda col: col.sort_values().reset_index(drop=True), axis=0)
+
+# Display the sorted DataFrame
+sorted_results_df
