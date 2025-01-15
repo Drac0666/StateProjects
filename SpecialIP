@@ -40,3 +40,10 @@ results_df = pd.concat([monthly_results, annual_results], axis=1)
 
 # Optional: Add a path index for identification
 results_df.index.name = "Path_ID"
+
+# Sort each column individually from lowest to highest
+sorted_results_df = results_df.apply(lambda col: col.sort_values().reset_index(drop=True), axis=0)
+
+# Display sorted DataFrame
+sorted_results_df
+
