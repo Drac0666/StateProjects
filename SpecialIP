@@ -25,3 +25,18 @@ for col in range(num_columns):
         annual_rates = column_data[annual_random_indices[i]]
         annual_product = monthly_product * np.prod(annual_rates)  # Continue from monthly
         path_results[1, i, col] = annual_product
+import pandas as pd
+
+# Define column names for the results
+monthly_columns = [f"Monthly_Col_{col+1}" for col in range(num_columns)]
+annual_columns = [f"Annual_Col_{col+1}" for col in range(num_columns)]
+
+# Flatten the results and create a DataFrame
+monthly_results = pd.DataFrame(path_results[0], columns=monthly_columns)
+annual_results = pd.DataFrame(path_results[1], columns=annual_columns)
+
+# Combine the results into a single DataFrame
+results_df = pd.concat([monthly_results, annual_results], axis=1)
+
+# Optional: Add a path index for identification
+results_df.index.name = "Path_ID"
