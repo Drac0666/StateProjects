@@ -1,18 +1,14 @@
-# Apply transformations to each element using applymap for DataFrame
-transformed_quantiles = quantile_values.applymap(
-    lambda value: 1 - value if value < 1 else value - 1
-)
-
-# Convert the transformed quantiles to a DataFrame
+# Reset index to prepare for final DataFrame transformation
 transformed_quantiles_df = transformed_quantiles.reset_index()
-transformed_quantiles_df.columns = ['Quantile', 'Currency', 'Transformed Value']
 
-# Pivot the DataFrame for better readability
-pivot_df = transformed_quantiles_df.pivot(index='Quantile', columns='Currency', values='Transformed Value')
+# Rename the columns after resetting the index
+transformed_quantiles_df.columns = ['Quantile'] + list(transformed_quantiles.columns)
 
-# Rename indices and columns for clarity
+# Pivot for better readability (quantiles as rows, currencies as columns)
+pivot_df = transformed_quantiles_df.pivot(index='Quantile', columns=None)
+
+# Rename index for clarity
 pivot_df.index.name = 'Quantile'
-pivot_df.columns.name = 'Currency'
 
-# Display the transformed quantiles DataFrame
+# Display the final DataFrame
 pivot_df
