@@ -1,23 +1,27 @@
 import numpy as np
 
-# Assuming `data` is a pandas DataFrame or Series
-data_array = data.to_numpy()  # Convert to NumPy array for faster indexing
-num_data_points = len(data_array)
+# Convert the DataFrame to a NumPy array for faster indexing
+data_array = data.values  # Assuming `data` is a pandas DataFrame with 5 columns
+num_data_points, num_columns = data_array.shape
 
-# Preallocate results array for paths
-path_results = np.zeros((2, paths))
+# Preallocate results array for paths and columns
+path_results = np.zeros((2, paths, num_columns))  # Shape: (monthly/annual, paths, columns)
 
 # Generate all random indices for the loops in advance
 monthly_random_indices = np.random.randint(0, num_data_points, (paths, 20))
 annual_random_indices = np.random.randint(0, num_data_points, (paths, 231))  # 253 - 22 = 231
 
-for i in range(paths):
-    # Monthly Path Result
-    monthly_rates = data_array[monthly_random_indices[i]]
-    monthly_product = np.prod(monthly_rates)  # Product for the monthly period
-    path_results[0, i] = monthly_product
+# Perform the simulation for each column
+for col in range(num_columns):
+    column_data = data_array[:, col]  # Extract the column for simulation
 
-    # Annual Path Result (continuing from monthly product)
-    annual_rates = data_array[annual_random_indices[i]]
-    annual_product = monthly_product * np.prod(annual_rates)  # Continue from monthly
-    path_results[1, i] = annual_product
+    for i in range(paths):
+        # Monthly Path Result
+        monthly_rates = column_data[monthly_random_indices[i]]
+        monthly_product = np.prod(monthly_rates)  # Product for the monthly period
+        path_results[0, i, col] = monthly_product
+
+        # Annual Path Result (continuing from monthly product)
+        annual_rates = column_data[annual_random_indices[i]]
+        annual_product = monthly_product * np.prod(annual_rates)  # Continue from monthly
+        path_results[1, i, col] = annual_product
