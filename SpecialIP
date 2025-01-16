@@ -1,17 +1,29 @@
-import pandas as pd
+import win32com.client
 
-# Load the Excel file
-input_file = "input_file.xlsx"  # Replace with your actual input file
-output_file = "output_file.xlsx"  # Replace with your desired output file
+# Open Excel
+excel = win32com.client.Dispatch("Excel.Application")
+excel.Visible = True
 
-# Read the input data
-data = pd.read_excel(input_file, sheet_name=0)
+# Open a workbook
+workbook = excel.Workbooks.Open(r"C:\path\to\your\file.xlsx")
 
-# Melt the DataFrame to reshape it from wide to long format
-melted = pd.melt(
-    data,
-    id_vars=["Column Indicating Metrics"],  # Replace with the actual column name holding metrics like "99% Long VaR"
-    var_name="Currency",
-    value_name=" "}
+# Access sensitivity label
+try:
+    # Check if sensitivity label is available (Office 365 feature)
+    sensitivity_label = workbook.SensitivityLabel
 
- reshaping later user
+    # Set a new sensitivity label
+    sensitivity_label.LabelId = "your-label-id"  # Purview classification ID
+    sensitivity_label.LabelName = "Confidential"  # Example label name
+    sensitivity_label.AssignmentMethod = 1  # Standard assignment method
+    
+    # Save changes
+    workbook.Save()
+
+    print("Sensitivity label applied successfully!")
+except Exception as e:
+    print("Failed to set sensitivity label:", e)
+finally:
+    # Clean up
+    workbook.Close(SaveChanges=True)
+    excel.Quit()
