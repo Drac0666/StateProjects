@@ -1,35 +1,38 @@
 import win32com.client
+import pandas as pd
 
-def send_calendar_invite():
-    # Email details
-    sender_email = "your_email@gmail.com"
-    recipient_email = "maciej@gmail.com"
-    subject = "ECB Rates"
-    body = "Discussion on ECB Rates"
-
-    # Calendar invite details
-    start_date = "2025-02-12"
-    start_time = "13:00"
-    end_time = "14:00"
-
+def send_calendar_invites_from_dataframe(df):
     # Create an Outlook application instance
     outlook = win32com.client.Dispatch("Outlook.Application")
 
-    # Create a new meeting request
-    appointment = outlook.CreateItem(1)  # 1 represents an AppointmentItem
-    appointment.Start = f"{start_date} {start_time}"
-    appointment.End = f"{start_date} {end_time}"
-    appointment.Subject = subject
-    appointment.Body = body
-    appointment.Location = "Online"
-    appointment.MeetingStatus = 1  # Sets the appointment as a meeting
-    
-    # Add recipient to the meeting
-    appointment.Recipients.Add(recipient_email)
+    # Loop through the DataFrame rows
+    for index, row in df.iterrows():
+        start_date = row['Date']
+        subject = row['Subject']
 
-    # Send the invitation
-    appointment.Send()
-    print("Calendar invitation sent successfully!")
+        # Define start and end times
+        start_time = "07:00"
+        end_time = "07:30"
+
+        # Create a new meeting request
+        appointment = outlook.CreateItem(1)  # 1 represents an AppointmentItem
+        appointment.Start = f"{start_date} {start_time}"
+        appointment.End = f"{start_date} {end_time}"
+        appointment.Subject = subject
+        appointment.Body = f"This is an automated event for: {subject}"
+        appointment.Location = "Online"
+        appointment.MeetingStatus = 1  # Sets the appointment as a meeting
+
+        # Send the invitation
+        appointment.Send()
+        print(f"Calendar invitation for '{subject}' on {start_date} sent successfully!")
+
+# Example DataFrame
+data = {
+    'Date': ['2025-02-12', '2025-02-13'],
+    'Subject': ['ECB Rates', 'Market Update']
+}
+df = pd.DataFrame(data)
 
 # Call the function
-send_calendar_invite()
+send_calendar_invites_from_dataframe(df)
