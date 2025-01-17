@@ -1,29 +1,35 @@
 import win32com.client
 
-# Open Excel
-excel = win32com.client.Dispatch("Excel.Application")
-excel.Visible = True
+def send_calendar_invite():
+    # Email details
+    sender_email = "your_email@gmail.com"
+    recipient_email = "maciej@gmail.com"
+    subject = "ECB Rates"
+    body = "Discussion on ECB Rates"
 
-# Open a workbook
-workbook = excel.Workbooks.Open(r"C:\path\to\your\file.xlsx")
+    # Calendar invite details
+    start_date = "2025-02-12"
+    start_time = "13:00"
+    end_time = "14:00"
 
-# Access sensitivity label
-try:
-    # Check if sensitivity label is available (Office 365 feature)
-    sensitivity_label = workbook.SensitivityLabel
+    # Create an Outlook application instance
+    outlook = win32com.client.Dispatch("Outlook.Application")
 
-    # Set a new sensitivity label
-    sensitivity_label.LabelId = "your-label-id"  # Purview classification ID
-    sensitivity_label.LabelName = "Confidential"  # Example label name
-    sensitivity_label.AssignmentMethod = 1  # Standard assignment method
+    # Create a new meeting request
+    appointment = outlook.CreateItem(1)  # 1 represents an AppointmentItem
+    appointment.Start = f"{start_date} {start_time}"
+    appointment.End = f"{start_date} {end_time}"
+    appointment.Subject = subject
+    appointment.Body = body
+    appointment.Location = "Online"
+    appointment.MeetingStatus = 1  # Sets the appointment as a meeting
     
-    # Save changes
-    workbook.Save()
+    # Add recipient to the meeting
+    appointment.Recipients.Add(recipient_email)
 
-    print("Sensitivity label applied successfully!")
-except Exception as e:
-    print("Failed to set sensitivity label:", e)
-finally:
-    # Clean up
-    workbook.Close(SaveChanges=True)
-    excel.Quit()
+    # Send the invitation
+    appointment.Send()
+    print("Calendar invitation sent successfully!")
+
+# Call the function
+send_calendar_invite()
