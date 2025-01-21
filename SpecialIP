@@ -1,1 +1,4 @@
-Issuer call assumptions are reviewed and updated annually. For all new purchases made during the interim period, please set all call options to "OFF" to ensure the most conservative approach is applied.
+SELECT OWNER, TABLE_NAME
+FROM ALL_TAB_COLUMNS
+WHERE COLUMN_NAME = 'PX_LAST'
+  AND OWNER = 'X';
