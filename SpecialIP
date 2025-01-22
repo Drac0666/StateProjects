@@ -1,4 +1,11 @@
-SELECT OWNER, TABLE_NAME
-FROM ALL_TAB_COLUMNS
-WHERE COLUMN_NAME = 'PX_LAST'
-  AND OWNER = 'X';
+Dear XYZ,
+
+We would like to follow up on the ransomware attack on Intex, which XYM previously informed you about. This incident has led to J.P. Morgan blocking access to Intex services.
+
+For SSFA, we are currently in the process of identifying an alternative solution on our end. However, we are also seeking clarification on whether this cybersecurity measure might impact processes on your side.
+
+Specifically, each time we upload a CUSIP list to the TDR system, it initiates an Intex data download and subsequently calculates the SSFA parameters. If TDR cannot connect with Intex, it may result in the absence of SSFA data in Spotfire or the database.
+
+Additionally, we would like to better understand how data is pulled on your end. Does the process involve a direct real-time connection with Intex, or is the TDR system sourcing data from files provided by Intex that can still be accessed even if the Intex service is blocked?
+
+We would appreciate your insights regarding any potential impact and steps that may need to be taken to address this.
