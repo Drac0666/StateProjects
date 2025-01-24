@@ -1,39 +1,48 @@
+import pandas as pd
 from scipy.optimize import minimize_scalar
 
-def find_W_for_target(CalculateRW, target=0.21, lower_bound=0.201):
+def find_W_for_row(row, target=0.21, lower_bound=0.201):
     """
-    Finds W such that CalculateRW(W) is as close as possible to target
-    but not less than lower_bound using scipy's minimize_scalar.
-
+    Finds W for a given row such that CalculateRW(W, row) is as close as possible to target
+    but not less than lower_bound using scipy.optimize.
+    
     Parameters:
-        CalculateRW (function): The function to evaluate.
+        row (pd.Series): The row from the DataFrame to use in CalculateRW.
         target (float): The target value for CalculateRW(W).
         lower_bound (float): The minimum allowable output for CalculateRW(W).
-
+    
     Returns:
-        float: The best W that meets the criteria.
+        float: The best W for the given row that meets the criteria.
     """
-    # Define the objective function
+    def CalculateRW(W, row):
+        # Replace this with your actual row-dependent function
+        # Example: row['param'] is some value from the DataFrame
+        return 0.2 + 0.01 * W + row.get('adjustment', 0)
+
     def objective(W):
-        value = CalculateRW(W)
-        if value < lower_bound:  # Penalize values below the lower_bound
-            return float('inf')
-        return abs(value - target)  # Minimize the absolute difference
+        result = CalculateRW(W, row)
+        # Penalize results that fall below the lower bound
+        if result < lower_bound:
+            return float('inf')  # Disqualify solutions below the threshold
+        return abs(target - result)  # Minimize the distance to the target
 
-    # Search within a reasonable range for W (adjust based on your function's behavior)
-    result = minimize_scalar(objective, bounds=(0, 10), method='bounded')
+    # Perform the optimization
+    result = minimize_scalar(objective, bounds=(0, 10), method='bounded')  # Adjust bounds as needed
 
+    # Return the W value if the optimization succeeded
     if result.success:
-        return result.x  # Optimal W
+        return result.x
     else:
-        raise ValueError("Optimization failed. Please check the function and constraints.")
+        return None  # Return None if optimization failed
 
-# Example usage:
-# Define your CalculateRW function
-def CalculateRW(W):
-    return 0.2 + 0.01 * W  # Replace this with your actual function
+# Example DataFrame
+data = {
+    'id': [1, 2, 3],
+    'adjustment': [0.0, 0.005, -0.002]  # Example adjustments for each row
+}
+df = pd.DataFrame(data)
 
-# Find the W
-result_W = find_W_for_target(CalculateRW)
-print(f"The best W is: {result_W}")
-print(f"Function output at W: {CalculateRW(result_W)}")
+# Apply the function row-wise
+df['optimal_W'] = df.apply(lambda row: find_W_for_row(row), axis=1)
+
+print(df)
