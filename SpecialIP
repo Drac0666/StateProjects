@@ -1,11 +1,39 @@
-Dear XYZ,
+from scipy.optimize import minimize_scalar
 
-We would like to follow up on the ransomware attack on Intex, which XYM previously informed you about. This incident has led to J.P. Morgan blocking access to Intex services.
+def find_W_for_target(CalculateRW, target=0.21, lower_bound=0.201):
+    """
+    Finds W such that CalculateRW(W) is as close as possible to target
+    but not less than lower_bound using scipy's minimize_scalar.
 
-For SSFA, we are currently in the process of identifying an alternative solution on our end. However, we are also seeking clarification on whether this cybersecurity measure might impact processes on your side.
+    Parameters:
+        CalculateRW (function): The function to evaluate.
+        target (float): The target value for CalculateRW(W).
+        lower_bound (float): The minimum allowable output for CalculateRW(W).
 
-Specifically, each time we upload a CUSIP list to the TDR system, it initiates an Intex data download and subsequently calculates the SSFA parameters. If TDR cannot connect with Intex, it may result in the absence of SSFA data in Spotfire or the database.
+    Returns:
+        float: The best W that meets the criteria.
+    """
+    # Define the objective function
+    def objective(W):
+        value = CalculateRW(W)
+        if value < lower_bound:  # Penalize values below the lower_bound
+            return float('inf')
+        return abs(value - target)  # Minimize the absolute difference
 
-Additionally, we would like to better understand how data is pulled on your end. Does the process involve a direct real-time connection with Intex, or is the TDR system sourcing data from files provided by Intex that can still be accessed even if the Intex service is blocked?
+    # Search within a reasonable range for W (adjust based on your function's behavior)
+    result = minimize_scalar(objective, bounds=(0, 10), method='bounded')
 
-We would appreciate your insights regarding any potential impact and steps that may need to be taken to address this.
+    if result.success:
+        return result.x  # Optimal W
+    else:
+        raise ValueError("Optimization failed. Please check the function and constraints.")
+
+# Example usage:
+# Define your CalculateRW function
+def CalculateRW(W):
+    return 0.2 + 0.01 * W  # Replace this with your actual function
+
+# Find the W
+result_W = find_W_for_target(CalculateRW)
+print(f"The best W is: {result_W}")
+print(f"Function output at W: {CalculateRW(result_W)}")
