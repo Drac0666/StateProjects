@@ -1,15 +1,14 @@
 import pandas as pd
 from scipy.optimize import minimize_scalar
 
-def optimize_row(row, target=0.2, bounds=(0.1, 0.3)):
+def optimize_row(row, target=0.2):
     """
     Optimizes W for a given row using minimize_scalar to find the value
-    where CalculateRW(W, row) is closest to the target.
+    where CalculateRW(W, row) is closest to the target, ensuring W > 0.
     
     Parameters:
         row (pd.Series): The row from the DataFrame to use in CalculateRW.
         target (float): The target value for CalculateRW(W).
-        bounds (tuple): The bounds for W optimization.
     
     Returns:
         float: The optimal W for the given row, or None if optimization fails.
@@ -19,12 +18,15 @@ def optimize_row(row, target=0.2, bounds=(0.1, 0.3)):
         return 0.2 + 0.01 * W + row.get('adjustment', 0)
 
     def objective(W):
+        if W < 0:
+            return float('inf')  # Penalize negative W
         return abs(CalculateRW(W, row) - target)
 
-    result = minimize_scalar(objective, bounds=bounds, method='bounded')
+    # Perform the optimization
+    result = minimize_scalar(objective, method='Brent')  # Brent handles unconstrained optimization well
 
     # Return the optimal W if the optimization succeeded
-    return result.x if result.success else None
+    return result.x if result.success and result.x > 0 else None
 
 # Example DataFrame
 data = {
