@@ -30,12 +30,23 @@ for i in range(len(attach_values)):
     for j in range(len(dq_values)):
         rw_values[i, j] = calculate_rw(attach_grid[i, j], dq_grid[i, j], other_params)
 
+# Create a custom colorscale
+# Colorscale is a list of [threshold, color] pairs
+# For RW > 0.2, we use red; otherwise, we use the Viridis colorscale
+colorscale = [
+    [0, 'blue'],        # RW <= 0.2
+    [0.2, 'blue'],      # RW = 0.2
+    [0.2, 'red'],       # RW > 0.2 (transition to red)
+    [1, 'red']          # RW = max value
+]
+
 # Create the 3D surface plot
 surface = go.Surface(
     x=attach_grid,
     y=dq_grid,
     z=rw_values,
-    colorscale='Viridis',  # Choose a colorscale
+    surfacecolor=rw_values,  # Use RW values to determine color
+    colorscale=colorscale,   # Apply the custom colorscale
     name='RW',
     hovertemplate=(
         '<b>Attach</b>: %{x:.2f}<br>' +
@@ -46,7 +57,7 @@ surface = go.Surface(
 )
 
 layout = go.Layout(
-    title='Sensitivity Plot: RW vs Attach and DQ',
+    title='Sensitivity Plot: RW vs Attach and DQ (Red where RW > 0.2)',
     scene=dict(
         xaxis=dict(title='Attach', range=[0, 1]),
         yaxis=dict(title='DQ', range=[0, 1]),
