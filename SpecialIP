@@ -36,7 +36,13 @@ surface = go.Surface(
     y=dq_grid,
     z=rw_values,
     colorscale='Viridis',  # Choose a colorscale
-    name='RW'
+    name='RW',
+    hovertemplate=(
+        '<b>Attach</b>: %{x:.2f}<br>' +
+        '<b>DQ</b>: %{y:.2f}<br>' +
+        '<b>RW</b>: %{z:.2f}<br>' +
+        '<extra></extra>'  # Remove the trace name from hover
+    )
 )
 
 layout = go.Layout(
