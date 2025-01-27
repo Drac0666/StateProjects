@@ -9,7 +9,7 @@ def calculate_rw(attach, dq, other_params):
     # For demonstration, let's assume RW = attach * dq * some_factor + some_constant
     some_factor = 0.5
     some_constant = 10
-    return attach * dq * some_factor + some_constant
+    return (attach * dq * some_factor + some_constant) / 100  # Convert to percentage
 
 # Define the range of Attach and DQ values
 attach_values = np.linspace(0.01, 0.99, 50)  # 50 points between 0.01 and 0.99
@@ -44,11 +44,11 @@ print(results.head())
 
 # Create a custom colorscale
 # Colorscale is a list of [threshold, color] pairs
-# For RW > 0.2, we use red; otherwise, we use the Viridis colorscale
+# For RW > 20%, we use red; otherwise, we use blue
 colorscale = [
-    [0, 'blue'],        # RW <= 0.2
-    [0.2, 'blue'],      # RW = 0.2
-    [0.2, 'red'],       # RW > 0.2 (transition to red)
+    [0, 'blue'],        # RW <= 20%
+    [0.2, 'blue'],      # RW = 20%
+    [0.2, 'red'],       # RW > 20% (transition to red)
     [1, 'red']          # RW = max value
 ]
 
@@ -61,4 +61,24 @@ surface = go.Surface(
     colorscale=colorscale,   # Apply the custom colorscale
     name='RW',
     hovertemplate=(
-        '<b>Attach</b>: %{x:.2f}<br>'
+        '<b>Attach</b>: %{x:.2f}<br>' +
+        '<b>DQ</b>: %{y:.2f}<br>' +
+        '<b>RW</b>: %{z:.1%}<br>' +  # Format RW as a percentage
+        '<extra></extra>'  # Remove the trace name from hover
+    )
+)
+
+layout = go.Layout(
+    title='Sensitivity Plot: RW vs Attach and DQ (Red where RW > 20%)',
+    scene=dict(
+        xaxis=dict(title='Attach', range=[0, 1]),
+        yaxis=dict(title='DQ', range=[0, 1]),
+        zaxis=dict(title='RW', tickformat='.0%')  # Format z-axis ticks as percentages
+    ),
+    margin=dict(l=0, r=0, b=0, t=40)
+)
+
+fig = go.Figure(data=[surface], layout=layout)
+
+# Plot the figure
+pyo.plot(fig, filename='rw_vs_attach_dq_sensitivity_plot.html')
