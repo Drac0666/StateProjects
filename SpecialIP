@@ -1,87 +1,39 @@
-import plotly.graph_objs as go
-import plotly.offline as pyo
+import plotly.graph_objects as go
 import numpy as np
-import pandas as pd
 
-# Assuming you have a function that calculates RW based on Attach and DQ
-def calculate_rw(attach, dq, other_params):
-    # Replace this with your actual calculation
-    # For demonstration, let's assume RW = attach * dq * some_factor + some_constant
-    some_factor = 0.5
-    some_constant = 10
-    return (attach * dq * some_factor + some_constant) / 100  # Convert to percentage
+# Sample data
+np.random.seed(42)
+X = np.random.rand(100)
+Y = np.random.rand(100)
+Z = np.random.rand(100)
 
-# Define the range of Attach and DQ values
-attach_values = np.linspace(0.01, 0.99, 50)  # 50 points between 0.01 and 0.99
-dq_values = np.linspace(0.01, 0.99, 50)     # 50 points between 0.01 and 0.99
+# Determine colors based on Z value
+colors = ['red' if z >= 0.2 else 'blue' for z in Z]
 
-# Create a grid of Attach and DQ values
-attach_grid, dq_grid = np.meshgrid(attach_values, dq_values)
+# Create 3D scatter plot
+fig = go.Figure()
 
-# Other parameters that your function might need
-other_params = {
-    'param1': 1.0,
-    'param2': 2.0,
-    # Add other parameters as needed
-}
+fig.add_trace(go.Scatter3d(
+    x=X,
+    y=Y,
+    z=Z,
+    mode='markers',
+    marker=dict(
+        size=5,
+        color=colors,  # Assign colors based on Z value
+        opacity=0.8
+    )
+))
 
-# Calculate RW for each combination of Attach and DQ
-rw_values = np.zeros_like(attach_grid)
-for i in range(len(attach_values)):
-    for j in range(len(dq_values)):
-        rw_values[i, j] = calculate_rw(attach_grid[i, j], dq_grid[i, j], other_params)
-
-# Store results in a DataFrame
-results = pd.DataFrame({
-    'Attach': attach_grid.flatten(),
-    'DQ': dq_grid.flatten(),
-    'RW': rw_values.flatten()
-})
-
-# Print the first few rows of the DataFrame
-print("Results DataFrame:")
-print(results.head())
-
-# Normalize RW values to the range [0, 1] for the colorscale
-rw_normalized = (rw_values - np.min(rw_values)) / (np.max(rw_values) - np.min(rw_values))
-
-# Create a custom colorscale
-# Colorscale is a list of [threshold, color] pairs
-# For RW > 20%, we use red; otherwise, we use blue
-threshold = 0.2  # 20%
-colorscale = [
-    [0, 'blue'],              # RW <= 20%
-    [threshold, 'blue'],      # RW = 20%
-    [threshold, 'red'],       # RW > 20% (transition to red)
-    [1, 'red']                # RW = max value
-]
-
-# Create the 3D surface plot
-surface = go.Surface(
-    x=attach_grid,
-    y=dq_grid,
-    z=rw_values,
-    surfacecolor=rw_values,  # Use RW values to determine color
-    colorscale=colorscale,   # Apply the custom colorscale
-    name='RW',
-    hovertemplate=(
-        '<b>Attach</b>: %{x:.2f}<br>' +
-        '<b>DQ</b>: %{y:.2f}<br>' +
-        '<b>RW</b>: %{z:.1%}<br>' +  # Format RW as a percentage
-        '<extra></extra>'  # Remove the trace name from hover
+# Update layout
+fig.update_layout(
+    title='3D Scatter Plot of X, Y, Z',
+    scene=dict(
+        xaxis_title='X-axis',
+        yaxis_title='Y-axis',
+        zaxis_title='Z-axis'
     )
 )
 
-layout = go.Layout(
-    title='Sensitivity Plot: RW vs Attach and DQ (Red where RW > 20%)',
-    scene=dict(
-        xaxis=dict(title='Attach', range=[0, 1]),
-        yaxis=dict(title='DQ', range=[0, 1]),
-        zaxis=dict(title='RW', tickformat='.0%')  # Format z-axis ticks as percentages
-    ),
-    margin=dict(l=0, r=0, b=0, t=40)
-)
-
-fig = go.Figure(data=[surface], layout=layout)
-
-# Plot the
+# Show the plot
+fig.show()
