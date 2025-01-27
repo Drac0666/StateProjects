@@ -42,14 +42,18 @@ results = pd.DataFrame({
 print("Results DataFrame:")
 print(results.head())
 
+# Normalize RW values to the range [0, 1] for the colorscale
+rw_normalized = (rw_values - np.min(rw_values)) / (np.max(rw_values) - np.min(rw_values))
+
 # Create a custom colorscale
 # Colorscale is a list of [threshold, color] pairs
 # For RW > 20%, we use red; otherwise, we use blue
+threshold = 0.2  # 20%
 colorscale = [
-    [0, 'blue'],        # RW <= 20%
-    [0.2, 'blue'],      # RW = 20%
-    [0.2, 'red'],       # RW > 20% (transition to red)
-    [1, 'red']          # RW = max value
+    [0, 'blue'],              # RW <= 20%
+    [threshold, 'blue'],      # RW = 20%
+    [threshold, 'red'],       # RW > 20% (transition to red)
+    [1, 'red']                # RW = max value
 ]
 
 # Create the 3D surface plot
@@ -80,5 +84,4 @@ layout = go.Layout(
 
 fig = go.Figure(data=[surface], layout=layout)
 
-# Plot the figure
-pyo.plot(fig, filename='rw_vs_attach_dq_sensitivity_plot.html')
+# Plot the
