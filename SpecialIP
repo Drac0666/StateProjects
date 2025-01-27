@@ -1,6 +1,7 @@
 import plotly.graph_objs as go
 import plotly.offline as pyo
 import numpy as np
+import pandas as pd
 
 # Assuming you have a function that calculates RW based on Attach and DQ
 def calculate_rw(attach, dq, other_params):
@@ -30,6 +31,17 @@ for i in range(len(attach_values)):
     for j in range(len(dq_values)):
         rw_values[i, j] = calculate_rw(attach_grid[i, j], dq_grid[i, j], other_params)
 
+# Store results in a DataFrame
+results = pd.DataFrame({
+    'Attach': attach_grid.flatten(),
+    'DQ': dq_grid.flatten(),
+    'RW': rw_values.flatten()
+})
+
+# Print the first few rows of the DataFrame
+print("Results DataFrame:")
+print(results.head())
+
 # Create a custom colorscale
 # Colorscale is a list of [threshold, color] pairs
 # For RW > 0.2, we use red; otherwise, we use the Viridis colorscale
@@ -49,24 +61,4 @@ surface = go.Surface(
     colorscale=colorscale,   # Apply the custom colorscale
     name='RW',
     hovertemplate=(
-        '<b>Attach</b>: %{x:.2f}<br>' +
-        '<b>DQ</b>: %{y:.2f}<br>' +
-        '<b>RW</b>: %{z:.2f}<br>' +
-        '<extra></extra>'  # Remove the trace name from hover
-    )
-)
-
-layout = go.Layout(
-    title='Sensitivity Plot: RW vs Attach and DQ (Red where RW > 0.2)',
-    scene=dict(
-        xaxis=dict(title='Attach', range=[0, 1]),
-        yaxis=dict(title='DQ', range=[0, 1]),
-        zaxis=dict(title='RW')
-    ),
-    margin=dict(l=0, r=0, b=0, t=40)
-)
-
-fig = go.Figure(data=[surface], layout=layout)
-
-# Plot the figure
-pyo.plot(fig, filename='rw_vs_attach_dq_sensitivity_plot.html')
+        '<b>Attach</b>: %{x:.2f}<br>'
