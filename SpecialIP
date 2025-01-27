@@ -1,41 +1,55 @@
-import pandas as pd
-from scipy.optimize import minimize_scalar
+import plotly.graph_objs as go
+import plotly.offline as pyo
+import numpy as np
 
-def optimize_row(row, target=0.2):
-    """
-    Optimizes W for a given row using minimize_scalar to find the value
-    where CalculateRW(W, row) is closest to the target, ensuring W > 0.
-    
-    Parameters:
-        row (pd.Series): The row from the DataFrame to use in CalculateRW.
-        target (float): The target value for CalculateRW(W).
-    
-    Returns:
-        float: The optimal W for the given row, or None if optimization fails.
-    """
-    def CalculateRW(W, row):
-        # Replace this with your actual row-specific function
-        return 0.2 + 0.01 * W + row.get('adjustment', 0)
+# Assuming you have a function that calculates RW based on Attach and DQ
+def calculate_rw(attach, dq, other_params):
+    # Replace this with your actual calculation
+    # For demonstration, let's assume RW = attach * dq * some_factor + some_constant
+    some_factor = 0.5
+    some_constant = 10
+    return attach * dq * some_factor + some_constant
 
-    def objective(W):
-        if W < 0:
-            return float('inf')  # Penalize negative W
-        return abs(CalculateRW(W, row) - target)
+# Define the range of Attach and DQ values
+attach_values = np.linspace(0.01, 0.99, 50)  # 50 points between 0.01 and 0.99
+dq_values = np.linspace(0.01, 0.99, 50)     # 50 points between 0.01 and 0.99
 
-    # Perform the optimization
-    result = minimize_scalar(objective, method='Brent')  # Brent handles unconstrained optimization well
+# Create a grid of Attach and DQ values
+attach_grid, dq_grid = np.meshgrid(attach_values, dq_values)
 
-    # Return the optimal W if the optimization succeeded
-    return result.x if result.success and result.x > 0 else None
-
-# Example DataFrame
-data = {
-    'id': [1, 2, 3],
-    'adjustment': [0.0, 0.005, -0.002]  # Example adjustments for each row
+# Other parameters that your function might need
+other_params = {
+    'param1': 1.0,
+    'param2': 2.0,
+    # Add other parameters as needed
 }
-df = pd.DataFrame(data)
 
-# Apply the optimization row-wise
-df['optimal_W'] = df.apply(lambda row: optimize_row(row), axis=1)
+# Calculate RW for each combination of Attach and DQ
+rw_values = np.zeros_like(attach_grid)
+for i in range(len(attach_values)):
+    for j in range(len(dq_values)):
+        rw_values[i, j] = calculate_rw(attach_grid[i, j], dq_grid[i, j], other_params)
 
-print(df)
+# Create the 3D surface plot
+surface = go.Surface(
+    x=attach_grid,
+    y=dq_grid,
+    z=rw_values,
+    colorscale='Viridis',  # Choose a colorscale
+    name='RW'
+)
+
+layout = go.Layout(
+    title='Sensitivity Plot: RW vs Attach and DQ',
+    scene=dict(
+        xaxis=dict(title='Attach', range=[0, 1]),
+        yaxis=dict(title='DQ', range=[0, 1]),
+        zaxis=dict(title='RW')
+    ),
+    margin=dict(l=0, r=0, b=0, t=40)
+)
+
+fig = go.Figure(data=[surface], layout=layout)
+
+# Plot the figure
+pyo.plot(fig, filename='rw_vs_attach_dq_sensitivity_plot.html')
