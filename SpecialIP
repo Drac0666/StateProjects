@@ -1,39 +1,46 @@
-import plotly.graph_objects as go
+import plotly.graph_objs as go
+import plotly.offline as pyo
 import numpy as np
 
-# Sample data
-np.random.seed(42)
-X = np.random.rand(100)
-Y = np.random.rand(100)
-Z = np.random.rand(100)
+# Assuming you have a function that calculates RW based on Attach
+def calculate_rw(attach, other_params):
+    # Replace this with your actual calculation
+    # For demonstration, let's assume RW = attach * some_factor + some_constant
+    some_factor = 0.5
+    some_constant = 10
+    return attach * some_factor + some_constant
 
-# Determine colors based on Z value
-colors = ['red' if z >= 0.2 else 'blue' for z in Z]
+# Define the range of Attach values from 0.01 to 0.99
+attach_values = np.linspace(0.01, 0.99, 100)  # Generates 100 points between 0.01 and 0.99
 
-# Create 3D scatter plot
-fig = go.Figure()
+# Other parameters that your function might need
+other_params = {
+    'param1': 1.0,
+    'param2': 2.0,
+    # Add other parameters as needed
+}
 
-fig.add_trace(go.Scatter3d(
-    x=X,
-    y=Y,
-    z=Z,
-    mode='markers',
-    marker=dict(
-        size=5,
-        color=colors,  # Assign colors based on Z value
-        opacity=0.8
-    )
-))
+# Calculate RW for each Attach value
+rw_values = [calculate_rw(attach, other_params) for attach in attach_values]
 
-# Update layout
-fig.update_layout(
-    title='3D Scatter Plot of X, Y, Z',
-    scene=dict(
-        xaxis_title='X-axis',
-        yaxis_title='Y-axis',
-        zaxis_title='Z-axis'
-    )
+# Create the plot
+trace = go.Scatter(
+    x=attach_values,
+    y=rw_values,
+    mode='lines+markers',
+    name='RW vs Attach',
+    line=dict(color='blue', width=2),
+    marker=dict(size=8, color='red')
 )
 
-# Show the plot
-fig.show()
+layout = go.Layout(
+    title='Sensitivity Plot: RW vs Attach',
+    xaxis=dict(title='Attach', range=[0, 1]),  # Ensure x-axis ranges from 0 to 1
+    yaxis=dict(title='RW'),
+    showlegend=True
+)
+
+fig = go.Figure(data=[trace], layout=layout)
+
+# Plot the figure
+pyo.plot(fig, filename='rw_vs_attach_sensitivity_plot.html')
