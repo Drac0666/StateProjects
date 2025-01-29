@@ -1,9 +1,8 @@
 import os
 import shutil
 import pandas as pd
-from openpyxl import load_workbook
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
+import xlwings as xw
 
 # Sample DataFrame
 data = {
@@ -19,41 +18,41 @@ mypath = r"C:\Your\Base\Path"  # Replace with your desired base path
 # Group by Final Asset Class and add Cusip_Sequence
 df['Cusip_Sequence'] = df.groupby('Final Asset Class').cumcount() + 1
 
-# Ensure base path exists
-os.makedirs(mypath, exist_ok=True)
-
-# Function to process each row
-def process_row(row):
-    final_asset_class = row["Final Asset Class"]
-    cusip = row["cusip"]
-    file_mapping = row["FileMapping"]
-    cusip_sequence = row["Cusip_Sequence"]
-
-    # Construct folder path
-    folder_path = os.path.join(mypath, final_asset_class, f"{cusip_sequence}. {cusip}")
-    os.makedirs(folder_path, exist_ok=True)
-
-    # Copy file to the folder
-    destination_file = os.path.join(folder_path, os.path.basename(file_mapping))
-    shutil.copy(file_mapping, destination_file)
-
-    # Edit the file to put cusip in cell A2
-    wb = load_workbook(destination_file)
-    ws = wb.active
-    ws["A2"] = cusip
-    wb.save(destination_file)
-
-    print(f"Processed cusip: {cusip}")
-
 # Print current time before starting
 start_time = datetime.now()
 print(f"Start time: {start_time}")
 
-# Use ThreadPoolExecutor for multithreading
-with ThreadPoolExecutor() as executor:
-    futures = [executor.submit(process_row, row) for _, row in df.iterrows()]
-    for future in futures:
-        future.result()  # Wait for each thread to complete
+# Iterate over the DataFrame rows
+paths = []
+for idx, row in df.iterrows():
+    print(f"Processing row {idx + 1}/{len(df)}: cusip={row['cusip']}")
+    
+    final_asset_class = row["Final Asset Class"]
+    cusip = row["cusip"]
+    file_mapping = row["FileMapping"]
+    cusip_sequence = row["Cusip_Sequence"]
+    
+    # Construct folder path
+    folder_path = os.path.join(mypath, final_asset_class, f"{cusip_sequence}. {cusip}")
+    os.makedirs(folder_path, exist_ok=True)
+    
+    # Copy file to the folder
+    destination_file = os.path.join(folder_path, os.path.basename(file_mapping))
+    shutil.copy(file_mapping, destination_file)
+    
+    # Edit the file using xlwings
+    with xw.App(visible=False) as app:
+        wb = app.books.open(destination_file)
+        sheet = wb.sheets[0]
+        sheet.range("A2").value = cusip
+        wb.save()
+        wb.close()
+
+    # Add the destination path to the list
+    paths.append(destination_file)
+
+# Add the PATH column to the DataFrame
+df["PATH"] = paths
 
 # Print current time after finishing
 end_time = datetime.now()
@@ -66,3 +65,8 @@ print(f"Total execution time: {total_time}")
 # Estimate time per row
 time_per_row = total_time / len(df)
 print(f"Estimated time per row: {time_per_row}")
+
+# Save the processed DataFrame (optional)
+df.to_csv("processed_files.csv", index=False)
+
+print("Processing completed!")
