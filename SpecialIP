@@ -1,46 +1,14 @@
-import plotly.graph_objs as go
-import plotly.offline as pyo
-import numpy as np
+import pandas as pd
 
-# Assuming you have a function that calculates RW based on Attach
-def calculate_rw(attach, other_params):
-    # Replace this with your actual calculation
-    # For demonstration, let's assume RW = attach * some_factor + some_constant
-    some_factor = 0.5
-    some_constant = 10
-    return attach * some_factor + some_constant
-
-# Define the range of Attach values from 0.01 to 0.99
-attach_values = np.linspace(0.01, 0.99, 100)  # Generates 100 points between 0.01 and 0.99
-
-# Other parameters that your function might need
-other_params = {
-    'param1': 1.0,
-    'param2': 2.0,
-    # Add other parameters as needed
+# Sample DataFrame
+data = {
+    "Final Asset Class": ["Class A", "Class A", "Class B", "Class B", "Class B", "Class C"],
+    "cusip": ["CUSIP1", "CUSIP2", "CUSIP3", "CUSIP4", "CUSIP5", "CUSIP6"]
 }
 
-# Calculate RW for each Attach value
-rw_values = [calculate_rw(attach, other_params) for attach in attach_values]
+df = pd.DataFrame(data)
 
-# Create the plot
-trace = go.Scatter(
-    x=attach_values,
-    y=rw_values,
-    mode='lines+markers',
-    name='RW vs Attach',
-    line=dict(color='blue', width=2),
-    marker=dict(size=8, color='red')
-)
+# Group by Final Asset Class and add a new column with sequential numbers for each cusip
+df['Cusip_Sequence'] = df.groupby('Final Asset Class').cumcount() + 1
 
-layout = go.Layout(
-    title='Sensitivity Plot: RW vs Attach',
-    xaxis=dict(title='Attach', range=[0, 1]),  # Ensure x-axis ranges from 0 to 1
-    yaxis=dict(title='RW'),
-    showlegend=True
-)
-
-fig = go.Figure(data=[trace], layout=layout)
-
-# Plot the figure
-pyo.plot(fig, filename='rw_vs_attach_sensitivity_plot.html')
+print(df)
