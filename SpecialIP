@@ -3,6 +3,7 @@ import shutil
 import pandas as pd
 from openpyxl import load_workbook
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 # Sample DataFrame
 data = {
@@ -21,32 +22,40 @@ df['Cusip_Sequence'] = df.groupby('Final Asset Class').cumcount() + 1
 # Ensure base path exists
 os.makedirs(mypath, exist_ok=True)
 
-# Print current time before starting the loop
-start_time = datetime.now()
-print(f"Start time: {start_time}")
-
-# Iterate over the DataFrame rows
-for idx, row in df.iterrows():
+# Function to process each row
+def process_row(row):
     final_asset_class = row["Final Asset Class"]
     cusip = row["cusip"]
     file_mapping = row["FileMapping"]
     cusip_sequence = row["Cusip_Sequence"]
-    
+
     # Construct folder path
     folder_path = os.path.join(mypath, final_asset_class, f"{cusip_sequence}. {cusip}")
     os.makedirs(folder_path, exist_ok=True)
-    
+
     # Copy file to the folder
     destination_file = os.path.join(folder_path, os.path.basename(file_mapping))
     shutil.copy(file_mapping, destination_file)
-    
+
     # Edit the file to put cusip in cell A2
     wb = load_workbook(destination_file)
     ws = wb.active
     ws["A2"] = cusip
     wb.save(destination_file)
 
-# Print current time after the loop
+    print(f"Processed cusip: {cusip}")
+
+# Print current time before starting
+start_time = datetime.now()
+print(f"Start time: {start_time}")
+
+# Use ThreadPoolExecutor for multithreading
+with ThreadPoolExecutor() as executor:
+    futures = [executor.submit(process_row, row) for _, row in df.iterrows()]
+    for future in futures:
+        future.result()  # Wait for each thread to complete
+
+# Print current time after finishing
 end_time = datetime.now()
 print(f"End time: {end_time}")
 
