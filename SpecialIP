@@ -2,6 +2,7 @@ import os
 import shutil
 import pandas as pd
 from openpyxl import load_workbook
+from datetime import datetime
 
 # Sample DataFrame
 data = {
@@ -20,8 +21,12 @@ df['Cusip_Sequence'] = df.groupby('Final Asset Class').cumcount() + 1
 # Ensure base path exists
 os.makedirs(mypath, exist_ok=True)
 
+# Print current time before starting the loop
+start_time = datetime.now()
+print(f"Start time: {start_time}")
+
 # Iterate over the DataFrame rows
-for _, row in df.iterrows():
+for idx, row in df.iterrows():
     final_asset_class = row["Final Asset Class"]
     cusip = row["cusip"]
     file_mapping = row["FileMapping"]
@@ -41,4 +46,14 @@ for _, row in df.iterrows():
     ws["A2"] = cusip
     wb.save(destination_file)
 
-print("Folder structure and file processing completed!")
+# Print current time after the loop
+end_time = datetime.now()
+print(f"End time: {end_time}")
+
+# Calculate execution time
+total_time = end_time - start_time
+print(f"Total execution time: {total_time}")
+
+# Estimate time per row
+time_per_row = total_time / len(df)
+print(f"Estimated time per row: {time_per_row}")
