@@ -1,14 +1,44 @@
+import os
+import shutil
 import pandas as pd
+from openpyxl import load_workbook
 
 # Sample DataFrame
 data = {
-    "Final Asset Class": ["Class A", "Class A", "Class B", "Class B", "Class B", "Class C"],
-    "cusip": ["CUSIP1", "CUSIP2", "CUSIP3", "CUSIP4", "CUSIP5", "CUSIP6"]
+    "Final Asset Class": ["Class A", "Class A", "Class B"],
+    "cusip": ["CUSIP1", "CUSIP2", "CUSIP3"],
+    "FileMapping": ["file1.xlsx", "file2.xlsx", "file3.xlsx"],
 }
-
 df = pd.DataFrame(data)
 
-# Group by Final Asset Class and add a new column with sequential numbers for each cusip
+# Base path for folder structure
+mypath = r"C:\Your\Base\Path"  # Replace with your desired base path
+
+# Group by Final Asset Class and add Cusip_Sequence
 df['Cusip_Sequence'] = df.groupby('Final Asset Class').cumcount() + 1
 
-print(df)
+# Ensure base path exists
+os.makedirs(mypath, exist_ok=True)
+
+# Iterate over the DataFrame rows
+for _, row in df.iterrows():
+    final_asset_class = row["Final Asset Class"]
+    cusip = row["cusip"]
+    file_mapping = row["FileMapping"]
+    cusip_sequence = row["Cusip_Sequence"]
+    
+    # Construct folder path
+    folder_path = os.path.join(mypath, final_asset_class, f"{cusip_sequence}. {cusip}")
+    os.makedirs(folder_path, exist_ok=True)
+    
+    # Copy file to the folder
+    destination_file = os.path.join(folder_path, os.path.basename(file_mapping))
+    shutil.copy(file_mapping, destination_file)
+    
+    # Edit the file to put cusip in cell A2
+    wb = load_workbook(destination_file)
+    ws = wb.active
+    ws["A2"] = cusip
+    wb.save(destination_file)
+
+print("Folder structure and file processing completed!")
