@@ -1,72 +1,25 @@
-import os
-import shutil
 import pandas as pd
-from datetime import datetime
-import xlwings as xw
 
-# Sample DataFrame
+def find_dash_columns(df):
+    # Melt the dataframe to make column names values under a new column
+    melted_df = df.melt(id_vars=['ISIN'], var_name='Column Name', value_name='Value')
+    
+    # Filter rows where the value is " - "
+    result_df = melted_df[melted_df['Value'] == " - "][['ISIN', 'Column Name']]
+    
+    return result_df
+
+# Example usage
 data = {
-    "Final Asset Class": ["Class A", "Class A", "Class B"],
-    "cusip": ["CUSIP1", "CUSIP2", "CUSIP3"],
-    "FileMapping": ["file1.xlsx", "file2.xlsx", "file3.xlsx"],
+    'ISIN': ['ABC123', 'DEF456', 'GHI789'],
+    'Ticket': ['T1', 'T2', 'T3'],
+    'A1': [' - ', 'X', ' - '],
+    'A2': ['Y', ' - ', 'Z'],
+    'A3': [' - ', ' - ', 'X']
 }
 df = pd.DataFrame(data)
 
-# Base path for folder structure
-mypath = r"C:\Your\Base\Path"  # Replace with your desired base path
-
-# Group by Final Asset Class and add Cusip_Sequence
-df['Cusip_Sequence'] = df.groupby('Final Asset Class').cumcount() + 1
-
-# Print current time before starting
-start_time = datetime.now()
-print(f"Start time: {start_time}")
-
-# Iterate over the DataFrame rows
-paths = []
-for idx, row in df.iterrows():
-    print(f"Processing row {idx + 1}/{len(df)}: cusip={row['cusip']}")
-    
-    final_asset_class = row["Final Asset Class"]
-    cusip = row["cusip"]
-    file_mapping = row["FileMapping"]
-    cusip_sequence = row["Cusip_Sequence"]
-    
-    # Construct folder path
-    folder_path = os.path.join(mypath, final_asset_class, f"{cusip_sequence}. {cusip}")
-    os.makedirs(folder_path, exist_ok=True)
-    
-    # Copy file to the folder
-    destination_file = os.path.join(folder_path, os.path.basename(file_mapping))
-    shutil.copy(file_mapping, destination_file)
-    
-    # Edit the file using xlwings
-    with xw.App(visible=False) as app:
-        wb = app.books.open(destination_file)
-        sheet = wb.sheets[0]
-        sheet.range("A2").value = cusip
-        wb.save()
-        wb.close()
-
-    # Add the destination path to the list
-    paths.append(destination_file)
-
-# Add the PATH column to the DataFrame
-df["PATH"] = paths
-
-# Print current time after finishing
-end_time = datetime.now()
-print(f"End time: {end_time}")
-
-# Calculate execution time
-total_time = end_time - start_time
-print(f"Total execution time: {total_time}")
-
-# Estimate time per row
-time_per_row = total_time / len(df)
-print(f"Estimated time per row: {time_per_row}")
-
-# Save the processed DataFrame (optional)
-df.to_csv("processed_files.csv", index=False)
-
-print("Processing completed!")
+# Running function and displaying output
+result_df = find_dash_columns(df)
+import ace_tools as tools
+tools.display_dataframe_to_user(name="Filtered DataFrame", dataframe=result_df)
