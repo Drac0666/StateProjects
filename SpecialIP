@@ -1,25 +1,9 @@
-import pandas as pd
+Hi John,
 
-def find_dash_columns(df):
-    # Melt the dataframe to make column names values under a new column
-    melted_df = df.melt(id_vars=['ISIN'], var_name='Column Name', value_name='Value')
-    
-    # Filter rows where the value is " - "
-    result_df = melted_df[melted_df['Value'] == " - "][['ISIN', 'Column Name']]
-    
-    return result_df
+Regarding our stock performance analysis and its correlation/trends with regions, I will conduct the necessary analysis and get back to you with the results.
 
-# Example usage
-data = {
-    'ISIN': ['ABC123', 'DEF456', 'GHI789'],
-    'Ticket': ['T1', 'T2', 'T3'],
-    'A1': [' - ', 'X', ' - '],
-    'A2': ['Y', ' - ', 'Z'],
-    'A3': [' - ', ' - ', 'X']
-}
-df = pd.DataFrame(data)
+As for your second question, we have reworked this process to run without Bloomberg, utilizing a combination of Bloomberg Back Office and the PSDL solution. I will need to obtain some identifiers to check their availability. However, expanding this report to cover additional movements may incur some extra costs.
 
-# Running function and displaying output
-result_df = find_dash_columns(df)
-import ace_tools as tools
-tools.display_dataframe_to_user(name="Filtered DataFrame", dataframe=result_df)
+Additionally, please note that data for Pacific Western Bank is no longer available as it was acquired by Bank of California. Is there anything specific you would like to see as a replacement for Pacific?
+
+Let me know your thoughts.
