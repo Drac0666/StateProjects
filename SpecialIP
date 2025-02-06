@@ -25,7 +25,7 @@ html_content = f"""
 <head>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
-<body>
+<body style="background-color: black; color: white;">
     <h2 style="text-align: center;">W_Final, Attachment & RW Trend Over Time</h2>
     
     <div style="text-align: center; margin-bottom: 10px;">
@@ -120,7 +120,7 @@ html_content = f"""
                         y: filteredData.map(row => row.RW),
                         mode: 'lines+markers',
                         name: 'RW',
-                        line: {{ dash: 'dot', color: 'blue' }}
+                        line: {{ dash: 'dot', color: 'red' }}
                     }}
                 ];
                 Plotly.newPlot('chart2', traces2, {{ title: "Attachment vs RW", template: 'plotly_dark' }});
