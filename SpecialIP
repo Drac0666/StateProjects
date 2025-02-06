@@ -14,30 +14,44 @@ df = pd.DataFrame(data)
 # Convert AsOfDate to datetime for proper plotting
 df['AsOfDate'] = pd.to_datetime(df['AsOfDate'])
 
-# Create interactive Plotly figure
+# Create a base figure
 fig = px.line(df, x='AsOfDate', y='W_Final', color='cusip',
               title="W_Final Trend Over Time",
               labels={'AsOfDate': 'As of Date', 'W_Final': 'W Final'},
               markers=True)
 
-# Add a dropdown menu to filter CUSIP dynamically
-fig.update_layout(
-    updatemenus=[{
-        "buttons": [
-            {"label": "All", "method": "update", "args": [{"visible": [True] * len(df['cusip'].unique())}]}
-        ] + [
-            {"label": cusip, "method": "update",
-             "args": [{"visible": [cusip == c for c in df['cusip']]}]}
-            for cusip in df['cusip'].unique()
-        ],
-        "direction": "down",
-        "showactive": True
-    }]
-)
+# Convert the figure to HTML and embed JavaScript for search functionality
+html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h2 style="text-align: center;">W_Final Trend Over Time</h2>
+    <div style="text-align: center;">
+        <input type="text" id="searchBox" placeholder="Search CUSIP..." onkeyup="filterData()">
+    </div>
+    <div id="chart">{fig.to_html(full_html=False, include_plotlyjs=False)}</div>
 
-# Save the interactive chart as a standalone HTML file
-html_filename = "/mnt/data/w_final_trend_interactive.html"
-pio.write_html(fig, file=html_filename, full_html=True, include_plotlyjs="cdn")
+    <script>
+        function filterData() {{
+            var searchValue = document.getElementById('searchBox').value;
+            var traces = document.getElementById('chart').data;
+            for (var i = 0; i < traces.length; i++) {{
+                traces[i].visible = searchValue === "" || traces[i].name.includes(searchValue) ? true : "legendonly";
+            }}
+            Plotly.redraw('chart');
+        }}
+    </script>
+</body>
+</html>
+"""
+
+# Save the interactive HTML file
+html_filename = "/mnt/data/w_final_trend_searchable.html"
+with open(html_filename, "w", encoding="utf-8") as f:
+    f.write(html_content)
 
 # Provide download link
 html_filename
