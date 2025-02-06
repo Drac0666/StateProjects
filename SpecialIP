@@ -1,9 +1,44 @@
-Hi John,
+import pandas as pd
+import numpy as np
 
-Regarding our stock performance analysis and its correlation/trends with regions, I will conduct the necessary analysis and get back to you with the results.
+def determine_trend(df):
+    """
+    Determines the trend (UP, DOWN, or STABLE) for column 'X' based on 'AsOfDate' within each 'cusip' group.
 
-As for your second question, we have reworked this process to run without Bloomberg, utilizing a combination of Bloomberg Back Office and the PSDL solution. I will need to obtain some identifiers to check their availability. However, expanding this report to cover additional movements may incur some extra costs.
+    :param df: pandas DataFrame containing 'AsOfDate', 'cusip', 'X', and 'Y'
+    :return: DataFrame with an additional 'X_Trend' column
+    """
+    # Sort the DataFrame by 'AsOfDate' and 'cusip'
+    df = df.sort_values(by=['cusip', 'AsOfDate'])
+    
+    # Define a function to calculate the trend for each cusip
+    def calculate_trend(group):
+        # Calculate the difference in 'X' between consecutive dates
+        trend = group['X'].diff().fillna(0)  # NaN for first row becomes 0
+        
+        # Determine the trend: UP, DOWN, or STABLE
+        group['X_Trend'] = np.where(trend > 0, 'UP',
+                             np.where(trend < 0, 'DOWN', 'STABLE'))
+        return group
 
-Additionally, please note that data for Pacific Western Bank is no longer available as it was acquired by Bank of California. Is there anything specific you would like to see as a replacement for Pacific?
+    # Apply the trend calculation to each cusip group
+    df = df.groupby('cusip', group_keys=False).apply(calculate_trend)
+    
+    return df
 
-Let me know your thoughts.
+# Example data
+data = {
+    'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02'],
+    'cusip': ['123456', '123456', '123456', '789012', '789012'],
+    'X': [100, 150, 150, 200, 100],
+    'Y': [10, 15, 15, 20, 25]
+}
+
+df = pd.DataFrame(data)
+
+# Apply the function
+df_with_trend = determine_trend(df)
+
+# Display the result
+import ace_tools as tools
+tools.display_dataframe_to_user(name="Data with X Trend", dataframe=df_with_trend)
