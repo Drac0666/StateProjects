@@ -1,42 +1,45 @@
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from ipywidgets import widgets
+from IPython.display import display
 
-def calculate_volatility_with_flag(df):
-    """
-    Computes the volatility of X and adds a RW_Change_Flag column.
-    
-    :param df: pandas DataFrame with 'AsOfDate', 'cusip', 'X', and 'RW' columns
-    :return: DataFrame with new 'Volatility' and 'RW_Change_Flag' columns
-    """
-    # Ensure data is sorted by date
-    df = df.sort_values(by=['AsOfDate'])
-    
-    # Calculate standard deviation of X per cusip
-    volatility_df = df.groupby('cusip')['X'].std().reset_index().rename(columns={'X': 'Volatility'})
-    
-    # Create RW_Change_Flag (1 if RW ever > 0.2, else 0)
-    rw_flag_df = df.groupby('cusip')['RW'].max().reset_index()
-    rw_flag_df['RW_Change_Flag'] = (rw_flag_df['RW'] > 0.2).astype(int)
-    
-    # Merge back to original df
-    df = df.merge(volatility_df, on='cusip', how='left')
-    df = df.merge(rw_flag_df[['cusip', 'RW_Change_Flag']], on='cusip', how='left')
-
-    return df
-
-# Sample Data
+# Sample Data (Replace with actual data)
 data = {
     'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02', '2024-01-03'],
     'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
-    'X': [100, 150, 120, 50, 55, 60],  # Column to detect volatility on
-    'RW': [0.1, 0.3, 0.15, 0.05, 0.1, 0.15],  # RW column to check threshold
-    'Y': ['A', 'B', 'C', 'D', 'E', 'F']
+    'W_Final': [1.2, 1.5, 1.8, 0.9, 1.0, 1.1]
 }
 
 df = pd.DataFrame(data)
 
-# Compute volatility and RW_Change_Flag
-df_with_volatility_flag = calculate_volatility_with_flag(df)
+# Convert AsOfDate to datetime for proper plotting
+df['AsOfDate'] = pd.to_datetime(df['AsOfDate'])
 
-# Display the result
-import ace_tools as tools
-tools.display_dataframe_to_user(name="Data with Volatility & RW Flag", dataframe=df_with_volatility_flag)
+# Create a dropdown search bar for cusip selection
+cusip_dropdown = widgets.Dropdown(
+    options=['All'] + sorted(df['cusip'].unique().tolist()),
+    value='All',
+    description='CUSIP:',
+    style={'description_width': 'initial'}
+)
+
+# Function to update plot based on selection
+def update_plot(cusip_selected):
+    filtered_df = df if cusip_selected == 'All' else df[df['cusip'] == cusip_selected]
+    
+    # Create line chart
+    fig = px.line(filtered_df, x='AsOfDate', y='W_Final', color='cusip',
+                  title="W_Final Trend Over Time",
+                  labels={'AsOfDate': 'As of Date', 'W_Final': 'W Final'},
+                  markers=True)
+
+    # Show interactive chart
+    fig.show()
+
+# Display search bar and plot
+display(cusip_dropdown)
+widgets.interactive(update_plot, cusip_selected=cusip_dropdown)
+
+# Show initial plot with all data
+update_plot('All')
