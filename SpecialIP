@@ -14,8 +14,8 @@ data = {
 
 df = pd.DataFrame(data)
 
-# Convert AsOfDate to datetime for proper plotting
-df['AsOfDate'] = pd.to_datetime(df['AsOfDate'])
+# Convert AsOfDate to proper format for Plotly
+df['AsOfDate'] = pd.to_datetime(df['AsOfDate']).dt.strftime('%Y-%m-%d')
 
 # Convert the figure to HTML and embed JavaScript for multi-level dropdown filtering
 html_content = f"""
@@ -41,7 +41,7 @@ html_content = f"""
     <div id="chart"></div>
 
     <script>
-        var allData = {df.to_json(orient="records")};
+        var allData = JSON.parse('{df.to_json(orient="records", date_format="iso") }');
 
         function populateDropdown(id, values) {{
             var select = document.getElementById(id);
@@ -78,14 +78,14 @@ html_content = f"""
             if (filteredData.length > 0) {{
                 var newTraces = [
                     {{
-                        x: filteredData.map(row => row.AsOfDate),
+                        x: filteredData.map(row => new Date(row.AsOfDate)),
                         y: filteredData.map(row => row.W_Final),
                         mode: 'lines+markers',
                         name: 'W_Final',
                         yaxis: 'y1'
                     }},
                     {{
-                        x: filteredData.map(row => row.AsOfDate),
+                        x: filteredData.map(row => new Date(row.AsOfDate)),
                         y: filteredData.map(row => row.RW),
                         mode: 'lines+markers',
                         name: 'RW',
@@ -95,7 +95,7 @@ html_content = f"""
                 ];
                 Plotly.newPlot('chart', newTraces, {{
                     title: "W_Final & RW Trend Over Time",
-                    xaxis: {{title: "As of Date"}},
+                    xaxis: {{title: "As of Date", type: "date"}},
                     yaxis: {{title: "W_Final", side: "left", showgrid: false}},
                     yaxis2: {{title: "RW", side: "right", overlaying: "y", showgrid: false, tickmode: "sync"}},
                     legend: {{title: "Metrics"}}
@@ -115,7 +115,7 @@ html_content = f"""
 """
 
 # Save the interactive HTML file
-html_filename = "/mnt/data/w_final_rw_multilevel_filter.html"
+html_filename = "d:\w_final_rw_multilevel_filter2.html"
 with open(html_filename, "w", encoding="utf-8") as f:
     f.write(html_content)
 
