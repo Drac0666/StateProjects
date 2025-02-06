@@ -5,6 +5,8 @@ import plotly.io as pio
 # Sample Data (Replace with actual data)
 data = {
     'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02', '2024-01-03'],
+    'FinalAssetClass': ['Equity', 'Equity', 'Equity', 'Fixed Income', 'Fixed Income', 'Fixed Income'],
+    'AlternateClassification': ['Tech', 'Tech', 'Tech', 'Government', 'Government', 'Government'],
     'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
     'W_Final': [1.2, 1.5, 1.8, 0.9, 1.0, 1.1],
     'RW': [0.3, 0.25, 0.28, 0.15, 0.18, 0.2]  # RW added for secondary axis
@@ -15,31 +17,7 @@ df = pd.DataFrame(data)
 # Convert AsOfDate to datetime for proper plotting
 df['AsOfDate'] = pd.to_datetime(df['AsOfDate'])
 
-# Select the first CUSIP to show by default
-default_cusip = df['cusip'].unique()[0]
-df_filtered = df[df['cusip'] == default_cusip]
-
-# Create figure with two y-axes
-fig = go.Figure()
-
-# Add W_Final to primary axis
-fig.add_trace(go.Scatter(x=df_filtered['AsOfDate'], y=df_filtered['W_Final'], mode='lines+markers',
-                         name='W_Final', yaxis='y1'))
-
-# Add RW to secondary axis
-fig.add_trace(go.Scatter(x=df_filtered['AsOfDate'], y=df_filtered['RW'], mode='lines+markers',
-                         name='RW', yaxis='y2', line=dict(dash='dot', color='red')))
-
-# Update layout for dual-axis
-fig.update_layout(
-    title="W_Final & RW Trend Over Time",
-    xaxis_title="As of Date",
-    yaxis=dict(title="W_Final", side="left", showgrid=False),
-    yaxis2=dict(title="RW", side="right", overlaying="y", showgrid=False, tickmode="sync"),
-    legend_title="Metrics",
-)
-
-# Convert the figure to HTML and embed JavaScript for search functionality
+# Convert the figure to HTML and embed JavaScript for multi-level dropdown filtering
 html_content = f"""
 <!DOCTYPE html>
 <html>
@@ -48,22 +26,54 @@ html_content = f"""
 </head>
 <body>
     <h2 style="text-align: center;">W_Final & RW Trend Over Time</h2>
+    
     <div style="text-align: center; margin-bottom: 10px;">
-        <input type="text" id="searchBox" placeholder="Search CUSIP..." onkeyup="filterData()" style="padding: 5px; width: 200px;">
+        <label>Final Asset Class:</label>
+        <select id="finalAssetClass" onchange="updateAlternateClassification()"></select>
+        
+        <label>Alternate Classification:</label>
+        <select id="alternateClassification" onchange="updateCusip()"></select>
+        
+        <label>CUSIP:</label>
+        <select id="cusipDropdown" onchange="filterData()"></select>
     </div>
+    
     <div id="chart"></div>
 
     <script>
-        var chartData = {fig.to_json()};  // Store the Plotly chart data
-        var allData = {df.to_json(orient="records")};  // Store the full dataset
+        var allData = {df.to_json(orient="records")};
 
-        function plotChart() {{
-            Plotly.newPlot('chart', chartData.data, chartData.layout);
+        function populateDropdown(id, values) {{
+            var select = document.getElementById(id);
+            select.innerHTML = "";
+            values.forEach(value => {{
+                var option = document.createElement("option");
+                option.value = value;
+                option.text = value;
+                select.appendChild(option);
+            }});
+        }}
+
+        function updateAlternateClassification() {{
+            var selectedFinalAsset = document.getElementById('finalAssetClass').value;
+            var filtered = allData.filter(row => row.FinalAssetClass === selectedFinalAsset);
+            var uniqueAltClasses = [...new Set(filtered.map(row => row.AlternateClassification))];
+            populateDropdown('alternateClassification', uniqueAltClasses);
+            updateCusip();
+        }}
+
+        function updateCusip() {{
+            var selectedFinalAsset = document.getElementById('finalAssetClass').value;
+            var selectedAltClass = document.getElementById('alternateClassification').value;
+            var filtered = allData.filter(row => row.FinalAssetClass === selectedFinalAsset && row.AlternateClassification === selectedAltClass);
+            var uniqueCusips = [...new Set(filtered.map(row => row.cusip))];
+            populateDropdown('cusipDropdown', uniqueCusips);
+            filterData();
         }}
 
         function filterData() {{
-            var searchValue = document.getElementById('searchBox').value.toLowerCase();
-            var filteredData = allData.filter(row => row.cusip.toLowerCase().includes(searchValue));
+            var selectedCusip = document.getElementById('cusipDropdown').value;
+            var filteredData = allData.filter(row => row.cusip === selectedCusip);
 
             if (filteredData.length > 0) {{
                 var newTraces = [
@@ -83,19 +93,29 @@ html_content = f"""
                         line: {{ dash: 'dot', color: 'red' }}
                     }}
                 ];
-
-                Plotly.react('chart', newTraces, chartData.layout);
+                Plotly.newPlot('chart', newTraces, {{
+                    title: "W_Final & RW Trend Over Time",
+                    xaxis: {{title: "As of Date"}},
+                    yaxis: {{title: "W_Final", side: "left", showgrid: false}},
+                    yaxis2: {{title: "RW", side: "right", overlaying: "y", showgrid: false, tickmode: "sync"}},
+                    legend: {{title: "Metrics"}}
+                }});
             }}
         }}
 
-        plotChart();  // Render initial chart
+        // Initialize dropdowns
+        document.addEventListener("DOMContentLoaded", function() {{
+            var uniqueFinalAssets = [...new Set(allData.map(row => row.FinalAssetClass))];
+            populateDropdown('finalAssetClass', uniqueFinalAssets);
+            updateAlternateClassification();
+        }});
     </script>
 </body>
 </html>
 """
 
 # Save the interactive HTML file
-html_filename = "/mnt/data/w_final_rw_searchable.html"
+html_filename = "/mnt/data/w_final_rw_multilevel_filter.html"
 with open(html_filename, "w", encoding="utf-8") as f:
     f.write(html_content)
 
