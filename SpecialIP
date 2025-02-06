@@ -1,11 +1,11 @@
 import pandas as pd
 
-def calculate_volatility(df):
+def calculate_volatility_with_flag(df):
     """
-    Computes the volatility of X for each cusip, using standard deviation.
+    Computes the volatility of X and adds a RW_Change_Flag column.
     
-    :param df: pandas DataFrame with 'AsOfDate', 'cusip', and 'X' columns
-    :return: DataFrame with a new 'Volatility' column indicating how much 'X' changes for each cusip
+    :param df: pandas DataFrame with 'AsOfDate', 'cusip', 'X', and 'RW' columns
+    :return: DataFrame with new 'Volatility' and 'RW_Change_Flag' columns
     """
     # Ensure data is sorted by date
     df = df.sort_values(by=['AsOfDate'])
@@ -13,9 +13,14 @@ def calculate_volatility(df):
     # Calculate standard deviation of X per cusip
     volatility_df = df.groupby('cusip')['X'].std().reset_index().rename(columns={'X': 'Volatility'})
     
-    # Merge back to original df to show volatility for each cusip
-    df = df.merge(volatility_df, on='cusip', how='left')
+    # Create RW_Change_Flag (1 if RW ever > 0.2, else 0)
+    rw_flag_df = df.groupby('cusip')['RW'].max().reset_index()
+    rw_flag_df['RW_Change_Flag'] = (rw_flag_df['RW'] > 0.2).astype(int)
     
+    # Merge back to original df
+    df = df.merge(volatility_df, on='cusip', how='left')
+    df = df.merge(rw_flag_df[['cusip', 'RW_Change_Flag']], on='cusip', how='left')
+
     return df
 
 # Sample Data
@@ -23,14 +28,15 @@ data = {
     'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02', '2024-01-03'],
     'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
     'X': [100, 150, 120, 50, 55, 60],  # Column to detect volatility on
+    'RW': [0.1, 0.3, 0.15, 0.05, 0.1, 0.15],  # RW column to check threshold
     'Y': ['A', 'B', 'C', 'D', 'E', 'F']
 }
 
 df = pd.DataFrame(data)
 
-# Calculate volatility
-df_with_volatility = calculate_volatility(df)
+# Compute volatility and RW_Change_Flag
+df_with_volatility_flag = calculate_volatility_with_flag(df)
 
 # Display the result
 import ace_tools as tools
-tools.display_dataframe_to_user(name="Data with Volatility", dataframe=df_with_volatility)
+tools.display_dataframe_to_user(name="Data with Volatility & RW Flag", dataframe=df_with_volatility_flag)
