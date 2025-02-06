@@ -1,5 +1,4 @@
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.io as pio
 
 # Sample Data (Replace with actual data)
@@ -10,7 +9,8 @@ data = {
     'AlternateClassification': ['Tech', 'Tech', 'Tech', 'Government', 'Government', 'Government'],
     'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
     'W_Final': [1.2, 1.5, 1.8, 0.9, 1.0, 1.1],
-    'RW': [0.3, 0.25, 0.28, 0.15, 0.18, 0.2]  # RW added for secondary axis
+    'RW': [0.3, 0.25, 0.28, 0.15, 0.18, 0.2],  # RW added for secondary axis
+    'Attachment': [2.0, 2.5, 2.8, 1.5, 1.8, 2.0]  # New Attachment column
 }
 
 df = pd.DataFrame(data)
@@ -26,7 +26,7 @@ html_content = f"""
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <h2 style="text-align: center;">W_Final & RW Trend Over Time</h2>
+    <h2 style="text-align: center;">W_Final, Attachment & RW Trend Over Time</h2>
     
     <div style="text-align: center; margin-bottom: 10px;">
         <label>RW Change Flag:</label>
@@ -42,7 +42,8 @@ html_content = f"""
         <select id="cusipDropdown" onchange="filterData()"></select>
     </div>
     
-    <div id="chart"></div>
+    <div id="chart1"></div>
+    <div id="chart2"></div>
 
     <script>
         var allData = JSON.parse('{df.to_json(orient="records", date_format="iso") }');
@@ -90,34 +91,42 @@ html_content = f"""
             var filteredData = allData.filter(row => row.cusip === selectedCusip);
 
             if (filteredData.length > 0) {{
-                var newTraces = [
+                var traces1 = [
                     {{
                         x: filteredData.map(row => new Date(row.AsOfDate)),
                         y: filteredData.map(row => row.W_Final),
                         mode: 'lines+markers',
-                        name: 'W_Final',
-                        yaxis: 'y1'
+                        name: 'W_Final'
                     }},
                     {{
                         x: filteredData.map(row => new Date(row.AsOfDate)),
                         y: filteredData.map(row => row.RW),
                         mode: 'lines+markers',
                         name: 'RW',
-                        yaxis: 'y2',
                         line: {{ dash: 'dot', color: 'red' }}
                     }}
                 ];
-                Plotly.newPlot('chart', newTraces, {{
-                    title: "W_Final & RW Trend Over Time",
-                    xaxis: {{title: "As of Date", type: "date"}},
-                    yaxis: {{title: "W_Final", side: "left", showgrid: false}},
-                    yaxis2: {{title: "RW", side: "right", overlaying: "y", showgrid: false, tickmode: "sync"}},
-                    legend: {{title: "Metrics"}}
-                }});
+                Plotly.newPlot('chart1', traces1, {{ title: "W_Final vs RW", template: 'plotly_dark' }});
+                
+                var traces2 = [
+                    {{
+                        x: filteredData.map(row => new Date(row.AsOfDate)),
+                        y: filteredData.map(row => row.Attachment),
+                        mode: 'lines+markers',
+                        name: 'Attachment'
+                    }},
+                    {{
+                        x: filteredData.map(row => new Date(row.AsOfDate)),
+                        y: filteredData.map(row => row.RW),
+                        mode: 'lines+markers',
+                        name: 'RW',
+                        line: {{ dash: 'dot', color: 'blue' }}
+                    }}
+                ];
+                Plotly.newPlot('chart2', traces2, {{ title: "Attachment vs RW", template: 'plotly_dark' }});
             }}
         }}
 
-        // Initialize dropdowns
         document.addEventListener("DOMContentLoaded", function() {{
             var uniqueRWFlags = [...new Set(allData.map(row => row.RW_Change_Flag))];
             populateDropdown('rwChangeFlag', uniqueRWFlags);
