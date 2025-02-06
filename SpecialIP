@@ -5,6 +5,7 @@ import plotly.io as pio
 # Sample Data (Replace with actual data)
 data = {
     'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02', '2024-01-03'],
+    'RW_Change_Flag': ['Yes', 'Yes', 'Yes', 'No', 'No', 'No'],
     'FinalAssetClass': ['Equity', 'Equity', 'Equity', 'Fixed Income', 'Fixed Income', 'Fixed Income'],
     'AlternateClassification': ['Tech', 'Tech', 'Tech', 'Government', 'Government', 'Government'],
     'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
@@ -28,6 +29,9 @@ html_content = f"""
     <h2 style="text-align: center;">W_Final & RW Trend Over Time</h2>
     
     <div style="text-align: center; margin-bottom: 10px;">
+        <label>RW Change Flag:</label>
+        <select id="rwChangeFlag" onchange="updateFinalAssetClass()"></select>
+        
         <label>Final Asset Class:</label>
         <select id="finalAssetClass" onchange="updateAlternateClassification()"></select>
         
@@ -54,18 +58,28 @@ html_content = f"""
             }});
         }}
 
+        function updateFinalAssetClass() {{
+            var selectedRWFlag = document.getElementById('rwChangeFlag').value;
+            var filtered = allData.filter(row => row.RW_Change_Flag === selectedRWFlag);
+            var uniqueFinalAssets = [...new Set(filtered.map(row => row.FinalAssetClass))];
+            populateDropdown('finalAssetClass', uniqueFinalAssets);
+            updateAlternateClassification();
+        }}
+
         function updateAlternateClassification() {{
+            var selectedRWFlag = document.getElementById('rwChangeFlag').value;
             var selectedFinalAsset = document.getElementById('finalAssetClass').value;
-            var filtered = allData.filter(row => row.FinalAssetClass === selectedFinalAsset);
+            var filtered = allData.filter(row => row.RW_Change_Flag === selectedRWFlag && row.FinalAssetClass === selectedFinalAsset);
             var uniqueAltClasses = [...new Set(filtered.map(row => row.AlternateClassification))];
             populateDropdown('alternateClassification', uniqueAltClasses);
             updateCusip();
         }}
 
         function updateCusip() {{
+            var selectedRWFlag = document.getElementById('rwChangeFlag').value;
             var selectedFinalAsset = document.getElementById('finalAssetClass').value;
             var selectedAltClass = document.getElementById('alternateClassification').value;
-            var filtered = allData.filter(row => row.FinalAssetClass === selectedFinalAsset && row.AlternateClassification === selectedAltClass);
+            var filtered = allData.filter(row => row.RW_Change_Flag === selectedRWFlag && row.FinalAssetClass === selectedFinalAsset && row.AlternateClassification === selectedAltClass);
             var uniqueCusips = [...new Set(filtered.map(row => row.cusip))];
             populateDropdown('cusipDropdown', uniqueCusips);
             filterData();
@@ -105,9 +119,9 @@ html_content = f"""
 
         // Initialize dropdowns
         document.addEventListener("DOMContentLoaded", function() {{
-            var uniqueFinalAssets = [...new Set(allData.map(row => row.FinalAssetClass))];
-            populateDropdown('finalAssetClass', uniqueFinalAssets);
-            updateAlternateClassification();
+            var uniqueRWFlags = [...new Set(allData.map(row => row.RW_Change_Flag))];
+            populateDropdown('rwChangeFlag', uniqueRWFlags);
+            updateFinalAssetClass();
         }});
     </script>
 </body>
@@ -115,7 +129,7 @@ html_content = f"""
 """
 
 # Save the interactive HTML file
-html_filename = "d:\w_final_rw_multilevel_filter2.html"
+html_filename = "/mnt/data/w_final_rw_multilevel_filter.html"
 with open(html_filename, "w", encoding="utf-8") as f:
     f.write(html_content)
 
