@@ -1,44 +1,36 @@
 import pandas as pd
-import numpy as np
 
-def determine_trend(df):
+def calculate_volatility(df):
     """
-    Determines the trend (UP, DOWN, or STABLE) for column 'X' based on 'AsOfDate' within each 'cusip' group.
-
-    :param df: pandas DataFrame containing 'AsOfDate', 'cusip', 'X', and 'Y'
-    :return: DataFrame with an additional 'X_Trend' column
-    """
-    # Sort the DataFrame by 'AsOfDate' and 'cusip'
-    df = df.sort_values(by=['cusip', 'AsOfDate'])
+    Computes the volatility of X for each cusip, using standard deviation.
     
-    # Define a function to calculate the trend for each cusip
-    def calculate_trend(group):
-        # Calculate the difference in 'X' between consecutive dates
-        trend = group['X'].diff().fillna(0)  # NaN for first row becomes 0
-        
-        # Determine the trend: UP, DOWN, or STABLE
-        group['X_Trend'] = np.where(trend > 0, 'UP',
-                             np.where(trend < 0, 'DOWN', 'STABLE'))
-        return group
-
-    # Apply the trend calculation to each cusip group
-    df = df.groupby('cusip', group_keys=False).apply(calculate_trend)
+    :param df: pandas DataFrame with 'AsOfDate', 'cusip', and 'X' columns
+    :return: DataFrame with a new 'Volatility' column indicating how much 'X' changes for each cusip
+    """
+    # Ensure data is sorted by date
+    df = df.sort_values(by=['AsOfDate'])
+    
+    # Calculate standard deviation of X per cusip
+    volatility_df = df.groupby('cusip')['X'].std().reset_index().rename(columns={'X': 'Volatility'})
+    
+    # Merge back to original df to show volatility for each cusip
+    df = df.merge(volatility_df, on='cusip', how='left')
     
     return df
 
-# Example data
+# Sample Data
 data = {
-    'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02'],
-    'cusip': ['123456', '123456', '123456', '789012', '789012'],
-    'X': [100, 150, 150, 200, 100],
-    'Y': [10, 15, 15, 20, 25]
+    'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02', '2024-01-03'],
+    'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
+    'X': [100, 150, 120, 50, 55, 60],  # Column to detect volatility on
+    'Y': ['A', 'B', 'C', 'D', 'E', 'F']
 }
 
 df = pd.DataFrame(data)
 
-# Apply the function
-df_with_trend = determine_trend(df)
+# Calculate volatility
+df_with_volatility = calculate_volatility(df)
 
 # Display the result
 import ace_tools as tools
-tools.display_dataframe_to_user(name="Data with X Trend", dataframe=df_with_trend)
+tools.display_dataframe_to_user(name="Data with Volatility", dataframe=df_with_volatility)
