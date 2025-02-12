@@ -1,51 +1,13 @@
-import logging
-import pandas as pd
-from datetime import datetime
+import numpy as np
 
-# Generate timestamped log filename
-timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-log_filename = f"Audit_{timestamp}.log"
+# Set a random seed
+seed_value = 42
+np.random.seed(seed_value)
 
-# Configure logging
-logging.basicConfig(
-    filename=log_filename,
-    level=logging.INFO,  
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filemode="w",  # Overwrite log file each time script runs
-)
+# Get the random state
+state = np.random.get_state()
 
-def log_and_print(message, level="info"):
-    """Function to log and print messages."""
-    if level == "info":
-        logging.info(message)
-    elif level == "warning":
-        logging.warning(message)
-    elif level == "error":
-        logging.error(message)
-    print(message)  # Print message to console as well
+# Extract the seed (first value of the first tuple in the state)
+retrieved_seed = state[1][0]
 
-# Load your Excel file
-try:
-    df = pd.read_excel("your_file.xlsx")  # Replace with actual file
-    log_and_print("Excel file loaded successfully.")
-
-    # Identify columns with missing values
-    missing_columns = df.columns[df.isnull().any()].tolist()
-
-    if missing_columns:
-        log_and_print(f"Columns dropped due to missing values: {missing_columns}", "warning")
-        df = df.drop(columns=missing_columns)
-    else:
-        log_and_print("No columns were dropped. No missing values found.")
-
-    # Log remaining columns
-    log_and_print(f"Remaining columns after dropping missing values: {list(df.columns)}", "info")
-
-except FileNotFoundError as e:
-    log_and_print(f"File not found error: {str(e)}", "error")
-
-except Exception as e:
-    log_and_print(f"Unexpected error: {str(e)}", "error")
-
-# Force close the log file
-logging.shutdown()
+print("Retrieved Seed:", retrieved_seed)
