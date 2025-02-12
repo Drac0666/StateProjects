@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime
 import pandas as pd
+from datetime import datetime
 
 # Generate timestamped log filename
 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -9,7 +9,7 @@ log_filename = f"Audit_{timestamp}.log"
 # Configure logging
 logging.basicConfig(
     filename=log_filename,
-    level=logging.INFO,  # Change to DEBUG for more detailed logs
+    level=logging.INFO,  
     format="%(asctime)s - %(levelname)s - %(message)s",
     filemode="w",  # Overwrite log file each time script runs
 )
@@ -24,14 +24,22 @@ def log_and_print(message, level="info"):
         logging.error(message)
     print(message)  # Print message to console as well
 
-# Example: Try to load an Excel file
+# Load your Excel file
 try:
-    df = pd.read_excel("your_file.xlsx")  # Replace with your actual file
-    log_and_print("Excel file loaded successfully.", "info")
-    
-    # Check for missing values
-    if df.isnull().sum().sum() > 0:
-        log_and_print("Warning: Missing values detected in the dataset!", "warning")
+    df = pd.read_excel("your_file.xlsx")  # Replace with actual file
+    log_and_print("Excel file loaded successfully.")
+
+    # Identify columns with missing values
+    missing_columns = df.columns[df.isnull().any()].tolist()
+
+    if missing_columns:
+        log_and_print(f"Columns dropped due to missing values: {missing_columns}", "warning")
+        df = df.drop(columns=missing_columns)
+    else:
+        log_and_print("No columns were dropped. No missing values found.")
+
+    # Log remaining columns
+    log_and_print(f"Remaining columns after dropping missing values: {list(df.columns)}", "info")
 
 except FileNotFoundError as e:
     log_and_print(f"File not found error: {str(e)}", "error")
@@ -39,119 +47,5 @@ except FileNotFoundError as e:
 except Exception as e:
     log_and_print(f"Unexpected error: {str(e)}", "error")
 
-
-
-
-
-
-
-
-import pandas as pd
-import logging
-from datetime import datetime
-
-# Generate timestamped log filename
-timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-log_filename = f"Audit_{timestamp}.log"
-
-# Setup logging
-logging.basicConfig(
-    filename=log_filename,  # Timestamped log file
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filemode="w",  # "w" to overwrite, "a" to append
-)
-
-def log_and_print(message, level="info"):
-    """Function to log and print messages."""
-    if level == "info":
-        logging.info(message)
-    elif level == "warning":
-        logging.warning(message)
-    elif level == "error":
-        logging.error(message)
-    print(message)  # Print message to console as well
-
-# Load your Excel file
-try:
-    df = pd.read_excel("your_file.xlsx")
-    log_and_print("Excel file loaded successfully.")
-except Exception as e:
-    log_and_print(f"Error loading Excel file: {str(e)}", "error")
-    exit()
-
-# General Data Overview
-log_and_print(f"Dataset contains {df.shape[0]} rows and {df.shape[1]} columns.")
-
-# Check for missing values
-missing_values = df.isnull().sum()
-missing_values = missing_values[missing_values > 0]
-if not missing_values.empty:
-    log_and_print(f"Missing values detected:\n{missing_values}", "warning
-
-
-==================
-
-
-
-
-
-import pandas as pd
-import logging
-
-# Setup logging
-logging.basicConfig(
-    filename="data_quality.log",  # Log file name
-    level=logging.INFO,  # Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    filemode="w",  # "w" to overwrite, "a" to append
-)
-
-def log_and_print(message, level="info"):
-    """Function to log and print messages."""
-    if level == "info":
-        logging.info(message)
-    elif level == "warning":
-        logging.warning(message)
-    elif level == "error":
-        logging.error(message)
-    print(message)  # Print message to console as well
-
-# Load your Excel file
-df = pd.read_excel("your_file.xlsx")
-
-# General Data Overview
-log_and_print(f"Dataset contains {df.shape[0]} rows and {df.shape[1]} columns.")
-
-# Check for missing values
-missing_values = df.isnull().sum()
-missing_values = missing_values[missing_values > 0]
-if not missing_values.empty:
-    log_and_print(f"Missing values detected:\n{missing_values}", "warning")
-else:
-    log_and_print("No missing values found.")
-
-# Check for duplicate rows
-duplicate_count = df.duplicated().sum()
-if duplicate_count > 0:
-    log_and_print(f"Warning: {duplicate_count} duplicate rows found!", "warning")
-else:
-    log_and_print("No duplicate rows found.")
-
-# Outlier Detection (Example: Using IQR for numerical columns)
-Q1 = df.quantile(0.25)
-Q3 = df.quantile(0.75)
-IQR = Q3 - Q1
-outliers = ((df < (Q1 - 1.5 * IQR)) | (df > (Q3 + 1.5 * IQR))).sum()
-outliers = outliers[outliers > 0]
-
-if not outliers.empty:
-    log_and_print(f"Potential outliers detected:\n{outliers}", "warning")
-else:
-    log_and_print("No significant outliers detected.")
-
-# Column Data Types
-log_and_print(f"Column data types:\n{df.dtypes}")
-
-# Save and close logging
-log_and_print("Data quality check completed. Logs saved to 'data_quality.log'.")
+# Force close the log file
+logging.shutdown()
