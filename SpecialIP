@@ -1,54 +1,17 @@
-import pandas as pd
+from datetime import datetime
 
-def reshape_simulation_results(df, confidence_order):
-    # Melt the dataframe to long format
-    df_reset = df.reset_index().rename(columns={'index': 'Confidence_Level'})
-    df_long = df_reset.melt(id_vars=['Confidence_Level'], var_name='Metric_Currency', value_name='Value')
-    
-    # Split the 'Metric_Currency' column into 'Metric' and 'Currency'
-    df_long[['Metric', 'Currency']] = df_long['Metric_Currency'].str.split('_', expand=True)
-    
-    # Convert Confidence_Level to categorical with custom order
-    df_long['Confidence_Level'] = pd.Categorical(df_long['Confidence_Level'], categories=confidence_order, ordered=True)
-    
-    # Sort to ensure Monthly comes before Annual, and custom Confidence Level order is maintained
-    df_long = df_long.sort_values(by=['Metric', 'Confidence_Level', 'Currency'], ascending=[False, True, True]).reset_index(drop=True)
-    
-    # Pivot the table so that currencies remain as columns
-    df_reshaped = df_long.pivot(index=['Confidence_Level', 'Metric'], columns='Currency', values='Value').reset_index()
-    
-    # Modify Confidence Level to include prefixes
-    df_reshaped['Confidence_Level'] = df_reshaped.apply(lambda row: f"1m {row['Confidence_Level']}" if row['Metric'] == 'Monthly' else f"1y {row['Confidence_Level']}", axis=1)
-    
-    # Sort for better readability: Monthly first, then Annual
-    df_reshaped = df_reshaped.sort_values(by=['Metric', 'Confidence_Level'], ascending=[False, True]).reset_index(drop=True)
-    
-    # Rename columns for clarity
-    df_reshaped.columns.name = None
-    
-    return df_reshaped
+# Record start time
+start_time = datetime.now()
+print("Start Time:", start_time)
 
-# Example usage with a sample dataframe
-data = {
-    "Monthly_USD": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    "Monthly_CHF": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-    "Monthly_GBP": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-    "Monthly_EUR": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    "Monthly_PLN": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-    "Annual_USD": [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
-    "Annual_CHF": [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130],
-    "Annual_GBP": [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140],
-    "Annual_EUR": [40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150],
-    "Annual_PLN": [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
-}
+# Some code execution (simulating with sleep)
+import time
+time.sleep(2)  # Simulate some processing delay
 
-confidence_levels = [99.9, 99.98, 99.95, 99.92, 99.85, 99.8, 99.75, 99.7, 99.65, 99.6, 99.55, 99.5]
-custom_confidence_order = [99.98, 99.95, 99.92, 99.9, 99.85, 99.8, 99.75, 99.7, 99.65, 99.6, 99.55, 99.5]  # Custom order
+# Record end time
+end_time = datetime.now()
+print("End Time:", end_time)
 
-df = pd.DataFrame(data, index=confidence_levels)
-
-reshaped_df = reshape_simulation_results(df, custom_confidence_order)
-
-# Display the reshaped dataframe
-import ace_tools as tools
-tools.display_dataframe_to_user(name="Reshaped Simulation Results", dataframe=reshaped_df)
+# Calculate duration
+duration = end_time - start_time
+print("Duration:", duration)
