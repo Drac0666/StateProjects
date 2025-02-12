@@ -1,146 +1,51 @@
 import pandas as pd
-import plotly.io as pio
 
-# Sample Data (Replace with actual data)
+def reshape_simulation_results(df, confidence_order):
+    # Melt the dataframe to long format
+    df_reset = df.reset_index().rename(columns={'index': 'Confidence_Level'})
+    df_long = df_reset.melt(id_vars=['Confidence_Level'], var_name='Metric_Currency', value_name='Value')
+    
+    # Split the 'Metric_Currency' column into 'Metric' and 'Currency'
+    df_long[['Metric', 'Currency']] = df_long['Metric_Currency'].str.split('_', expand=True)
+    
+    # Convert Confidence_Level to categorical with custom order
+    df_long['Confidence_Level'] = pd.Categorical(df_long['Confidence_Level'], categories=confidence_order, ordered=True)
+    
+    # Sort to ensure Monthly comes before Annual, and custom Confidence Level order is maintained
+    df_long = df_long.sort_values(by=['Metric', 'Confidence_Level', 'Currency'], ascending=[False, True, True]).reset_index(drop=True)
+    
+    # Pivot the table so that currencies remain as columns
+    df_reshaped = df_long.pivot(index=['Confidence_Level', 'Metric'], columns='Currency', values='Value').reset_index()
+    
+    # Sort for better readability: Monthly first, then Annual
+    df_reshaped = df_reshaped.sort_values(by=['Metric', 'Confidence_Level'], ascending=[False, True]).reset_index(drop=True)
+    
+    # Rename columns for clarity
+    df_reshaped.columns.name = None
+    
+    return df_reshaped
+
+# Example usage with a sample dataframe
 data = {
-    'AsOfDate': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-01', '2024-01-02', '2024-01-03'],
-    'RW_Change_Flag': ['Yes', 'Yes', 'Yes', 'No', 'No', 'No'],
-    'FinalAssetClass': ['Equity', 'Equity', 'Equity', 'Fixed Income', 'Fixed Income', 'Fixed Income'],
-    'AlternateClassification': ['Tech', 'Tech', 'Tech', 'Government', 'Government', 'Government'],
-    'cusip': ['123456', '123456', '123456', '789012', '789012', '789012'],
-    'W_Final': [1.2, 1.5, 1.8, 0.9, 1.0, 1.1],
-    'RW': [0.3, 0.25, 0.28, 0.15, 0.18, 0.2],  # RW added for secondary axis
-    'Attachment': [2.0, 2.5, 2.8, 1.5, 1.8, 2.0]  # New Attachment column
+    "Monthly_USD": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "Monthly_CHF": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+    "Monthly_GBP": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+    "Monthly_EUR": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    "Monthly_PLN": [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    "Annual_USD": [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
+    "Annual_CHF": [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130],
+    "Annual_GBP": [30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140],
+    "Annual_EUR": [40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150],
+    "Annual_PLN": [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
 }
 
-df = pd.DataFrame(data)
+confidence_levels = [99.9, 99.98, 99.95, 99.92, 99.85, 99.8, 99.75, 99.7, 99.65, 99.6, 99.55, 99.5]
+custom_confidence_order = [99.98, 99.95, 99.92, 99.9, 99.85, 99.8, 99.75, 99.7, 99.65, 99.6, 99.55, 99.5]  # Custom order
 
-# Convert AsOfDate to proper format for Plotly
-df['AsOfDate'] = pd.to_datetime(df['AsOfDate']).dt.strftime('%Y-%m-%d')
+df = pd.DataFrame(data, index=confidence_levels)
 
-# Convert the figure to HTML and embed JavaScript for multi-level dropdown filtering
-html_content = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-</head>
-<body style="background-color: black; color: white;">
-    <h2 style="text-align: center;">W_Final, Attachment & RW Trend Over Time</h2>
-    
-    <div style="text-align: center; margin-bottom: 10px;">
-        <label>RW Change Flag:</label>
-        <select id="rwChangeFlag" onchange="updateFinalAssetClass()"></select>
-        
-        <label>Final Asset Class:</label>
-        <select id="finalAssetClass" onchange="updateAlternateClassification()"></select>
-        
-        <label>Alternate Classification:</label>
-        <select id="alternateClassification" onchange="updateCusip()"></select>
-        
-        <label>CUSIP:</label>
-        <select id="cusipDropdown" onchange="filterData()"></select>
-    </div>
-    
-    <div id="chart1"></div>
-    <div id="chart2"></div>
+reshaped_df = reshape_simulation_results(df, custom_confidence_order)
 
-    <script>
-        var allData = JSON.parse('{df.to_json(orient="records", date_format="iso") }');
-
-        function populateDropdown(id, values) {{
-            var select = document.getElementById(id);
-            select.innerHTML = "";
-            values.forEach(value => {{
-                var option = document.createElement("option");
-                option.value = value;
-                option.text = value;
-                select.appendChild(option);
-            }});
-        }}
-
-        function updateFinalAssetClass() {{
-            var selectedRWFlag = document.getElementById('rwChangeFlag').value;
-            var filtered = allData.filter(row => row.RW_Change_Flag === selectedRWFlag);
-            var uniqueFinalAssets = [...new Set(filtered.map(row => row.FinalAssetClass))];
-            populateDropdown('finalAssetClass', uniqueFinalAssets);
-            updateAlternateClassification();
-        }}
-
-        function updateAlternateClassification() {{
-            var selectedRWFlag = document.getElementById('rwChangeFlag').value;
-            var selectedFinalAsset = document.getElementById('finalAssetClass').value;
-            var filtered = allData.filter(row => row.RW_Change_Flag === selectedRWFlag && row.FinalAssetClass === selectedFinalAsset);
-            var uniqueAltClasses = [...new Set(filtered.map(row => row.AlternateClassification))];
-            populateDropdown('alternateClassification', uniqueAltClasses);
-            updateCusip();
-        }}
-
-        function updateCusip() {{
-            var selectedRWFlag = document.getElementById('rwChangeFlag').value;
-            var selectedFinalAsset = document.getElementById('finalAssetClass').value;
-            var selectedAltClass = document.getElementById('alternateClassification').value;
-            var filtered = allData.filter(row => row.RW_Change_Flag === selectedRWFlag && row.FinalAssetClass === selectedFinalAsset && row.AlternateClassification === selectedAltClass);
-            var uniqueCusips = [...new Set(filtered.map(row => row.cusip))];
-            populateDropdown('cusipDropdown', uniqueCusips);
-            filterData();
-        }}
-
-        function filterData() {{
-            var selectedCusip = document.getElementById('cusipDropdown').value;
-            var filteredData = allData.filter(row => row.cusip === selectedCusip);
-
-            if (filteredData.length > 0) {{
-                var traces1 = [
-                    {{
-                        x: filteredData.map(row => new Date(row.AsOfDate)),
-                        y: filteredData.map(row => row.W_Final),
-                        mode: 'lines+markers',
-                        name: 'W_Final'
-                    }},
-                    {{
-                        x: filteredData.map(row => new Date(row.AsOfDate)),
-                        y: filteredData.map(row => row.RW),
-                        mode: 'lines+markers',
-                        name: 'RW',
-                        line: {{ dash: 'dot', color: 'red' }}
-                    }}
-                ];
-                Plotly.newPlot('chart1', traces1, {{ title: "W_Final vs RW", template: 'plotly_dark' }});
-                
-                var traces2 = [
-                    {{
-                        x: filteredData.map(row => new Date(row.AsOfDate)),
-                        y: filteredData.map(row => row.Attachment),
-                        mode: 'lines+markers',
-                        name: 'Attachment'
-                    }},
-                    {{
-                        x: filteredData.map(row => new Date(row.AsOfDate)),
-                        y: filteredData.map(row => row.RW),
-                        mode: 'lines+markers',
-                        name: 'RW',
-                        line: {{ dash: 'dot', color: 'red' }}
-                    }}
-                ];
-                Plotly.newPlot('chart2', traces2, {{ title: "Attachment vs RW", template: 'plotly_dark' }});
-            }}
-        }}
-
-        document.addEventListener("DOMContentLoaded", function() {{
-            var uniqueRWFlags = [...new Set(allData.map(row => row.RW_Change_Flag))];
-            populateDropdown('rwChangeFlag', uniqueRWFlags);
-            updateFinalAssetClass();
-        }});
-    </script>
-</body>
-</html>
-"""
-
-# Save the interactive HTML file
-html_filename = "/mnt/data/w_final_rw_multilevel_filter.html"
-with open(html_filename, "w", encoding="utf-8") as f:
-    f.write(html_content)
-
-# Provide download link
-html_filename
+# Display the reshaped dataframe
+import ace_tools as tools
+tools.display_dataframe_to_user(name="Reshaped Simulation Results", dataframe=reshaped_df)
