@@ -1,13 +1,31 @@
-import numpy as np
+import os
+import logging
+from datetime import datetime
 
-# Set a random seed
-seed_value = 42
-np.random.seed(seed_value)
+# Generate timestamp
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-# Get the random state
-state = np.random.get_state()
+# Create folder named "Audit_{Timestamp}"
+folder_name = f"Audit_{timestamp}"
+os.makedirs(folder_name, exist_ok=True)  # Creates folder if it doesn't exist
 
-# Extract the seed (first value of the first tuple in the state)
-retrieved_seed = state[1][0]
+# Define log file path inside the new folder
+log_filename = os.path.join(folder_name, f"Audit_{timestamp}.log")
 
-print("Retrieved Seed:", retrieved_seed)
+# Configure logging
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filemode="w",  # Overwrite log file each time
+)
+
+def log_and_print(message, level="info"):
+    """Function to log and print messages."""
+    if level == "info":
+        logging.info(message)
+    elif level == "warning":
+        logging.warning(message)
+    elif level == "error":
+        logging.error(message)
+    print(message
