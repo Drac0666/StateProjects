@@ -1,31 +1,22 @@
-import os
-import logging
-from datetime import datetime
+import pandas as pd
 
-# Generate timestamp
-timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+# Read the config file
+config_file = "config.xlsx"  # Update this path if needed
+config_df = pd.read_excel(config_file)
 
-# Create folder named "Audit_{Timestamp}"
-folder_name = f"Audit_{timestamp}"
-os.makedirs(folder_name, exist_ok=True)  # Creates folder if it doesn't exist
+# Convert config to a dictionary
+config_dict = dict(zip(config_df["Parameter"], config_df["Value"]))
 
-# Define log file path inside the new folder
-log_filename = os.path.join(folder_name, f"Audit_{timestamp}.log")
+# Assign variables dynamically
+for param, value in config_dict.items():
+    try:
+        # Convert numeric values properly
+        if isinstance(value, str) and value.replace(".", "", 1).isdigit():
+            value = float(value) if "." in value else int(value)
+        globals()[param] = value
+    except Exception as e:
+        print(f"Error setting variable {param}: {e}")
 
-# Configure logging
-logging.basicConfig(
-    filename=log_filename,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filemode="w",  # Overwrite log file each time
-)
-
-def log_and_print(message, level="info"):
-    """Function to log and print messages."""
-    if level == "info":
-        logging.info(message)
-    elif level == "warning":
-        logging.warning(message)
-    elif level == "error":
-        logging.error(message)
-    print(message
+# Print all variables for verification
+for param in config_dict.keys():
+    print(f"{param} = {globals().get(param)}")
