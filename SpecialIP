@@ -1,5 +1,55 @@
 import pandas as pd
 import logging
+from datetime import datetime
+
+# Generate timestamped log filename
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+log_filename = f"Audit_{timestamp}.log"
+
+# Setup logging
+logging.basicConfig(
+    filename=log_filename,  # Timestamped log file
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filemode="w",  # "w" to overwrite, "a" to append
+)
+
+def log_and_print(message, level="info"):
+    """Function to log and print messages."""
+    if level == "info":
+        logging.info(message)
+    elif level == "warning":
+        logging.warning(message)
+    elif level == "error":
+        logging.error(message)
+    print(message)  # Print message to console as well
+
+# Load your Excel file
+try:
+    df = pd.read_excel("your_file.xlsx")
+    log_and_print("Excel file loaded successfully.")
+except Exception as e:
+    log_and_print(f"Error loading Excel file: {str(e)}", "error")
+    exit()
+
+# General Data Overview
+log_and_print(f"Dataset contains {df.shape[0]} rows and {df.shape[1]} columns.")
+
+# Check for missing values
+missing_values = df.isnull().sum()
+missing_values = missing_values[missing_values > 0]
+if not missing_values.empty:
+    log_and_print(f"Missing values detected:\n{missing_values}", "warning
+
+
+==================
+
+
+
+
+
+import pandas as pd
+import logging
 
 # Setup logging
 logging.basicConfig(
