@@ -1,3 +1,51 @@
+import logging
+from datetime import datetime
+import pandas as pd
+
+# Generate timestamped log filename
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+log_filename = f"Audit_{timestamp}.log"
+
+# Configure logging
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.INFO,  # Change to DEBUG for more detailed logs
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filemode="w",  # Overwrite log file each time script runs
+)
+
+def log_and_print(message, level="info"):
+    """Function to log and print messages."""
+    if level == "info":
+        logging.info(message)
+    elif level == "warning":
+        logging.warning(message)
+    elif level == "error":
+        logging.error(message)
+    print(message)  # Print message to console as well
+
+# Example: Try to load an Excel file
+try:
+    df = pd.read_excel("your_file.xlsx")  # Replace with your actual file
+    log_and_print("Excel file loaded successfully.", "info")
+    
+    # Check for missing values
+    if df.isnull().sum().sum() > 0:
+        log_and_print("Warning: Missing values detected in the dataset!", "warning")
+
+except FileNotFoundError as e:
+    log_and_print(f"File not found error: {str(e)}", "error")
+
+except Exception as e:
+    log_and_print(f"Unexpected error: {str(e)}", "error")
+
+
+
+
+
+
+
+
 import pandas as pd
 import logging
 from datetime import datetime
