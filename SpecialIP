@@ -17,6 +17,9 @@ def reshape_simulation_results(df, confidence_order):
     # Pivot the table so that currencies remain as columns
     df_reshaped = df_long.pivot(index=['Confidence_Level', 'Metric'], columns='Currency', values='Value').reset_index()
     
+    # Modify Confidence Level to include prefixes
+    df_reshaped['Confidence_Level'] = df_reshaped.apply(lambda row: f"1m {row['Confidence_Level']}" if row['Metric'] == 'Monthly' else f"1y {row['Confidence_Level']}", axis=1)
+    
     # Sort for better readability: Monthly first, then Annual
     df_reshaped = df_reshaped.sort_values(by=['Metric', 'Confidence_Level'], ascending=[False, True]).reset_index(drop=True)
     
