@@ -1,26 +1,12 @@
-import pandas as pd
-import numpy as np
-
-def find_most_volatile_period(df, date_col, value_col, window=504):
-    # Ensure date column is in datetime format
-    df[date_col] = pd.to_datetime(df[date_col])
+def slice_most_volatile_period(df, date_col, value_col, window=504):
+    # Find the most volatile period
+    start_date, end_date, df = find_most_volatile_period(df, date_col, value_col, window)
     
-    # Sort data by date
-    df = df.sort_values(by=date_col).reset_index(drop=True)
+    # Slice the dataframe within this period
+    sliced_df = df[(df[date_col] >= start_date) & (df[date_col] <= end_date)]
     
-    # Calculate rolling volatility (standard deviation over the window)
-    df['rolling_volatility'] = df[value_col].rolling(window=window).std()
-    
-    # Find the row with the highest volatility
-    max_vol_index = df['rolling_volatility'].idxmax()
-    
-    # Get the start and end date of that period
-    start_date = df.loc[max_vol_index - window + 1, date_col] if max_vol_index >= window else df.loc[0, date_col]
-    end_date = df.loc[max_vol_index, date_col]
-    
-    return start_date, end_date, df
+    return sliced_df
 
 # Example usage:
-# df = pd.read_csv('your_data.csv')  # Load your data
-# start, end, df = find_most_volatile_period(df, date_col='Date', value_col='Price')
-# print(f"Most volatile period: {start} to {end}")
+# sliced_df = slice_most_volatile_period(df, date_col='Date', value_col='Price')
+# print(sliced_df)
