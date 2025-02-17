@@ -1,31 +1,26 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
-# Load your data (replace 'your_data.csv' with actual file)
-df = pd.read_csv('your_data.csv', parse_dates=['Date'], index_col='Date')
+def find_most_volatile_period(df, date_col, value_col, window=504):
+    # Ensure date column is in datetime format
+    df[date_col] = pd.to_datetime(df[date_col])
+    
+    # Sort data by date
+    df = df.sort_values(by=date_col).reset_index(drop=True)
+    
+    # Calculate rolling volatility (standard deviation over the window)
+    df['rolling_volatility'] = df[value_col].rolling(window=window).std()
+    
+    # Find the row with the highest volatility
+    max_vol_index = df['rolling_volatility'].idxmax()
+    
+    # Get the start and end date of that period
+    start_date = df.loc[max_vol_index - window + 1, date_col] if max_vol_index >= window else df.loc[0, date_col]
+    end_date = df.loc[max_vol_index, date_col]
+    
+    return start_date, end_date, df
 
-# Ensure data is sorted
-df = df.sort_index()
-
-# Calculate daily returns (assuming price data is provided)
-df['Returns'] = df['Price'].pct_change()
-
-# Compute rolling volatility (504-day standard deviation of returns)
-df['Rolling_Volatility'] = df['Returns'].rolling(window=504).std()
-
-# Identify the most volatile period
-max_vol_date = df['Rolling_Volatility'].idxmax()
-max_vol_value = df['Rolling_Volatility'].max()
-
-print(f"Most volatile period ends on: {max_vol_date}, with volatility: {max_vol_value:.4f}")
-
-# Plot the rolling volatility
-plt.figure(figsize=(12, 6))
-plt.plot(df.index, df['Rolling_Volatility'], label="504-day Rolling Volatility", color='b')
-plt.axvline(max_vol_date, color='r', linestyle='--', label="Most Volatile Period")
-plt.xlabel("Date")
-plt.ylabel("Volatility")
-plt.title("Rolling 504-Day Volatility")
-plt.legend()
-plt.show()
+# Example usage:
+# df = pd.read_csv('your_data.csv')  # Load your data
+# start, end, df = find_most_volatile_period(df, date_col='Date', value_col='Price')
+# print(f"Most volatile period: {start} to {end}")
