@@ -1,12 +1,54 @@
-def slice_most_volatile_period(df, date_col, value_col, window=504):
-    # Find the most volatile period
-    start_date, end_date, df = find_most_volatile_period(df, date_col, value_col, window)
-    
-    # Slice the dataframe within this period
-    sliced_df = df[(df[date_col] >= start_date) & (df[date_col] <= end_date)]
-    
-    return sliced_df
+import pandas as pd
 
-# Example usage:
-# sliced_df = slice_most_volatile_period(df, date_col='Date', value_col='Price')
-# print(sliced_df)
+def assign_asset_class(data_file, conditions_file):
+    """
+    Assigns an Asset Class to each row in the data file based on conditions in the conditions file.
+    Empty cells in the conditions file are treated as wildcards (match anything).
+    
+    Parameters:
+    data_file (str): Path to the Excel file containing your data
+    conditions_file (str): Path to the CSV file containing your conditions
+    
+    Returns:
+    pandas.DataFrame: Original data with an additional 'Asset Class' column
+    """
+    # Load your data
+    df = pd.read_excel(data_file)
+    
+    # Load your conditions
+    conditions_df = pd.read_csv(conditions_file)
+    
+    # Create a new column for Asset Class (with default value None)
+    df['Asset Class'] = None
+    
+    # Get column names excluding the 'Asset Class' column from conditions
+    condition_columns = list(conditions_df.columns[:-1])
+    
+    # Loop through each row in the conditions dataframe
+    for idx, cond_row in conditions_df.iterrows():
+        # Create a mask to identify matching rows
+        mask = pd.Series(True, index=df.index)
+        
+        # Build compound condition across specified columns
+        for col in condition_columns:
+            # Only apply the filter if the condition cell is not empty
+            if pd.notna(cond_row[col]) and cond_row[col] != "":
+                mask = mask & (df[col] == cond_row[col])
+        
+        # Assign the Asset Class where all conditions are met
+        df.loc[mask, 'Asset Class'] = cond_row['Asset Class']
+    
+    return df
+
+# Example usage
+if __name__ == "__main__":
+    # Example file paths (replace with your actual paths)
+    data_file = "your_data.xlsx"
+    conditions_file = "conditions.csv"
+    
+    # Process the data
+    result_df = assign_asset_class(data_file, conditions_file)
+    
+    # Save the result to a new Excel file
+    result_df.to_excel("result_with_asset_class.xlsx", index=False)
+    print(f"Processed {len(result_df)} rows and saved to result_with_asset_class.xlsx")
