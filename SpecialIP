@@ -1,81 +1,64 @@
-import pandas as pd
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl import Workbook
-from openpyxl.styles import numbers, PatternFill
-from openpyxl.formatting.rule import CellIsRule
+# GROUP 1️⃣ Parent Level: Aggregate Par Value and Utilization
+parent_group = df.groupby('Parent Asset Class').agg({
+    'Par Value': 'sum',
+    'Parent Asset Class Limit': 'first'
+}).reset_index()
 
-# Example lists (replace these with your actual lists)
-dataframes = [df1, df2, df3]  # Your list of dataframes
-sheet_names = ['Sheet1', 'Sheet2', 'Sheet3']  # Your list of worksheet names
+parent_group['Utilization'] = parent_group['Par Value'] / parent_group['Parent Asset Class Limit']
+parent_group['Utilization %'] = (parent_group['Utilization'] * 100).round(2)
 
-# Create a workbook
-wb = Workbook()
+# GROUP 2️⃣ Asset Class Level: Aggregate within each Parent
+asset_group = df.groupby(['Parent Asset Class', 'Asset Class']).agg({
+    'Par Value': 'sum',
+    'Asset Class Limit': 'first'
+}).reset_index()
 
-# Remove the default sheet that comes with a new workbook
-default_sheet = wb.active
-wb.remove(default_sheet)
+asset_group['Utilization'] = asset_group['Par Value'] / asset_group['Asset Class Limit']
+asset_group['Utilization %'] = (asset_group['Utilization'] * 100).round(2)
 
-# Loop through each dataframe and sheet name
-for df, name in zip(dataframes, sheet_names):
-    ws = wb.create_sheet(title=name)
-    
-    # Write dataframe to worksheet
-    for row in dataframe_to_rows(df, index=False, header=True):
-        ws.append(row)
-    
-    # Auto-adjust column widths and locate important columns
-    limit_utilization_col = None
-    available_limit_col = None
-    
-    for column_cells in ws.columns:
-        max_length = 0
-        column = column_cells[0].column_letter
-        
-        for cell in column_cells:
-            # Identify column letters by header names
-            if cell.row == 1:
-                if cell.value == 'Limit Utilization':
-                    limit_utilization_col = column
-                if cell.value == 'Available Limit':
-                    available_limit_col = column
-            
-            try:
-                cell_value = str(cell.value)
-                if cell_value:
-                    max_length = max(max_length, len(cell_value))
-            except:
-                pass
-        
-        adjusted_width = max_length + 2
-        ws.column_dimensions[column].width = adjusted_width
-    
-    # Apply percentage format to 'Limit Utilization' column (if it exists)
-    if limit_utilization_col:
-        for cell in ws[limit_utilization_col][1:]:  # Skip header
-            cell.number_format = '0.00%'  # Two decimal percentage
-    
-    # Apply conditional formatting to 'Available Limit' column
-    if available_limit_col:
-        green_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')  # Light green
-        red_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')    # Light red
-        
-        first_data_row = 2
-        last_data_row = ws.max_row
-        data_range = f"{available_limit_col}{first_data_row}:{available_limit_col}{last_data_row}"
-        
-        # Rule 1: If cell > 0 → Light Green
-        ws.conditional_formatting.add(
-            data_range,
-            CellIsRule(operator='greaterThan', formula=['0'], fill=green_fill)
-        )
-        
-        # Rule 2: If cell <= 0 → Light Red
-        ws.conditional_formatting.add(
-            data_range,
-            CellIsRule(operator='lessThanOrEqual', formula=['0'], fill=red_fill)
-        )
+# GROUP 3️⃣ Sub Asset Class Level: Individual exposure vs sub limits
+subasset_group = df.copy()
+subasset_group['Utilization'] = subasset_group['Par Value'] / subasset_group['Sub Asset Class Limit']
+subasset_group['Utilization %'] = (subasset_group['Utilization'] * 100).round(2)
 
-# Save the workbook
-wb.save('Combined_Dataframes_with_Conditional_Formatting.xlsx')
 
-print("Excel file with both conditional formats created successfully!")
+
+arent_report = parent_group[['Parent Asset Class', 'Par Value', 'Parent Asset Class Limit', 'Utilization %']]
+parent_report['Level'] = 'Parent'
+parent_report.rename(columns={
+    'Parent Asset Class': 'Name',
+    'Parent Asset Class Limit': 'Limit'
+}, inplace=True)
+parent_report['Asset Class'] = None
+parent_report['Sub Asset Class'] = None
+
+# Prepare Asset Level Report
+asset_report = asset_group[['Parent Asset Class', 'Asset Class', 'Par Value', 'Asset Class Limit', 'Utilization %']]
+asset_report['Level'] = 'Asset Class'
+asset_report.rename(columns={
+    'Asset Class': 'Name',
+    'Asset Class Limit': 'Limit'
+}, inplace=True)
+asset_report['Sub Asset Class'] = None
+
+# Prepare Sub Asset Class Report
+subasset_report = subasset_group[['Parent Asset Class', 'Asset Class', 'Sub Asset Class', 'Par Value', 'Sub Asset Class Limit', 'Utilization %']]
+subasset_report['Level'] = 'Sub Asset Class'
+subasset_report.rename(columns={
+    'Sub Asset Class': 'Name',
+    'Sub Asset Class Limit': 'Limit'
+}, inplace=True)
+
+# Combine all into one report
+combined_report = pd.concat([parent_report, asset_report, subasset_report], ignore_index=True)
+
+# Sort for readability: Parent > Asset Class > Sub Asset Class
+level_sort_order = {'Parent': 0, 'Asset Class': 1, 'Sub Asset Class': 2}
+combined_report['Sort Order'] = combined_report['Level'].map(level_sort_order)
+
+combined_report.sort_values(by=['Parent Asset Class', 'Sort Order', 'Asset Class', 'Name'], inplace=True)
+
+# Final Report Cleanup
+final_report = combined_report[['Level', 'Parent Asset Class', 'Asset Class', 'Name', 'Par Value', 'Limit', 'Utilization %']]
+
+print(final_report)
