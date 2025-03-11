@@ -1,7 +1,8 @@
 import pandas as pd
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl import Workbook
-from openpyxl.styles import numbers
+from openpyxl.styles import numbers, PatternFill
+from openpyxl.formatting.rule import CellIsRule
 
 # Example lists (replace these with your actual lists)
 dataframes = [df1, df2, df3]  # Your list of dataframes
@@ -22,15 +23,22 @@ for df, name in zip(dataframes, sheet_names):
     for row in dataframe_to_rows(df, index=False, header=True):
         ws.append(row)
     
-    # Auto-adjust column widths
+    # Auto-adjust column widths and locate important columns
+    limit_utilization_col = None
+    available_limit_col = None
+    
     for column_cells in ws.columns:
         max_length = 0
         column = column_cells[0].column_letter
         
         for cell in column_cells:
-            # Format 'Limit Utilization' column as percentage if found
-            if cell.row == 1 and cell.value == 'Limit Utilization':
-                limit_utilization_col = column
+            # Identify the column letters by header name
+            if cell.row == 1:
+                if cell.value == 'Limit Utilization':
+                    limit_utilization_col = column
+                if cell.value == 'Available Limit':
+                    available_limit_col = column
+            
             try:
                 cell_value = str(cell.value)
                 if cell_value:
@@ -42,11 +50,25 @@ for df, name in zip(dataframes, sheet_names):
         ws.column_dimensions[column].width = adjusted_width
     
     # Apply percentage format to 'Limit Utilization' column (if it exists)
-    if 'limit_utilization_col' in locals():
-        for cell in ws[limit_utilization_col][1:]:  # Skip header (row 1)
-            cell.number_format = '0.00%'  # Format with two decimal percentage
+    if limit_utilization_col:
+        for cell in ws[limit_utilization_col][1:]:  # Skip header
+            cell.number_format = '0.00%'  # Two decimal percentage
+    
+    # Apply conditional formatting to 'Available Limit' column
+    if available_limit_col:
+        green_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
+        # Define the range for the conditional formatting
+        first_data_row = 2
+        last_data_row = ws.max_row
+        data_range = f"{available_limit_col}{first_data_row}:{available_limit_col}{last_data_row}"
+        
+        # Apply rule: If cell > 0, fill with light green
+        ws.conditional_formatting.add(
+            data_range,
+            CellIsRule(operator='greaterThan', formula=['0'], fill=green_fill)
+        )
 
 # Save the workbook
-wb.save('Combined_Dataframes.xlsx')
+wb.save('Combined_Dataframes_with_Formatting.xlsx')
 
-print("Excel file with formatted percentages created successfully!")
+print("Excel file with conditional formatting created successfully!")
