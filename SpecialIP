@@ -32,7 +32,7 @@ for df, name in zip(dataframes, sheet_names):
         column = column_cells[0].column_letter
         
         for cell in column_cells:
-            # Identify the column letters by header name
+            # Identify column letters by header names
             if cell.row == 1:
                 if cell.value == 'Limit Utilization':
                     limit_utilization_col = column
@@ -56,19 +56,26 @@ for df, name in zip(dataframes, sheet_names):
     
     # Apply conditional formatting to 'Available Limit' column
     if available_limit_col:
-        green_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')
-        # Define the range for the conditional formatting
+        green_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')  # Light green
+        red_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')    # Light red
+        
         first_data_row = 2
         last_data_row = ws.max_row
         data_range = f"{available_limit_col}{first_data_row}:{available_limit_col}{last_data_row}"
         
-        # Apply rule: If cell > 0, fill with light green
+        # Rule 1: If cell > 0 → Light Green
         ws.conditional_formatting.add(
             data_range,
             CellIsRule(operator='greaterThan', formula=['0'], fill=green_fill)
         )
+        
+        # Rule 2: If cell <= 0 → Light Red
+        ws.conditional_formatting.add(
+            data_range,
+            CellIsRule(operator='lessThanOrEqual', formula=['0'], fill=red_fill)
+        )
 
 # Save the workbook
-wb.save('Combined_Dataframes_with_Formatting.xlsx')
+wb.save('Combined_Dataframes_with_Conditional_Formatting.xlsx')
 
-print("Excel file with conditional formatting created successfully!")
+print("Excel file with both conditional formats created successfully!")
