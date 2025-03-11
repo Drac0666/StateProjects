@@ -1,64 +1,7 @@
-# GROUP 1️⃣ Parent Level: Aggregate Par Value and Utilization
-parent_group = df.groupby('Parent Asset Class').agg({
+subasset_group = df.groupby(['Parent Asset Class', 'Asset Class', 'Sub Asset Class']).agg({
     'Par Value': 'sum',
-    'Parent Asset Class Limit': 'first'
+    'Sub Asset Class Limit': 'first'  # Assuming one unique limit per sub asset class
 }).reset_index()
 
-parent_group['Utilization'] = parent_group['Par Value'] / parent_group['Parent Asset Class Limit']
-parent_group['Utilization %'] = (parent_group['Utilization'] * 100).round(2)
-
-# GROUP 2️⃣ Asset Class Level: Aggregate within each Parent
-asset_group = df.groupby(['Parent Asset Class', 'Asset Class']).agg({
-    'Par Value': 'sum',
-    'Asset Class Limit': 'first'
-}).reset_index()
-
-asset_group['Utilization'] = asset_group['Par Value'] / asset_group['Asset Class Limit']
-asset_group['Utilization %'] = (asset_group['Utilization'] * 100).round(2)
-
-# GROUP 3️⃣ Sub Asset Class Level: Individual exposure vs sub limits
-subasset_group = df.copy()
 subasset_group['Utilization'] = subasset_group['Par Value'] / subasset_group['Sub Asset Class Limit']
 subasset_group['Utilization %'] = (subasset_group['Utilization'] * 100).round(2)
-
-
-
-arent_report = parent_group[['Parent Asset Class', 'Par Value', 'Parent Asset Class Limit', 'Utilization %']]
-parent_report['Level'] = 'Parent'
-parent_report.rename(columns={
-    'Parent Asset Class': 'Name',
-    'Parent Asset Class Limit': 'Limit'
-}, inplace=True)
-parent_report['Asset Class'] = None
-parent_report['Sub Asset Class'] = None
-
-# Prepare Asset Level Report
-asset_report = asset_group[['Parent Asset Class', 'Asset Class', 'Par Value', 'Asset Class Limit', 'Utilization %']]
-asset_report['Level'] = 'Asset Class'
-asset_report.rename(columns={
-    'Asset Class': 'Name',
-    'Asset Class Limit': 'Limit'
-}, inplace=True)
-asset_report['Sub Asset Class'] = None
-
-# Prepare Sub Asset Class Report
-subasset_report = subasset_group[['Parent Asset Class', 'Asset Class', 'Sub Asset Class', 'Par Value', 'Sub Asset Class Limit', 'Utilization %']]
-subasset_report['Level'] = 'Sub Asset Class'
-subasset_report.rename(columns={
-    'Sub Asset Class': 'Name',
-    'Sub Asset Class Limit': 'Limit'
-}, inplace=True)
-
-# Combine all into one report
-combined_report = pd.concat([parent_report, asset_report, subasset_report], ignore_index=True)
-
-# Sort for readability: Parent > Asset Class > Sub Asset Class
-level_sort_order = {'Parent': 0, 'Asset Class': 1, 'Sub Asset Class': 2}
-combined_report['Sort Order'] = combined_report['Level'].map(level_sort_order)
-
-combined_report.sort_values(by=['Parent Asset Class', 'Sort Order', 'Asset Class', 'Name'], inplace=True)
-
-# Final Report Cleanup
-final_report = combined_report[['Level', 'Parent Asset Class', 'Asset Class', 'Name', 'Par Value', 'Limit', 'Utilization %']]
-
-print(final_report)
