@@ -1,19 +1,43 @@
 import pandas as pd
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl import Workbook
 
-# Sample dataframe (replace this with your actual df)
-# df = pd.read_csv('your_file.csv')  # Or however you're loading your data
+# Example lists (replace with your actual lists)
+dataframes = [df1, df2, df3]  # Your list of dataframes
+sheet_names = ['Sheet1', 'Sheet2', 'Sheet3']  # Your list of names (same length/order as dataframes)
 
-# Step 1: Group by 'Asset Class' and sum 'Par Value'
-grouped = df.groupby('Asset Class').agg({
-    'Par Value': 'sum',
-    'Trust Limit': 'first'  # Assuming unique Trust Limit per Asset Class
-}).reset_index()
+# Create a workbook
+wb = Workbook()
 
-# Step 2: Calculate Limit Utilization
-grouped['Limit Utilization'] = grouped['Par Value'] / grouped['Trust Limit']
+# Remove the default sheet
+default_sheet = wb.active
+wb.remove(default_sheet)
 
-# Optional: format as percentage
-grouped['Limit Utilization %'] = grouped['Limit Utilization'] * 100
+# Loop through dataframes and names
+for df, name in zip(dataframes, sheet_names):
+    ws = wb.create_sheet(title=name)
+    
+    # Write dataframe to worksheet
+    for row in dataframe_to_rows(df, index=False, header=True):
+        ws.append(row)
+    
+    # Auto-adjust column widths
+    for column_cells in ws.columns:
+        max_length = 0
+        column = column_cells[0].column_letter  # Get the column name (A, B, C...)
+        
+        for cell in column_cells:
+            try:
+                cell_value = str(cell.value)
+                if cell_value:
+                    max_length = max(max_length, len(cell_value))
+            except:
+                pass
+        
+        adjusted_width = max_length + 2
+        ws.column_dimensions[column].width = adjusted_width
 
-# View the result
-print(grouped[['Asset Class', 'Par Value', 'Trust Limit', 'Limit Utilization %']])
+# Save the workbook
+wb.save('Combined_Dataframes.xlsx')
+
+print("Excel file created successfully!")
