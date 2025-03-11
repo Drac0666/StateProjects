@@ -1,9 +1,19 @@
-=IF(E2 >= 35000000000, 1800000000, 
-  IF(E2 >= 20000000000, 1500000000, 
-    IF(E2 >= 8000000000, 1000000000, 
-      IF(E2 >= 5000000000, 500000000, 
-        300000000
-      )
-    )
-  )
-)
+import pandas as pd
+
+# Sample dataframe (replace this with your actual df)
+# df = pd.read_csv('your_file.csv')  # Or however you're loading your data
+
+# Step 1: Group by 'Asset Class' and sum 'Par Value'
+grouped = df.groupby('Asset Class').agg({
+    'Par Value': 'sum',
+    'Trust Limit': 'first'  # Assuming unique Trust Limit per Asset Class
+}).reset_index()
+
+# Step 2: Calculate Limit Utilization
+grouped['Limit Utilization'] = grouped['Par Value'] / grouped['Trust Limit']
+
+# Optional: format as percentage
+grouped['Limit Utilization %'] = grouped['Limit Utilization'] * 100
+
+# View the result
+print(grouped[['Asset Class', 'Par Value', 'Trust Limit', 'Limit Utilization %']])
