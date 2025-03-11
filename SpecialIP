@@ -1,19 +1,20 @@
 import pandas as pd
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl import Workbook
+from openpyxl.styles import numbers
 
-# Example lists (replace with your actual lists)
+# Example lists (replace these with your actual lists)
 dataframes = [df1, df2, df3]  # Your list of dataframes
-sheet_names = ['Sheet1', 'Sheet2', 'Sheet3']  # Your list of names (same length/order as dataframes)
+sheet_names = ['Sheet1', 'Sheet2', 'Sheet3']  # Your list of worksheet names
 
 # Create a workbook
 wb = Workbook()
 
-# Remove the default sheet
+# Remove the default sheet that comes with a new workbook
 default_sheet = wb.active
 wb.remove(default_sheet)
 
-# Loop through dataframes and names
+# Loop through each dataframe and sheet name
 for df, name in zip(dataframes, sheet_names):
     ws = wb.create_sheet(title=name)
     
@@ -24,9 +25,12 @@ for df, name in zip(dataframes, sheet_names):
     # Auto-adjust column widths
     for column_cells in ws.columns:
         max_length = 0
-        column = column_cells[0].column_letter  # Get the column name (A, B, C...)
+        column = column_cells[0].column_letter
         
         for cell in column_cells:
+            # Format 'Limit Utilization' column as percentage if found
+            if cell.row == 1 and cell.value == 'Limit Utilization':
+                limit_utilization_col = column
             try:
                 cell_value = str(cell.value)
                 if cell_value:
@@ -36,8 +40,13 @@ for df, name in zip(dataframes, sheet_names):
         
         adjusted_width = max_length + 2
         ws.column_dimensions[column].width = adjusted_width
+    
+    # Apply percentage format to 'Limit Utilization' column (if it exists)
+    if 'limit_utilization_col' in locals():
+        for cell in ws[limit_utilization_col][1:]:  # Skip header (row 1)
+            cell.number_format = '0.00%'  # Format with two decimal percentage
 
 # Save the workbook
 wb.save('Combined_Dataframes.xlsx')
 
-print("Excel file created successfully!")
+print("Excel file with formatted percentages created successfully!")
