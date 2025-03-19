@@ -1,3 +1,5 @@
+An analysis of the correlation between State Street Corporation (STT), its primary custodian banking peers, and the SPDR S&P Regional Banking ETF (KRE) was conducted using historical price data spanning from March 2020 to March 2025. In addition to the static correlation matrix, a rolling correlation analysis was performed utilizing a 60-day window to capture short- to medium-term relationship dynamics. The 60-day window was selected as it effectively balances responsiveness to market changes with the need to smooth out short-term volatility, providing a clearer view of evolving correlations over time.
+
 Certainly! Here’s a professional summary of the key observations regarding **State Street’s (STT)** correlation with its peers and the **SPDR S&P Regional Banking ETF (KRE)**:
 
 ---
