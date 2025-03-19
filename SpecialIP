@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 
 # Assuming you have a dataframe 'df' with date index and stock prices as columns
 # Example: df.columns = ['State Street', 'Apple', 'Microsoft', 'Amazon', ...]
@@ -16,19 +17,25 @@ correlation_matrix = returns.corr()
 state_street_corr = correlation_matrix['State Street'].sort_values(ascending=False)
 
 # Step 4: Create a heatmap of correlations with State Street
-plt.figure(figsize=(12, 8))
-sns.heatmap(
-    pd.DataFrame(state_street_corr).T,  # Transpose to get horizontal display
-    annot=True,
-    cmap='coolwarm',
-    vmin=-1,
-    vmax=1,
-    center=0
+fig_heatmap = px.imshow(
+    pd.DataFrame(state_street_corr).T,  # Transpose for horizontal display
+    color_continuous_scale='RdBu_r',
+    zmin=-1,
+    zmax=1,
+    text_auto=True,
+    aspect="auto",
+    title='Correlation of Each Stock with State Street'
 )
-plt.title('Correlation of Each Stock with State Street')
-plt.tight_layout()
-plt.savefig('state_street_correlations.png')
-plt.close()
+fig_heatmap.update_layout(
+    height=600,
+    width=1000,
+    coloraxis_colorbar=dict(
+        title="Correlation",
+        thicknessmode="pixels", thickness=20,
+        lenmode="pixels", len=300
+    )
+)
+fig_heatmap.write_html("state_street_correlations.html")
 
 # Step 5: Calculate rolling correlations with State Street (60-day window)
 window_size = 60  # Can be adjusted as needed
@@ -41,18 +48,36 @@ for column in returns.columns:
         rolling_correlations[column] = roll_corr
 
 # Step 6: Plot rolling correlations
-plt.figure(figsize=(12, 8))
+fig_rolling = go.Figure()
 for column in rolling_correlations.columns:
-    plt.plot(rolling_correlations.index, rolling_correlations[column], label=column)
+    fig_rolling.add_trace(
+        go.Scatter(
+            x=rolling_correlations.index,
+            y=rolling_correlations[column],
+            mode='lines',
+            name=column
+        )
+    )
 
-plt.axhline(y=0, color='r', linestyle='-', alpha=0.3)
-plt.title(f'{window_size}-Day Rolling Correlation with State Street')
-plt.xlabel('Date')
-plt.ylabel('Correlation Coefficient')
-plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.tight_layout()
-plt.savefig('state_street_rolling_correlations.png')
-plt.close()
+fig_rolling.add_shape(
+    type="line",
+    x0=rolling_correlations.index[0],
+    y0=0,
+    x1=rolling_correlations.index[-1],
+    y1=0,
+    line=dict(color="red", width=1, dash="dash"),
+)
+
+fig_rolling.update_layout(
+    title=f'{window_size}-Day Rolling Correlation with State Street',
+    xaxis_title='Date',
+    yaxis_title='Correlation Coefficient',
+    legend_title='Stocks',
+    height=600,
+    width=1000,
+    hovermode="x unified"
+)
+fig_rolling.write_html("state_street_rolling_correlations.html")
 
 # Step 7: Generate statistical summary
 summary_stats = pd.DataFrame({
@@ -69,15 +94,47 @@ print(summary_stats)
 top_5_stocks = state_street_corr.index[1:6]  # Exclude State Street itself
 rolling_corr_heatmap = rolling_correlations[top_5_stocks]
 
-plt.figure(figsize=(12, 8))
-sns.heatmap(
+# Create a heatmap with dates on x-axis and stocks on y-axis
+fig_heat_time = px.imshow(
     rolling_corr_heatmap.T,  # Transpose for better visualization
-    cmap='coolwarm',
-    vmin=-1,
-    vmax=1,
-    center=0
+    x=rolling_corr_heatmap.index,
+    y=list(top_5_stocks),
+    color_continuous_scale='RdBu_r',
+    zmin=-1,
+    zmax=1,
+    aspect="auto",
+    title=f'{window_size}-Day Rolling Correlation with State Street (Top 5 Correlated Stocks)'
 )
-plt.title(f'{window_size}-Day Rolling Correlation with State Street (Top 5 Correlated Stocks)')
-plt.tight_layout()
-plt.savefig('state_street_rolling_correlation_heatmap.png')
-plt.close()
+fig_heat_time.update_layout(
+    height=600,
+    width=1000,
+    xaxis_title='Date',
+    yaxis_title='Stock',
+    coloraxis_colorbar=dict(
+        title="Correlation",
+        thicknessmode="pixels", thickness=20,
+        lenmode="pixels", len=300
+    )
+)
+fig_heat_time.write_html("state_street_rolling_correlation_heatmap.html")
+
+# Step 9: Create a correlation matrix heatmap for all stocks
+fig_corr_matrix = px.imshow(
+    correlation_matrix,
+    color_continuous_scale='RdBu_r',
+    zmin=-1,
+    zmax=1,
+    text_auto=True,
+    aspect="auto",
+    title='Correlation Matrix for All Stocks'
+)
+fig_corr_matrix.update_layout(
+    height=800,
+    width=1000,
+    coloraxis_colorbar=dict(
+        title="Correlation",
+        thicknessmode="pixels", thickness=20,
+        lenmode="pixels", len=500
+    )
+)
+fig_corr_matrix.write_html("correlation_matrix.html")
