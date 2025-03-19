@@ -1,229 +1,24 @@
+import os
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-import json
-import plotly
+import pyperclip  # To copy to clipboard
 
-# Assuming you have a dataframe 'df' with date index and stock prices as columns
-# Example: df.columns = ['State Street', 'Apple', 'Microsoft', 'Amazon', ...]
+# Base directory to search
+base_dir = r'C:\Your\Path\To\PostTrade\2024'  # Change this to your path!
 
-# Step 1: Calculate daily returns for all stocks
-returns = df.pct_change().dropna()
+# Create an empty list to store folders missing MCC.xlsx
+missing_mcc_folders = []
 
-# Step 2: Calculate correlation matrix
-correlation_matrix = returns.corr()
+# Walk through the directory
+for dirpath, dirnames, filenames in os.walk(base_dir):
+    # Check if 'MCC.xlsx' is in the current folder
+    if 'MCC.xlsx' not in filenames:
+        # Append the path if MCC.xlsx is missing
+        missing_mcc_folders.append(dirpath)
 
-# Step 3: Extract correlations with State Street
-state_street_corr = correlation_matrix['State Street'].sort_values(ascending=False)
+# Convert the list into a DataFrame
+df_missing = pd.DataFrame(missing_mcc_folders, columns=['Missing MCC Folder Path'])
 
-# Step 4: Calculate rolling correlations with State Street (60-day window)
-window_size = 60  # Can be adjusted as needed
-rolling_correlations = pd.DataFrame(index=returns.index[window_size-1:])
+# Copy the DataFrame to clipboard
+df_missing.to_clipboard(index=False)
 
-for column in returns.columns:
-    if column != 'State Street':
-        # Calculate rolling correlation for each stock with State Street
-        roll_corr = returns['State Street'].rolling(window=window_size).corr(returns[column])
-        rolling_correlations[column] = roll_corr
-
-# Step 5: Get top 5 correlated stocks for the time-based heatmap
-top_5_stocks = state_street_corr.index[1:6]  # Exclude State Street itself
-rolling_corr_heatmap = rolling_correlations[top_5_stocks]
-
-# Step 6: Generate statistical summary
-summary_stats = pd.DataFrame({
-    'Mean Correlation': rolling_correlations.mean(),
-    'Min Correlation': rolling_correlations.min(),
-    'Max Correlation': rolling_correlations.max(),
-    'Volatility': rolling_correlations.std()
-}).sort_values('Mean Correlation', ascending=False)
-
-# Create figures separately first
-# 1. State Street Correlation Heatmap
-fig1 = px.imshow(
-    pd.DataFrame(state_street_corr).T,
-    color_continuous_scale='RdBu_r',
-    zmin=-1, zmax=1,
-    text_auto=True,
-    aspect="auto",
-    title='Correlation of Each Stock with State Street'
-)
-
-# 2. Rolling Correlations Line Chart
-fig2 = go.Figure()
-for column in rolling_correlations.columns[:10]:  # Limit to top 10 for readability
-    fig2.add_trace(
-        go.Scatter(
-            x=rolling_correlations.index,
-            y=rolling_correlations[column],
-            mode='lines',
-            name=column
-        )
-    )
-fig2.add_shape(
-    type="line", x0=rolling_correlations.index[0], y0=0,
-    x1=rolling_correlations.index[-1], y1=0,
-    line=dict(color="red", width=1, dash="dash"),
-)
-fig2.update_layout(
-    title=f'{window_size}-Day Rolling Correlation with State Street',
-    xaxis_title='Date',
-    yaxis_title='Correlation Coefficient',
-    legend_title='Stocks',
-    hovermode="x unified"
-)
-
-# 3. Time-based Heatmap for Top 5 Stocks
-fig3 = px.imshow(
-    rolling_corr_heatmap.T,
-    x=rolling_corr_heatmap.index,
-    y=list(top_5_stocks),
-    color_continuous_scale='RdBu_r',
-    zmin=-1, zmax=1,
-    aspect="auto",
-    title=f'{window_size}-Day Rolling Correlation with State Street (Top 5 Correlated Stocks)'
-)
-fig3.update_layout(
-    xaxis_title='Date',
-    yaxis_title='Stock'
-)
-
-# 4. Full Correlation Matrix
-fig4 = px.imshow(
-    correlation_matrix,
-    color_continuous_scale='RdBu_r',
-    zmin=-1, zmax=1,
-    text_auto=True,
-    aspect="auto",
-    title='Correlation Matrix for All Stocks'
-)
-
-# 5. Summary Stats Table
-summary_for_plot = summary_stats.reset_index()
-summary_for_plot.rename(columns={'index': 'Stock'}, inplace=True)
-fig5 = go.Figure(data=[go.Table(
-    header=dict(
-        values=list(summary_for_plot.columns),
-        fill_color='paleturquoise',
-        align='left'
-    ),
-    cells=dict(
-        values=[summary_for_plot[col] for col in summary_for_plot.columns],
-        fill_color='lavender',
-        align='left',
-        format=[None, '.4f', '.4f', '.4f', '.4f']
-    )
-)])
-fig5.update_layout(title='Statistical Summary of Rolling Correlations with State Street')
-
-# Convert figures to JSON for embedding in HTML
-fig1_json = json.dumps(fig1.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
-fig2_json = json.dumps(fig2.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
-fig3_json = json.dumps(fig3.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
-fig4_json = json.dumps(fig4.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
-fig5_json = json.dumps(fig5.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
-
-# Create the HTML content separately to avoid f-string issues with curly braces
-html_content = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Stock Correlation Analysis with State Street</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 20px;
-        }
-        .full-width {
-            grid-column: 1 / span 2;
-        }
-        .chart-container {
-            background-color: white;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Stock Correlation Analysis with State Street</h1>
-    
-    <div class="dashboard">
-        <div class="chart-container full-width" id="state-street-corr"></div>
-        <div class="chart-container full-width" id="rolling-correlations"></div>
-        <div class="chart-container" id="rolling-heatmap"></div>
-        <div class="chart-container" id="summary-stats"></div>
-        <div class="chart-container full-width" id="full-matrix"></div>
-    </div>
-    
-    <script>
-        // State Street Correlation Heatmap
-        var fig1 = FIG1_JSON;
-        Plotly.newPlot('state-street-corr', fig1.data, fig1.layout);
-        
-        // Rolling Correlations Line Chart
-        var fig2 = FIG2_JSON;
-        Plotly.newPlot('rolling-correlations', fig2.data, fig2.layout);
-        
-        // Time-based Heatmap
-        var fig3 = FIG3_JSON;
-        Plotly.newPlot('rolling-heatmap', fig3.data, fig3.layout);
-        
-        // Summary Stats Table
-        var fig5 = FIG5_JSON;
-        Plotly.newPlot('summary-stats', fig5.data, fig5.layout);
-        
-        // Full Correlation Matrix
-        var fig4 = FIG4_JSON;
-        Plotly.newPlot('full-matrix', fig4.data, fig4.layout);
-        
-        // Make plots responsive
-        window.onresize = function() {
-            Plotly.relayout('state-street-corr', {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true
-            });
-            Plotly.relayout('rolling-correlations', {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true
-            });
-            Plotly.relayout('rolling-heatmap', {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true
-            });
-            Plotly.relayout('full-matrix', {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true
-            });
-        };
-    </script>
-</body>
-</html>
-"""
-
-# Replace placeholders with actual JSON content
-html_content = html_content.replace('FIG1_JSON', fig1_json)
-html_content = html_content.replace('FIG2_JSON', fig2_json)
-html_content = html_content.replace('FIG3_JSON', fig3_json)
-html_content = html_content.replace('FIG4_JSON', fig4_json)
-html_content = html_content.replace('FIG5_JSON', fig5_json)
-
-# Write the complete HTML file
-with open('state_street_correlation_dashboard.html', 'w') as f:
-    f.write(html_content)
-
-print("Dashboard created successfully! Open 'state_street_correlation_dashboard.html' in your browser.")
+print("Done! Missing MCC.xlsx folder paths copied to clipboard.")
