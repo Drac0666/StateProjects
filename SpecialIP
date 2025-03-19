@@ -10,9 +10,11 @@ missing_mcc_folders = []
 
 # Walk through the directory
 for dirpath, dirnames, filenames in os.walk(base_dir):
-    # Check if 'MCC.xlsx' is in the current folder
-    if 'MCC.xlsx' not in filenames:
-        # Append the path if MCC.xlsx is missing
+    # Check if any filename contains 'MCC.xlsx'
+    mcc_exists = any('MCC.xlsx' in filename for filename in filenames)
+    
+    if not mcc_exists:
+        # Append the path if no MCC.xlsx variant is found
         missing_mcc_folders.append(dirpath)
 
 # Convert the list into a DataFrame
