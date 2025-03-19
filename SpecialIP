@@ -3,6 +3,8 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import json
+import plotly
 
 # Assuming you have a dataframe 'df' with date index and stock prices as columns
 # Example: df.columns = ['State Street', 'Apple', 'Microsoft', 'Amazon', ...]
@@ -37,11 +39,6 @@ summary_stats = pd.DataFrame({
     'Max Correlation': rolling_correlations.max(),
     'Volatility': rolling_correlations.std()
 }).sort_values('Mean Correlation', ascending=False)
-
-# Create the dashboard with all visualizations
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from plotly.offline import plot
 
 # Create figures separately first
 # 1. State Street Correlation Heatmap
@@ -121,6 +118,13 @@ fig5 = go.Figure(data=[go.Table(
 )])
 fig5.update_layout(title='Statistical Summary of Rolling Correlations with State Street')
 
+# Convert figures to JSON for embedding in HTML
+fig1_json = json.dumps(fig1.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
+fig2_json = json.dumps(fig2.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
+fig3_json = json.dumps(fig3.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
+fig4_json = json.dumps(fig4.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
+fig5_json = json.dumps(fig5.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
+
 # Create the HTML file with all visualizations using div structure
 html_content = f"""
 <!DOCTYPE html>
@@ -168,23 +172,23 @@ html_content = f"""
     
     <script>
         // State Street Correlation Heatmap
-        var fig1 = {JSON_FIG1};
+        var fig1 = {fig1_json};
         Plotly.newPlot('state-street-corr', fig1.data, fig1.layout);
         
         // Rolling Correlations Line Chart
-        var fig2 = {JSON_FIG2};
+        var fig2 = {fig2_json};
         Plotly.newPlot('rolling-correlations', fig2.data, fig2.layout);
         
         // Time-based Heatmap
-        var fig3 = {JSON_FIG3};
+        var fig3 = {fig3_json};
         Plotly.newPlot('rolling-heatmap', fig3.data, fig3.layout);
         
         // Summary Stats Table
-        var fig5 = {JSON_FIG5};
+        var fig5 = {fig5_json};
         Plotly.newPlot('summary-stats', fig5.data, fig5.layout);
         
         // Full Correlation Matrix
-        var fig4 = {JSON_FIG4};
+        var fig4 = {fig4_json};
         Plotly.newPlot('full-matrix', fig4.data, fig4.layout);
         
         // Make plots responsive
@@ -211,13 +215,14 @@ html_content = f"""
 </html>
 """
 
-# Replace the JSON placeholders with actual JSON representations of the figures
-import json
-html_content = html_content.replace('{JSON_FIG1}', json.dumps(fig1, cls=plotly.utils.PlotlyJSONEncoder))
-html_content = html_content.replace('{JSON_FIG2}', json.dumps(fig2, cls=plotly.utils.PlotlyJSONEncoder))
-html_content = html_content.replace('{JSON_FIG3}', json.dumps(fig3, cls=plotly.utils.PlotlyJSONEncoder))
-html_content = html_content.replace('{JSON_FIG4}', json.dumps(fig4, cls=plotly.utils.PlotlyJSONEncoder))
-html_content = html_content.replace('{JSON_FIG5}', json.dumps(fig5, cls=plotly.utils.PlotlyJSONEncoder))
+# Use f-string for direct insertion of JSON variables
+html_content = html_content.format(
+    fig1_json=fig1_json,
+    fig2_json=fig2_json,
+    fig3_json=fig3_json,
+    fig4_json=fig4_json,
+    fig5_json=fig5_json
+)
 
 # Write the complete HTML file
 with open('state_street_correlation_dashboard.html', 'w') as f:
