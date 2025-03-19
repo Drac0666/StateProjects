@@ -125,38 +125,38 @@ fig3_json = json.dumps(fig3.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
 fig4_json = json.dumps(fig4.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
 fig5_json = json.dumps(fig5.to_dict(), cls=plotly.utils.PlotlyJSONEncoder)
 
-# Create the HTML file with all visualizations using div structure
-html_content = f"""
+# Create the HTML content separately to avoid f-string issues with curly braces
+html_content = """
 <!DOCTYPE html>
 <html>
 <head>
     <title>Stock Correlation Analysis with State Street</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body {{
+        body {
             font-family: Arial, sans-serif;
             margin: 20px;
             background-color: #f5f5f5;
-        }}
-        h1 {{
+        }
+        h1 {
             color: #333;
             text-align: center;
-        }}
-        .dashboard {{
+        }
+        .dashboard {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-gap: 20px;
-        }}
-        .full-width {{
+        }
+        .full-width {
             grid-column: 1 / span 2;
-        }}
-        .chart-container {{
+        }
+        .chart-container {
             background-color: white;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             padding: 15px;
             margin-bottom: 20px;
-        }}
+        }
     </style>
 </head>
 <body>
@@ -172,57 +172,55 @@ html_content = f"""
     
     <script>
         // State Street Correlation Heatmap
-        var fig1 = {fig1_json};
+        var fig1 = FIG1_JSON;
         Plotly.newPlot('state-street-corr', fig1.data, fig1.layout);
         
         // Rolling Correlations Line Chart
-        var fig2 = {fig2_json};
+        var fig2 = FIG2_JSON;
         Plotly.newPlot('rolling-correlations', fig2.data, fig2.layout);
         
         // Time-based Heatmap
-        var fig3 = {fig3_json};
+        var fig3 = FIG3_JSON;
         Plotly.newPlot('rolling-heatmap', fig3.data, fig3.layout);
         
         // Summary Stats Table
-        var fig5 = {fig5_json};
+        var fig5 = FIG5_JSON;
         Plotly.newPlot('summary-stats', fig5.data, fig5.layout);
         
         // Full Correlation Matrix
-        var fig4 = {fig4_json};
+        var fig4 = FIG4_JSON;
         Plotly.newPlot('full-matrix', fig4.data, fig4.layout);
         
         // Make plots responsive
-        window.onresize = function() {{
-            Plotly.relayout('state-street-corr', {{
+        window.onresize = function() {
+            Plotly.relayout('state-street-corr', {
                 'xaxis.autorange': true,
                 'yaxis.autorange': true
-            }});
-            Plotly.relayout('rolling-correlations', {{
+            });
+            Plotly.relayout('rolling-correlations', {
                 'xaxis.autorange': true,
                 'yaxis.autorange': true
-            }});
-            Plotly.relayout('rolling-heatmap', {{
+            });
+            Plotly.relayout('rolling-heatmap', {
                 'xaxis.autorange': true,
                 'yaxis.autorange': true
-            }});
-            Plotly.relayout('full-matrix', {{
+            });
+            Plotly.relayout('full-matrix', {
                 'xaxis.autorange': true,
                 'yaxis.autorange': true
-            }});
-        }};
+            });
+        };
     </script>
 </body>
 </html>
 """
 
-# Use f-string for direct insertion of JSON variables
-html_content = html_content.format(
-    fig1_json=fig1_json,
-    fig2_json=fig2_json,
-    fig3_json=fig3_json,
-    fig4_json=fig4_json,
-    fig5_json=fig5_json
-)
+# Replace placeholders with actual JSON content
+html_content = html_content.replace('FIG1_JSON', fig1_json)
+html_content = html_content.replace('FIG2_JSON', fig2_json)
+html_content = html_content.replace('FIG3_JSON', fig3_json)
+html_content = html_content.replace('FIG4_JSON', fig4_json)
+html_content = html_content.replace('FIG5_JSON', fig5_json)
 
 # Write the complete HTML file
 with open('state_street_correlation_dashboard.html', 'w') as f:
