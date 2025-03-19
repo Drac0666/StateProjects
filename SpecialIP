@@ -16,28 +16,7 @@ correlation_matrix = returns.corr()
 # Step 3: Extract correlations with State Street
 state_street_corr = correlation_matrix['State Street'].sort_values(ascending=False)
 
-# Step 4: Create a heatmap of correlations with State Street
-fig_heatmap = px.imshow(
-    pd.DataFrame(state_street_corr).T,  # Transpose for horizontal display
-    color_continuous_scale='RdBu_r',
-    zmin=-1,
-    zmax=1,
-    text_auto=True,
-    aspect="auto",
-    title='Correlation of Each Stock with State Street'
-)
-fig_heatmap.update_layout(
-    height=600,
-    width=1000,
-    coloraxis_colorbar=dict(
-        title="Correlation",
-        thicknessmode="pixels", thickness=20,
-        lenmode="pixels", len=300
-    )
-)
-fig_heatmap.write_html("state_street_correlations.html")
-
-# Step 5: Calculate rolling correlations with State Street (60-day window)
+# Step 4: Calculate rolling correlations with State Street (60-day window)
 window_size = 60  # Can be adjusted as needed
 rolling_correlations = pd.DataFrame(index=returns.index[window_size-1:])
 
@@ -47,39 +26,11 @@ for column in returns.columns:
         roll_corr = returns['State Street'].rolling(window=window_size).corr(returns[column])
         rolling_correlations[column] = roll_corr
 
-# Step 6: Plot rolling correlations
-fig_rolling = go.Figure()
-for column in rolling_correlations.columns:
-    fig_rolling.add_trace(
-        go.Scatter(
-            x=rolling_correlations.index,
-            y=rolling_correlations[column],
-            mode='lines',
-            name=column
-        )
-    )
+# Step 5: Get top 5 correlated stocks for the time-based heatmap
+top_5_stocks = state_street_corr.index[1:6]  # Exclude State Street itself
+rolling_corr_heatmap = rolling_correlations[top_5_stocks]
 
-fig_rolling.add_shape(
-    type="line",
-    x0=rolling_correlations.index[0],
-    y0=0,
-    x1=rolling_correlations.index[-1],
-    y1=0,
-    line=dict(color="red", width=1, dash="dash"),
-)
-
-fig_rolling.update_layout(
-    title=f'{window_size}-Day Rolling Correlation with State Street',
-    xaxis_title='Date',
-    yaxis_title='Correlation Coefficient',
-    legend_title='Stocks',
-    height=600,
-    width=1000,
-    hovermode="x unified"
-)
-fig_rolling.write_html("state_street_rolling_correlations.html")
-
-# Step 7: Generate statistical summary
+# Step 6: Generate statistical summary
 summary_stats = pd.DataFrame({
     'Mean Correlation': rolling_correlations.mean(),
     'Min Correlation': rolling_correlations.min(),
@@ -87,54 +38,189 @@ summary_stats = pd.DataFrame({
     'Volatility': rolling_correlations.std()
 }).sort_values('Mean Correlation', ascending=False)
 
-print("Statistical Summary of Rolling Correlations with State Street:")
-print(summary_stats)
+# Create the dashboard with all visualizations
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+from plotly.offline import plot
 
-# Step 8: Create heatmap of rolling correlations over time (for top 5 correlated stocks)
-top_5_stocks = state_street_corr.index[1:6]  # Exclude State Street itself
-rolling_corr_heatmap = rolling_correlations[top_5_stocks]
+# Create figures separately first
+# 1. State Street Correlation Heatmap
+fig1 = px.imshow(
+    pd.DataFrame(state_street_corr).T,
+    color_continuous_scale='RdBu_r',
+    zmin=-1, zmax=1,
+    text_auto=True,
+    aspect="auto",
+    title='Correlation of Each Stock with State Street'
+)
 
-# Create a heatmap with dates on x-axis and stocks on y-axis
-fig_heat_time = px.imshow(
-    rolling_corr_heatmap.T,  # Transpose for better visualization
+# 2. Rolling Correlations Line Chart
+fig2 = go.Figure()
+for column in rolling_correlations.columns[:10]:  # Limit to top 10 for readability
+    fig2.add_trace(
+        go.Scatter(
+            x=rolling_correlations.index,
+            y=rolling_correlations[column],
+            mode='lines',
+            name=column
+        )
+    )
+fig2.add_shape(
+    type="line", x0=rolling_correlations.index[0], y0=0,
+    x1=rolling_correlations.index[-1], y1=0,
+    line=dict(color="red", width=1, dash="dash"),
+)
+fig2.update_layout(
+    title=f'{window_size}-Day Rolling Correlation with State Street',
+    xaxis_title='Date',
+    yaxis_title='Correlation Coefficient',
+    legend_title='Stocks',
+    hovermode="x unified"
+)
+
+# 3. Time-based Heatmap for Top 5 Stocks
+fig3 = px.imshow(
+    rolling_corr_heatmap.T,
     x=rolling_corr_heatmap.index,
     y=list(top_5_stocks),
     color_continuous_scale='RdBu_r',
-    zmin=-1,
-    zmax=1,
+    zmin=-1, zmax=1,
     aspect="auto",
     title=f'{window_size}-Day Rolling Correlation with State Street (Top 5 Correlated Stocks)'
 )
-fig_heat_time.update_layout(
-    height=600,
-    width=1000,
+fig3.update_layout(
     xaxis_title='Date',
-    yaxis_title='Stock',
-    coloraxis_colorbar=dict(
-        title="Correlation",
-        thicknessmode="pixels", thickness=20,
-        lenmode="pixels", len=300
-    )
+    yaxis_title='Stock'
 )
-fig_heat_time.write_html("state_street_rolling_correlation_heatmap.html")
 
-# Step 9: Create a correlation matrix heatmap for all stocks
-fig_corr_matrix = px.imshow(
+# 4. Full Correlation Matrix
+fig4 = px.imshow(
     correlation_matrix,
     color_continuous_scale='RdBu_r',
-    zmin=-1,
-    zmax=1,
+    zmin=-1, zmax=1,
     text_auto=True,
     aspect="auto",
     title='Correlation Matrix for All Stocks'
 )
-fig_corr_matrix.update_layout(
-    height=800,
-    width=1000,
-    coloraxis_colorbar=dict(
-        title="Correlation",
-        thicknessmode="pixels", thickness=20,
-        lenmode="pixels", len=500
+
+# 5. Summary Stats Table
+summary_for_plot = summary_stats.reset_index()
+summary_for_plot.rename(columns={'index': 'Stock'}, inplace=True)
+fig5 = go.Figure(data=[go.Table(
+    header=dict(
+        values=list(summary_for_plot.columns),
+        fill_color='paleturquoise',
+        align='left'
+    ),
+    cells=dict(
+        values=[summary_for_plot[col] for col in summary_for_plot.columns],
+        fill_color='lavender',
+        align='left',
+        format=[None, '.4f', '.4f', '.4f', '.4f']
     )
-)
-fig_corr_matrix.write_html("correlation_matrix.html")
+)])
+fig5.update_layout(title='Statistical Summary of Rolling Correlations with State Street')
+
+# Create the HTML file with all visualizations using div structure
+html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Correlation Analysis with State Street</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }}
+        h1 {{
+            color: #333;
+            text-align: center;
+        }}
+        .dashboard {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 20px;
+        }}
+        .full-width {{
+            grid-column: 1 / span 2;
+        }}
+        .chart-container {{
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 15px;
+            margin-bottom: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <h1>Stock Correlation Analysis with State Street</h1>
+    
+    <div class="dashboard">
+        <div class="chart-container full-width" id="state-street-corr"></div>
+        <div class="chart-container full-width" id="rolling-correlations"></div>
+        <div class="chart-container" id="rolling-heatmap"></div>
+        <div class="chart-container" id="summary-stats"></div>
+        <div class="chart-container full-width" id="full-matrix"></div>
+    </div>
+    
+    <script>
+        // State Street Correlation Heatmap
+        var fig1 = {JSON_FIG1};
+        Plotly.newPlot('state-street-corr', fig1.data, fig1.layout);
+        
+        // Rolling Correlations Line Chart
+        var fig2 = {JSON_FIG2};
+        Plotly.newPlot('rolling-correlations', fig2.data, fig2.layout);
+        
+        // Time-based Heatmap
+        var fig3 = {JSON_FIG3};
+        Plotly.newPlot('rolling-heatmap', fig3.data, fig3.layout);
+        
+        // Summary Stats Table
+        var fig5 = {JSON_FIG5};
+        Plotly.newPlot('summary-stats', fig5.data, fig5.layout);
+        
+        // Full Correlation Matrix
+        var fig4 = {JSON_FIG4};
+        Plotly.newPlot('full-matrix', fig4.data, fig4.layout);
+        
+        // Make plots responsive
+        window.onresize = function() {{
+            Plotly.relayout('state-street-corr', {{
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            }});
+            Plotly.relayout('rolling-correlations', {{
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            }});
+            Plotly.relayout('rolling-heatmap', {{
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            }});
+            Plotly.relayout('full-matrix', {{
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            }});
+        }};
+    </script>
+</body>
+</html>
+"""
+
+# Replace the JSON placeholders with actual JSON representations of the figures
+import json
+html_content = html_content.replace('{JSON_FIG1}', json.dumps(fig1, cls=plotly.utils.PlotlyJSONEncoder))
+html_content = html_content.replace('{JSON_FIG2}', json.dumps(fig2, cls=plotly.utils.PlotlyJSONEncoder))
+html_content = html_content.replace('{JSON_FIG3}', json.dumps(fig3, cls=plotly.utils.PlotlyJSONEncoder))
+html_content = html_content.replace('{JSON_FIG4}', json.dumps(fig4, cls=plotly.utils.PlotlyJSONEncoder))
+html_content = html_content.replace('{JSON_FIG5}', json.dumps(fig5, cls=plotly.utils.PlotlyJSONEncoder))
+
+# Write the complete HTML file
+with open('state_street_correlation_dashboard.html', 'w') as f:
+    f.write(html_content)
+
+print("Dashboard created successfully! Open 'state_street_correlation_dashboard.html' in your browser.")
