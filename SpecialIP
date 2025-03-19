@@ -3,27 +3,21 @@ import pandas as pd
 import pyperclip  # To copy to clipboard
 
 # Base directory to search
-base_dir = r'C:\Your\Path\To\PostTrade\2024'  # Change this to your path!
+base_dir = r'C:\Your\Path\To\PostTrade\2024'  # Update with your actual path
 
 # Create an empty list to store folders missing MCC.xlsx
 missing_mcc_folders = []
 
-# Loop through only the immediate subdirectories
-for folder_name in os.listdir(base_dir):
-    folder_path = os.path.join(base_dir, folder_name)
-    
-    # Check if it's a directory
-    if os.path.isdir(folder_path):
-        
-        # Get the files in this folder (only top-level, not recursive)
-        filenames = os.listdir(folder_path)
-        
+# Walk through the entire structure
+for root, dirs, files in os.walk(base_dir):
+    # If there are no subfolders inside (this is a "leaf" folder)
+    if not dirs:
         # Check if any file contains 'MCC.xlsx'
-        mcc_exists = any('MCC.xlsx' in filename for filename in filenames)
+        mcc_exists = any('MCC.xlsx' in filename for filename in files)
         
         if not mcc_exists:
-            # Append the path if no MCC.xlsx variant is found
-            missing_mcc_folders.append(folder_path)
+            # Append the folder path if no MCC.xlsx variant is found
+            missing_mcc_folders.append(root)
 
 # Convert the list into a DataFrame
 df_missing = pd.DataFrame(missing_mcc_folders, columns=['Missing MCC Folder Path'])
