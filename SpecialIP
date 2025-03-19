@@ -1,13 +1,83 @@
-from functools import reduce
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# List of your dataframes
-dfs = [df_aapl, df_msft, df_googl]
+# Assuming you have a dataframe 'df' with date index and stock prices as columns
+# Example: df.columns = ['State Street', 'Apple', 'Microsoft', 'Amazon', ...]
 
-# Merge all dataframes on 'Date'
-combined_df = reduce(lambda left, right: pd.merge(left, right, on='Date', how='outer'), dfs)
+# Step 1: Calculate daily returns for all stocks
+returns = df.pct_change().dropna()
 
-# Sort by Date (optional)
-combined_df = combined_df.sort_values('Date')
+# Step 2: Calculate correlation matrix
+correlation_matrix = returns.corr()
 
-# Preview
-print(combined_df.head())
+# Step 3: Extract correlations with State Street
+state_street_corr = correlation_matrix['State Street'].sort_values(ascending=False)
+
+# Step 4: Create a heatmap of correlations with State Street
+plt.figure(figsize=(12, 8))
+sns.heatmap(
+    pd.DataFrame(state_street_corr).T,  # Transpose to get horizontal display
+    annot=True,
+    cmap='coolwarm',
+    vmin=-1,
+    vmax=1,
+    center=0
+)
+plt.title('Correlation of Each Stock with State Street')
+plt.tight_layout()
+plt.savefig('state_street_correlations.png')
+plt.close()
+
+# Step 5: Calculate rolling correlations with State Street (60-day window)
+window_size = 60  # Can be adjusted as needed
+rolling_correlations = pd.DataFrame(index=returns.index[window_size-1:])
+
+for column in returns.columns:
+    if column != 'State Street':
+        # Calculate rolling correlation for each stock with State Street
+        roll_corr = returns['State Street'].rolling(window=window_size).corr(returns[column])
+        rolling_correlations[column] = roll_corr
+
+# Step 6: Plot rolling correlations
+plt.figure(figsize=(12, 8))
+for column in rolling_correlations.columns:
+    plt.plot(rolling_correlations.index, rolling_correlations[column], label=column)
+
+plt.axhline(y=0, color='r', linestyle='-', alpha=0.3)
+plt.title(f'{window_size}-Day Rolling Correlation with State Street')
+plt.xlabel('Date')
+plt.ylabel('Correlation Coefficient')
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+plt.savefig('state_street_rolling_correlations.png')
+plt.close()
+
+# Step 7: Generate statistical summary
+summary_stats = pd.DataFrame({
+    'Mean Correlation': rolling_correlations.mean(),
+    'Min Correlation': rolling_correlations.min(),
+    'Max Correlation': rolling_correlations.max(),
+    'Volatility': rolling_correlations.std()
+}).sort_values('Mean Correlation', ascending=False)
+
+print("Statistical Summary of Rolling Correlations with State Street:")
+print(summary_stats)
+
+# Step 8: Create heatmap of rolling correlations over time (for top 5 correlated stocks)
+top_5_stocks = state_street_corr.index[1:6]  # Exclude State Street itself
+rolling_corr_heatmap = rolling_correlations[top_5_stocks]
+
+plt.figure(figsize=(12, 8))
+sns.heatmap(
+    rolling_corr_heatmap.T,  # Transpose for better visualization
+    cmap='coolwarm',
+    vmin=-1,
+    vmax=1,
+    center=0
+)
+plt.title(f'{window_size}-Day Rolling Correlation with State Street (Top 5 Correlated Stocks)')
+plt.tight_layout()
+plt.savefig('state_street_rolling_correlation_heatmap.png')
+plt.close()
