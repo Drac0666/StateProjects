@@ -1,1 +1,1 @@
-For the EMEA Consumer ABS and OFRMBS models, and in light of the previously mentioned Intex outage, the CMA team has decided to implement a workaround, as described in the document XXX.docx.
+For the ICAAP Stress Testing scenario, we previously relied on the XXX Severely Adverse scenario, which is no longer produced for XXX purposes. Since the XXX Severely Adverse scenario was originally based on the FRB CCAR scenario and was only rolled forward by the CMA team for benchmarking purposes, we have decided to leverage the CCAR 2025 BHC Stress Test scenario for Q1 2025.
