@@ -1,37 +1,7 @@
-import win32com.client
-import os
+Hi Ste, Jae,
 
-def save_excel_range_as_png(excel_file, sheet_name, cell_range, output_png):
-    excel = win32com.client.Dispatch("Excel.Application")
-    excel.Visible = False
-    excel.DisplayAlerts = False
+We were wondering if you could help us out. On a quarterly basis, we collect Credit Enhancement and Retention values from Intex. Since that data is currently unavailable to us, we’re exploring alternatives.
 
-    wb = excel.Workbooks.Open(os.path.abspath(excel_file))
-    ws = wb.Sheets(sheet_name)
+Would it be possible for you to pull the Credit Enhancement, Retention Level (or status), and STS status from Bloomberg? Alternatively, if you could share the relevant Bloomberg fields, we can try to retrieve the data on our end.
 
-    # Select the range
-    rng = ws.Range(cell_range)
-
-    # Copy the range as a picture
-    rng.CopyPicture(Format=win32com.client.constants.xlBitmap)
-
-    # Paste it into a ChartObject (this is a trick to export it)
-    chart = ws.ChartObjects().Add(0, 0, rng.Width, rng.Height)
-    chart.Activate()
-    chart.Chart.Paste()
-
-    # Export chart as PNG
-    chart.Chart.Export(os.path.abspath(output_png))
-
-    # Clean up
-    chart.Delete()
-    wb.Close(False)
-    excel.Quit()
-
-# Example usage
-save_excel_range_as_png(
-    excel_file="example.xlsx",
-    sheet_name="Sheet1",
-    cell_range="A1:D10",
-    output_png="output.png"
-)
+Thanks in advance!
