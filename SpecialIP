@@ -1,49 +1,11 @@
-Sure! Here's a summary of the key points from the image:
+Currently, without Intex access, providing detailed insights is challenging; however, the primary factors influencing this issue can be categorized as follows:
 
+PD Model:
 
----
+This is not directly managed by the CMA team but appears to be generating relatively high values. Historical data indicates that delinquency/default rates in the CLO portfolio have not exceeded 6% over the past three years. Soon, we expect discussions regarding CLO assumptions, particularly around liquidity timelines and recovery lags. Given that CLOs are actively managed, it's unlikely for loans to remain in the portfolio for as long as the current 12-month assumption.
 
-Scenario: Geopolitical tension leads to moderate global recession
+Intex Settings:
 
-Key Assumptions:
+Another contributing factor involves Intex configurations. We frequently observe large fluctuations between a value of 100 and lower figures (typically around 3-4). A setting of 100 typically indicates that Intex was unable to solve for breaking bonds based on the current configuration. I need to verify, but it is possible that the maximum CR (Collateral Recovery) for CLO is set at 10, and when Intex cannot find a solution, it defaults to 100, causing significant volatility.
 
-Geopolitical Conflicts: Escalation in the Middle East and ongoing Russia-Ukraine war increase global instability.
-
-China Slowdown: U.S. tariffs and weak Chinese policy response worsen economic slowdown.
-
-Global Recession: Political uncertainty, lower consumer and business confidence drive a moderate global recession.
-
-Commercial Real Estate (CRE): CRE office sector hit by high vacancies due to ongoing work-from-home trends.
-
-Monetary Policy: Central banks aggressively cut rates to combat recession.
-
-Fiscal Policy: Governments are not providing much fiscal support.
-
-
-Macro Conditions:
-
-US: GDP drops by 1.4%, unemployment peaks at 7.6%, real estate prices fall significantly.
-
-Global: Major economies like the Eurozone, UK, and Japan also see contractions in GDP.
-
-
-Financial Conditions:
-
-Equities: US equity prices drop ~14.1%, global markets follow; volatility spikes (VIX reaches 62).
-
-Rates: Sharp decline in interest rates; 3M Treasury down to ~-1.6%, 10Y Treasury to ~2.9%.
-
-Credit Spreads: BBB spreads widen by ~212 bps.
-
-FX: USD strengthens against all major currencies except JPY.
-
-
-Additional Features:
-
-Cyclical and financial sectors face credit downgrades.
-
-CRE and collateral losses increase exposure to counterparties.
-
-Bank runs and liquidity stress emerge.
-
-Market stress worsens losses in illiquid and leveraged positions.
+An illustrative example is seen when comparing Q4 to Q1 collateral losses (related to the first point). In Q4, certain deals had a CR of 100 with a collateral loss of 5%. In Q1, those same deals had a CR of 4 with a collateral loss of 10%, which intuitively suggests a CR of 50—yet this is not reflected. Given the complexity of these quantitative models, continuous monitoring over extended periods is advisable to identify deals consistently demonstrating deterioration in CR ratios
