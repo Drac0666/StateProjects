@@ -1,11 +1,1 @@
-Currently, without Intex access, providing detailed insights is challenging; however, the primary factors influencing this issue can be categorized as follows:
-
-PD Model:
-
-This is not directly managed by the CMA team but appears to be generating relatively high values. Historical data indicates that delinquency/default rates in the CLO portfolio have not exceeded 6% over the past three years. Soon, we expect discussions regarding CLO assumptions, particularly around liquidity timelines and recovery lags. Given that CLOs are actively managed, it's unlikely for loans to remain in the portfolio for as long as the current 12-month assumption.
-
-Intex Settings:
-
-Another contributing factor involves Intex configurations. We frequently observe large fluctuations between a value of 100 and lower figures (typically around 3-4). A setting of 100 typically indicates that Intex was unable to solve for breaking bonds based on the current configuration. I need to verify, but it is possible that the maximum CR (Collateral Recovery) for CLO is set at 10, and when Intex cannot find a solution, it defaults to 100, causing significant volatility.
-
-An illustrative example is seen when comparing Q4 to Q1 collateral losses (related to the first point). In Q4, certain deals had a CR of 100 with a collateral loss of 5%. In Q1, those same deals had a CR of 4 with a collateral loss of 10%, which intuitively suggests a CR of 50—yet this is not reflected. Given the complexity of these quantitative models, continuous monitoring over extended periods is advisable to identify deals consistently demonstrating deterioration in CR ratios
+I believe it’s worth maintaining access to Fitch. Relying solely on one rating agency, such as Moody’s, may not be sufficient—especially if MVG requests additional insights, a deep dive, or market research. Having an alternative perspective is valuable in such cases.
