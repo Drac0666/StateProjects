@@ -1,1 +1,32 @@
-I believe it’s worth maintaining access to Fitch. Relying solely on one rating agency, such as Moody’s, may not be sufficient—especially if MVG requests additional insights, a deep dive, or market research. Having an alternative perspective is valuable in such cases.
+import pandas as pd
+import re
+
+# Load your Excel file
+df = pd.read_excel('your_file.xlsx')
+
+# Function to extract names from a cell
+def extract_names(cell):
+    if pd.isna(cell):
+        return set()
+    names = [re.sub(r'<.*?>', '', name).strip() for name in cell.split(';')]
+    return set(filter(None, names))
+
+# Extract names from Previous and Current columns
+previous_names = extract_names(df.at[0, 'Previous'])
+current_names = extract_names(df.at[0, 'Current'])
+
+# Find added and removed names
+added = current_names - previous_names
+removed = previous_names - current_names
+
+# Create a new dataframe
+result_df = pd.DataFrame({
+    'Added': pd.Series(list(added)),
+    'Removed': pd.Series(list(removed))
+})
+
+# Optional: Save the results to a new Excel file
+result_df.to_excel('comparison_result.xlsx', index=False)
+
+# Display the resulting dataframe
+print(result_df)
