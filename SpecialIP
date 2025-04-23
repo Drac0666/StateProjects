@@ -1,32 +1,94 @@
-import pandas as pd
-import re
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.gridspec import GridSpec
+import numpy as np
 
-# Load your Excel file
-df = pd.read_excel('your_file.xlsx')
+# Set up the figure with specific size
+fig = plt.figure(figsize=(12, 8))
+gs = GridSpec(3, 4, figure=fig)
 
-# Function to extract names from a cell
-def extract_names(cell):
-    if pd.isna(cell):
-        return set()
-    names = [re.sub(r'<.*?>', '', name).strip() for name in cell.split(';')]
-    return set(filter(None, names))
+# Colors
+highlight_color = '#4285f4'  # Blue for months with activities
+regular_color = '#e8eaed'    # Gray for months without activities
+text_color = '#333333'       # Dark gray for text
+white = '#ffffff'            # White for text on colored backgrounds
 
-# Extract names from Previous and Current columns
-previous_names = extract_names(df.at[0, 'Previous'])
-current_names = extract_names(df.at[0, 'Current'])
+# Month data 
+months = [
+    'January', 'February', 'March', 'April',
+    'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December'
+]
 
-# Find added and removed names
-added = current_names - previous_names
-removed = previous_names - current_names
+# Activity data - which months have what activities
+activities = {
+    'January': 'CCAR & QST',
+    'February': 'CECL',
+    'April': 'QST',
+    'May': 'CECL',
+    'June': 'QST',
+    'August': 'CECL',
+    'October': 'QST',
+    'November': 'CECL',
+}
 
-# Create a new dataframe
-result_df = pd.DataFrame({
-    'Added': pd.Series(list(added)),
-    'Removed': pd.Series(list(removed))
-})
+# Create a subplot for each month
+for i, month in enumerate(months):
+    row = i // 4
+    col = i % 4
+    ax = fig.add_subplot(gs[row, col])
+    
+    # Determine if this month has an activity
+    has_activity = month in activities
+    color = highlight_color if has_activity else regular_color
+    
+    # Create the rectangle for the month
+    rect = patches.Rectangle((0, 0), 1, 1, facecolor=color)
+    ax.add_patch(rect)
+    
+    # Add month name
+    text_color_to_use = white if has_activity else text_color
+    ax.text(0.5, 0.7, month, 
+            horizontalalignment='center',
+            verticalalignment='center',
+            fontsize=12, 
+            fontweight='bold',
+            color=text_color_to_use)
+    
+    # Add activity name if it exists
+    if has_activity:
+        ax.text(0.5, 0.4, activities[month], 
+                horizontalalignment='center',
+                verticalalignment='center',
+                fontsize=10,
+                color=white)
+    
+    # Remove axes
+    ax.axis('off')
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
 
-# Optional: Save the results to a new Excel file
-result_df.to_excel('comparison_result.xlsx', index=False)
+# Add title
+fig.suptitle('Annual Banking Regulatory Calendar', fontsize=18, y=0.95)
 
-# Display the resulting dataframe
-print(result_df)
+# Add legend and abbreviations
+legend_ax = fig.add_axes([0.1, 0.92, 0.8, 0.05])
+legend_ax.axis('off')
+legend_ax.add_patch(patches.Rectangle((0.7, 0.2), 0.02, 0.5, facecolor=highlight_color))
+legend_ax.text(0.73, 0.45, 'Reporting Period', fontsize=9)
+
+# Add abbreviation explanations in one line
+abbr_ax = fig.add_axes([0.1, 0.85, 0.8, 0.05])
+abbr_ax.axis('off')
+abbr_ax.text(0.01, 0.5, 
+         'CCAR: Comprehensive Capital Analysis and Review   |   QST: Quarterly Stress Test   |   CECL: Current Expected Credit Loss', 
+         fontsize=9)
+
+# Adjust layout
+plt.tight_layout(rect=[0, 0, 1, 0.85])
+
+# Show the plot
+plt.show()
+
+# Uncomment to save the image to a file
+# plt.savefig('banking_regulatory_calendar.png', dpi=300, bbox_inches='tight')
