@@ -1,15 +1,20 @@
 import pandas as pd
 
-# Read the Excel or CSV file
-df = pd.read_excel('your_file.xlsx')  # or pd.read_csv('your_file.csv')
+# Load your data
+df = pd.read_excel('your_file.xlsx')  # or use pd.read_csv('your_file.csv')
 
-# Define the columns to compare
+# Columns to compare
 rating_cols = ['RTG_SP', 'RTG_FITCH', 'RTG_DBRS', 'RTG_MOODYS']
 
-# Find the column with the minimum value for each row
-df['Lowest_Rating_Source'] = df[rating_cols].idxmin(axis=1)
+# Function to find all column names with the minimum value
+def get_min_sources(row):
+    min_val = row[rating_cols].min(skipna=True)
+    return ', '.join([col for col in rating_cols if row[col] == min_val])
 
-# Optional: Save the result
-df.to_excel('output_with_lowest_rating.xlsx', index=False)
+# Apply the function row-wise
+df['Lowest_Rating_Sources'] = df.apply(get_min_sources, axis=1)
 
-print(df[['Lowest_Rating_Source'] + rating_cols].head())
+# Optional: save result
+df.to_excel('output_with_multiple_min_sources.xlsx', index=False)
+
+print(df[['Lowest_Rating_Sources'] + rating_cols].head())
