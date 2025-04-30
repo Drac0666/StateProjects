@@ -1,39 +1,15 @@
-Subject: Clarification on New Issuance Purchase (Ticket XYZ)
+import pandas as pd
 
-Hi Michael,
+# Read the Excel or CSV file
+df = pd.read_excel('your_file.xlsx')  # or pd.read_csv('your_file.csv')
 
-I would like to inform you that the ticket (XYZ) purchased last Friday pertains to a new issuance; however, it was acquired from the secondary market. As a result, there are no comparable or alternative prices available in IDC.
+# Define the columns to compare
+rating_cols = ['RTG_SP', 'RTG_FITCH', 'RTG_DBRS', 'RTG_MOODYS']
 
-The issue price for this bond was 99.721, and EUR 5 million was purchased at 99.79 from Mizuho. Although the comparison between the issue price and the purchase price does not indicate any breach, it is a noteworthy case where a newly issued bond was acquired via the secondary market.
+# Find the column with the minimum value for each row
+df['Lowest_Rating_Source'] = df[rating_cols].idxmin(axis=1)
 
-Please let me know if you need any additional details.
+# Optional: Save the result
+df.to_excel('output_with_lowest_rating.xlsx', index=False)
 
-Best regards,
-[Your Name]
-
-Would you also like a slightly more formal or executive-level version depending on the audience?
-Powiedziałeś(-aś):
-do you see any risk in described situation ?
-ChatGPT powiedział:
-
-Good question — yes, there are a few potential risks in the situation you described:
-
-    Valuation Risk:
-    Since there are no comparable prices in IDC and the bond was bought in the secondary market slightly above issue price (99.79 vs. 99.721), it could raise questions from auditors, pricing committees, or regulators about how the fair value was determined.
-
-    Liquidity Risk:
-    New issues are typically less liquid immediately after launch. Buying from secondary (instead of primary allocation) could signal weaker initial demand or result in less price transparency, potentially making it harder to sell or mark-to-market the bond accurately.
-
-    Documentation/Compliance Risk:
-    If internal policies or regulatory frameworks (like valuation policies under IFRS 13 or SEC rules) require independent or multiple pricing sources for verification, the lack of IDC pricing could be seen as a control gap unless properly documented and justified.
-
-    Market Risk:
-    Because the bond was purchased slightly above the issue price in a less transparent secondary trade, there is a small mark-to-market risk if secondary market prices fall or liquidity deteriorates soon after purchase.
-
-In short:
-
-    If properly documented (as you're doing) and if the price difference is minor (which it is here), the immediate risk is low.
-
-    However, for governance and audit purposes, it's important to record why the secondary market was used, why no IDC price exists, and how the fair value was determined.
-
-Would you like me also to suggest a few sentences you could add to your email to proactively address this? It would make your message even stronger.
+print(df[['Lowest_Rating_Source'] + rating_cols].head())
