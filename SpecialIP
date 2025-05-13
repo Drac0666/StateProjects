@@ -1,20 +1,43 @@
+import os
 import pandas as pd
+from openpyxl import load_workbook
 
-# Load your data
-df = pd.read_excel('your_file.xlsx')  # or use pd.read_csv('your_file.csv')
+def extract_data_from_excel(file_path):
+    wb = load_workbook(filename=file_path, data_only=True)
+    
+    # Get the 'b' worksheet
+    if "b" not in wb.sheetnames:
+        print(f"Worksheet 'b' not found in file: {file_path}")
+        return None
+    
+    ws_b = wb["b"]
 
-# Columns to compare
-rating_cols = ['RTG_SP', 'RTG_FITCH', 'RTG_DBRS', 'RTG_MOODYS']
+    # Extract values
+    try:
+        date = ws_b["A1"].value
+        clo = ws_b["B2"].value
+        lf_clo = ws_b["B3"].value
+        return {"Date": date, "CLO": clo, "LF CLO": lf_clo}
+    except Exception as e:
+        print(f"Error reading file {file_path}: {e}")
+        return None
 
-# Function to find all column names with the minimum value
-def get_min_sources(row):
-    min_val = row[rating_cols].min(skipna=True)
-    return ', '.join([col for col in rating_cols if row[col] == min_val])
+def aggregate_data_from_folder(folder_path):
+    data_list = []
 
-# Apply the function row-wise
-df['Lowest_Rating_Sources'] = df.apply(get_min_sources, axis=1)
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".xlsx"):
+            file_path = os.path.join(folder_path, filename)
+            data = extract_data_from_excel(file_path)
+            if data:
+                data_list.append(data)
+    
+    return pd.DataFrame(data_list)
 
-# Optional: save result
-df.to_excel('output_with_multiple_min_sources.xlsx', index=False)
+# Usage
+folder_path = "/path/to/your/folder"
+df = aggregate_data_from_folder(folder_path)
 
-print(df[['Lowest_Rating_Sources'] + rating_cols].head())
+# Display or export
+print(df)
+# df.to_excel("aggregated_data.xlsx", index=False)
