@@ -1,48 +1,46 @@
-import os
-import pandas as pd
-from openpyxl import load_workbook
+📌 Key Takeaways: CMIS Nederland, RMBS Risk & NatWest Lawsuit
+🏛️ 1. CMIS Nederland’s Legal Liability
 
-def extract_data_from_excel(file_path):
-    wb = load_workbook(filename=file_path, data_only=True)
-    
-    # Get the 'b' worksheet
-    if "b" not in wb.sheetnames:
-        print(f"Worksheet 'b' not found in file: {file_path}")
-        return None
-    
-    ws_b = wb["b"]
+    CMIS was found liable by the UK High Court to pay €155 million to NatWest.
 
-    # Extract values
-    try:
-        date = ws_b["A1"].value
-        clo = ws_b["B2"].value
-        lf_clo = ws_b["B3"].value
-        return {
-            "Date": date,
-            "CLO": clo,
-            "LF CLO": lf_clo,
-            "Filename": os.path.basename(file_path)
-        }
-    except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
-        return None
+    The dispute concerned 7 Deeds of Indemnity linked to RMBS swap transactions (2006–2008).
 
-def aggregate_data_from_folder(folder_path):
-    data_list = []
+    The court ruled these were indemnities, not guarantees — meaning CMIS had a primary payment obligation.
 
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".xlsx"):
-            file_path = os.path.join(folder_path, filename)
-            data = extract_data_from_excel(file_path)
-            if data:
-                data_list.append(data)
-    
-    return pd.DataFrame(data_list)
+📜 2. Purpose of the Deeds of Indemnity
 
-# Usage
-folder_path = "/path/to/your/folder"
-df = aggregate_data_from_folder(folder_path)
+    Used in RMBS structures to secure swap obligations owed by SPVs to NatWest.
 
-# Display or export
-print(df)
-# df.to_excel("aggregated_data.xlsx", index=False)
+    Ensured NatWest would be paid even if the SPV failed to meet its obligations.
+
+    CMIS signed them to support transactions known as EMAC deals.
+
+🧱 3. RMBS Structures Are Legally Isolated
+
+    Mortgage loans were sold to SPVs via true sale.
+
+    CMIS's own financial problems do not allow creditors to access SPV assets.
+
+    RMBS principal and interest payments are protected by legal structure.
+
+💸 4. Can RMBS Payments Be Taken to Repay NatWest?
+
+    ❌ No — CMIS cannot use RMBS principal payments to cover its debt to NatWest.
+
+    The €155M obligation is enforceable only against CMIS, not the RMBS trust or SPVs.
+
+⚠️ 5. Risks to Investors in CMIS-Serviced RMBS
+
+    Operational risk if CMIS fails (delays, reporting issues, transition to backup servicer).
+
+    No direct financial loss from CMIS legal case unless servicing collapses without replacement.
+
+    Important to verify trustee protections, backup servicer, and waterfall mechanics.
+
+🔗 6. ABN AMRO Connection to NatWest
+
+    Some 2007 RMBS deals list ABN AMRO as swap counterparty.
+
+    After 2007, RBS (now NatWest) acquired ABN AMRO’s investment banking division.
+
+    Many swap obligations were transferred to NatWest, explaining current involvement.
