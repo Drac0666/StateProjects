@@ -1,54 +1,73 @@
+import customtkinter as ctk
 import win32com.client
 from datetime import datetime
+from tkinter import messagebox
 
-def find_attachment_in_mail(folder, subject_to_find, attachment_name, received_date=None):
-    """
-    Searches for an Outlook email by subject and date, and looks for a specific attachment.
+# Global variable to store found email
+found_email = None
 
-    Parameters:
-        folder: Outlook folder COM object.
-        subject_to_find (str): Keyword in subject line.
-        attachment_name (str): Exact filename of attachment to look for.
-        received_date (str or datetime.date, optional): Date to filter received emails. Defaults to today.
-
-    Returns:
-        Attachment object if found, else None.
-    """
-    if isinstance(received_date, str):
-        received_date = datetime.strptime(received_date, "%m/%d/%Y").date()
-    elif received_date is None:
-        received_date = datetime.today().date()
-
-    try:
-        messages = folder.Items
-        messages.Sort("[ReceivedTime]", True)
-
-        for message in messages:
-            try:
-                if (hasattr(message, "Subject") and
-                    subject_to_find.lower() in message.Subject.lower() and
-                    message.ReceivedTime.date() == received_date):
-
-                    if message.Attachments.Count > 0:
-                        for i in range(1, message.Attachments.Count + 1):  # 1-based index
-                            attachment = message.Attachments.Item(i)
-                            if attachment.FileName.lower() == attachment_name.lower():
-                                return attachment  # You can also save it here if needed
-            except AttributeError:
-                continue
-
-    except Exception as e:
-        print(f"Error: {e}")
+def search_email(subject, date_str):
+    global found_email
+    outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
     
-    return None
+    # Adjust to your default mailbox if needed
+    folder = outlook.Folders.Item(1).Folders("Inbox")  
+    
+    try:
+        received_date = datetime.today().date()
+        if date_str:
+            received_date = datetime.strptime(date_str, "%m/%d/%Y").date()
+    except ValueError:
+        messagebox.showerror("Invalid Date", "Date must be in MM/DD/YYYY format.")
+        return
 
+    messages = folder.Items
+    messages.Sort("[ReceivedTime]", True)
 
-outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
-folder = outlook.Folders("YourMailboxName").Folders("Inbox")
+    for message in messages:
+        try:
+            if (hasattr(message, "Subject") and
+                subject.lower() in message.Subject.lower() and
+                message.ReceivedTime.date() == received_date):
+                found_email = message
+                result_label.configure(text=f"Found: {message.Subject}")
+                open_button.configure(state=ctk.NORMAL)
+                return
+        except AttributeError:
+            continue
 
-attachment = find_attachment_in_mail(folder, "Sales Update", "Month-To-Date.xlsx", "3/20/2025")
+    found_email = None
+    result_label.configure(text="Email not found.")
+    open_button.configure(state=ctk.DISABLED)
 
-if attachment:
-    print("Attachment found:", attachment.FileName)
-else:
-    print("Attachment not found.")
+def open_email():
+    global found_email
+    if found_email:
+        found_email.Display()
+    else:
+        messagebox.showwarning("No Email", "No email has been found to open.")
+
+# GUI Setup
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
+
+app = ctk.CTk()
+app.title("Outlook Email Finder")
+app.geometry("400x300")
+
+subject_entry = ctk.CTkEntry(app, placeholder_text="Enter subject...")
+subject_entry.pack(pady=10)
+
+date_entry = ctk.CTkEntry(app, placeholder_text="Enter date (MM/DD/YYYY) - optional")
+date_entry.pack(pady=10)
+
+search_button = ctk.CTkButton(app, text="Search Email", command=lambda: search_email(subject_entry.get(), date_entry.get()))
+search_button.pack(pady=10)
+
+result_label = ctk.CTkLabel(app, text="No search yet.")
+result_label.pack(pady=10)
+
+open_button = ctk.CTkButton(app, text="Open Email", command=open_email, state=ctk.DISABLED)
+open_button.pack(pady=10)
+
+app.mainloop()
