@@ -3,7 +3,7 @@ import customtkinter as ctk
 
 def show_dataframe_in_gui(df):
     """
-    Displays a DataFrame in a scrollable grid layout with horizontal and vertical scrolling.
+    Displays a DataFrame in a scrollable grid with right-click-to-copy functionality.
     """
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
@@ -17,7 +17,6 @@ def show_dataframe_in_gui(df):
         app.mainloop()
         return
 
-    # Root canvas and scrollbars
     outer_frame = ctk.CTkFrame(app)
     outer_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -31,24 +30,40 @@ def show_dataframe_in_gui(df):
 
     canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
 
-    # Frame inside canvas
     table_frame = tk.Frame(canvas, bg="#1f1f1f")
     canvas.create_window((0, 0), window=table_frame, anchor="nw")
 
-    # Fill table
-    for col_idx, column in enumerate(df.columns):
-        label = tk.Label(table_frame, text=column, font=("Arial", 10, "bold"), bg="#333333", fg="white", padx=5, pady=3, anchor="w")
-        label.grid(row=0, column=col_idx, sticky="nsew")
-
-    for row_idx, row in df.iterrows():
-        for col_idx, value in enumerate(row):
-            label = tk.Label(table_frame, text=str(value), font=("Arial", 10), bg="#1f1f1f", fg="white", padx=5, pady=2, anchor="w")
-            label.grid(row=row_idx+1, column=col_idx, sticky="nsew")
-
-    # Resize event to reconfigure scroll region
     def on_configure(event):
         canvas.configure(scrollregion=canvas.bbox("all"))
 
     table_frame.bind("<Configure>", on_configure)
+
+    # Right-click context menu
+    menu = tk.Menu(app, tearoff=0)
+    menu.add_command(label="Copy", command=lambda: copy_to_clipboard(menu.selected_text))
+
+    def copy_to_clipboard(text):
+        app.clipboard_clear()
+        app.clipboard_append(text)
+        app.update()  # Now it stays on clipboard after window closes
+
+    def on_right_click(event, text):
+        menu.selected_text = text
+        menu.tk_popup(event.x_root, event.y_root)
+
+    # Add headers
+    for col_idx, column in enumerate(df.columns):
+        label = tk.Label(table_frame, text=column, font=("Arial", 10, "bold"),
+                         bg="#333333", fg="white", padx=5, pady=3, anchor="w")
+        label.grid(row=0, column=col_idx, sticky="nsew")
+
+    # Add data cells
+    for row_idx, row in df.iterrows():
+        for col_idx, value in enumerate(row):
+            cell_text = str(value)
+            label = tk.Label(table_frame, text=cell_text, font=("Arial", 10),
+                             bg="#1f1f1f", fg="white", padx=5, pady=2, anchor="w")
+            label.grid(row=row_idx + 1, column=col_idx, sticky="nsew")
+            label.bind("<Button-3>", lambda event, text=cell_text: on_right_click(event, text))
 
     app.mainloop()
