@@ -1,8 +1,54 @@
-https://www.ft.com/content/65431d08-6a1e-4d12-9549-61575fb79245?utm_source=chatgpt.com
-https://www.casemine.com/judgement/uk/6787fefc758cc66a6e8f8b03?utm_source=chatgpt.com
-https://www.taylorwessing.com/en/insights-and-events/insights/2025/02/lf-guarantee-or-indemnity?utm_source=chatgpt.com
-https://www.macfarlanes.com/what-we-think/102eli5/don-t-judge-a-deed-by-its-cover-indemnities-v-guarantees-in-securitisation-transactions-102k22r/?utm_source=chatgpt.com
+import win32com.client
+from datetime import datetime
 
-https://www.cadwalader.com/fin-news/index.php?eid=884&nid=121
+def find_attachment_in_mail(folder, subject_to_find, attachment_name, received_date=None):
+    """
+    Searches for an Outlook email by subject and date, and looks for a specific attachment.
+
+    Parameters:
+        folder: Outlook folder COM object.
+        subject_to_find (str): Keyword in subject line.
+        attachment_name (str): Exact filename of attachment to look for.
+        received_date (str or datetime.date, optional): Date to filter received emails. Defaults to today.
+
+    Returns:
+        Attachment object if found, else None.
+    """
+    if isinstance(received_date, str):
+        received_date = datetime.strptime(received_date, "%m/%d/%Y").date()
+    elif received_date is None:
+        received_date = datetime.today().date()
+
+    try:
+        messages = folder.Items
+        messages.Sort("[ReceivedTime]", True)
+
+        for message in messages:
+            try:
+                if (hasattr(message, "Subject") and
+                    subject_to_find.lower() in message.Subject.lower() and
+                    message.ReceivedTime.date() == received_date):
+
+                    if message.Attachments.Count > 0:
+                        for i in range(1, message.Attachments.Count + 1):  # 1-based index
+                            attachment = message.Attachments.Item(i)
+                            if attachment.FileName.lower() == attachment_name.lower():
+                                return attachment  # You can also save it here if needed
+            except AttributeError:
+                continue
+
+    except Exception as e:
+        print(f"Error: {e}")
+    
+    return None
 
 
+outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+folder = outlook.Folders("YourMailboxName").Folders("Inbox")
+
+attachment = find_attachment_in_mail(folder, "Sales Update", "Month-To-Date.xlsx", "3/20/2025")
+
+if attachment:
+    print("Attachment found:", attachment.FileName)
+else:
+    print("Attachment not found.")
