@@ -1,10 +1,115 @@
+import os
 import tkinter as tk
 import customtkinter as ctk
+import pandas as pd
+import win32com.client
+from datetime import datetime
+
+# === OUTLOOK FUNCTIONS ===
+def find_email_by_subject_and_date(folder, subject, received_date=None):
+    if isinstance(received_date, str):
+        received_date = datetime.strptime(received_date, "%m/%d/%Y").date()
+    elif received_date is None:
+        received_date = datetime.today().date()
+
+    messages = folder.Items
+    messages.Sort("[ReceivedTime]", True)
+
+    for message in messages:
+        try:
+            if (hasattr(message, "Subject") and
+                subject.lower() in message.Subject.lower() and
+                message.ReceivedTime.date() == received_date):
+                return message
+        except AttributeError:
+            continue
+
+    return None
+
+def open_email(mail_item):
+    if mail_item:
+        mail_item.Display()
+
+def save_attachment_with_date_prefix(mail_item, attachment_name, save_path):
+    if not os.path.exists(save_path):
+        raise FileNotFoundError(f"Save path does not exist: {save_path}")
+    if not mail_item:
+        raise ValueError("No mail item provided.")
+
+    received_date_str = mail_item.ReceivedTime.strftime("%Y-%m-%d")
+
+    for i in range(1, mail_item.Attachments.Count + 1):
+        attachment = mail_item.Attachments.Item(i)
+        if attachment.FileName.lower() == attachment_name.lower():
+            prefixed_name = f"{received_date_str}_{attachment.FileName}"
+            full_path = os.path.join(save_path, prefixed_name)
+            attachment.SaveAsFile(full_path)
+            return full_path
+    return None
+
+def download_month_to_date_attachments(folder, save_path, attachment_name="Month-To-Date.xlsx"):
+    if not os.path.exists(save_path):
+        raise FileNotFoundError(f"Save path does not exist: {save_path}")
+
+    messages = folder.Items
+    messages.Sort("[ReceivedTime]", True)
+
+    for message in messages:
+        try:
+            if hasattr(message, "Attachments") and message.Attachments.Count > 0:
+                for i in range(1, message.Attachments.Count + 1):
+                    attachment = message.Attachments.Item(i)
+                    if attachment.FileName.lower() == attachment_name.lower():
+                        date_prefix = message.ReceivedTime.strftime("%Y-%m-%d")
+                        file_name = f"{date_prefix}_{attachment.FileName}"
+                        full_path = os.path.join(save_path, file_name)
+                        if not os.path.exists(full_path):
+                            attachment.SaveAsFile(full_path)
+        except Exception as e:
+            print(f"Error processing message: {e}")
+
+def aggregated_read(folder_path):
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"Path does not exist: {folder_path}")
+
+    frames = []
+    for file in os.listdir(folder_path):
+        if file.endswith(".xlsx"):
+            try:
+                df = pd.read_excel(os.path.join(folder_path, file))
+                frames.append(df)
+            except Exception as e:
+                print(f"Failed to read {file}: {e}")
+
+    if frames:
+        combined_df = pd.concat(frames, ignore_index=True)
+        combined_df.drop_duplicates(subset="Ticket", inplace=True)
+        return combined_df
+    else:
+        return pd.DataFrame()
+
+def compare_and_update_database(new_file_path, db_path):
+    if not os.path.exists(new_file_path):
+        raise FileNotFoundError(f"File does not exist: {new_file_path}")
+
+    new_df = pd.read_excel(new_file_path)
+    if os.path.exists(db_path):
+        db_df = pd.read_excel(db_path)
+    else:
+        db_df = pd.DataFrame()
+
+    if not db_df.empty:
+        combined = pd.concat([db_df, new_df], ignore_index=True)
+        combined.drop_duplicates(subset="Ticket", keep="first", inplace=True)
+        new_rows = combined[~combined["Ticket"].isin(db_df["Ticket"])]
+    else:
+        combined = new_df.copy()
+        new_rows = new_df.copy()
+
+    combined.to_excel(db_path, index=False)
+    return new_rows
 
 def show_dataframe_in_gui(df):
-    """
-    Displays a DataFrame in a scrollable grid with right-click-to-copy functionality.
-    """
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
     app = ctk.CTk()
@@ -38,26 +143,23 @@ def show_dataframe_in_gui(df):
 
     table_frame.bind("<Configure>", on_configure)
 
-    # Right-click context menu
     menu = tk.Menu(app, tearoff=0)
     menu.add_command(label="Copy", command=lambda: copy_to_clipboard(menu.selected_text))
 
     def copy_to_clipboard(text):
         app.clipboard_clear()
         app.clipboard_append(text)
-        app.update()  # Now it stays on clipboard after window closes
+        app.update()
 
     def on_right_click(event, text):
         menu.selected_text = text
         menu.tk_popup(event.x_root, event.y_root)
 
-    # Add headers
     for col_idx, column in enumerate(df.columns):
         label = tk.Label(table_frame, text=column, font=("Arial", 10, "bold"),
                          bg="#333333", fg="white", padx=5, pady=3, anchor="w")
         label.grid(row=0, column=col_idx, sticky="nsew")
 
-    # Add data cells
     for row_idx, row in df.iterrows():
         for col_idx, value in enumerate(row):
             cell_text = str(value)
@@ -67,3 +169,42 @@ def show_dataframe_in_gui(df):
             label.bind("<Button-3>", lambda event, text=cell_text: on_right_click(event, text))
 
     app.mainloop()
+
+# === GUI Wrapper ===
+def main_gui():
+    def handle_download():
+        download_month_to_date_attachments(inbox, save_dir)
+
+    def handle_aggregate():
+        df = aggregated_read(save_dir)
+        df.to_excel(os.path.join(save_dir, "AggregatedATD.xlsx"), index=False)
+
+    def handle_compare():
+        email = find_email_by_subject_and_date(inbox, "Month-To-Date")
+        if email:
+            new_file = save_attachment_with_date_prefix(email, "Month-To-Date.xlsx", save_dir)
+            new_rows = compare_and_update_database(new_file, os.path.join(save_dir, "AggregatedATD.xlsx"))
+            if not new_rows.empty:
+                show_dataframe_in_gui(new_rows)
+
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("blue")
+    app = ctk.CTk()
+    app.title("Outlook Ticket Manager")
+    app.geometry("400x300")
+
+    ctk.CTkLabel(app, text="Outlook Ticket Manager", font=("Arial", 20)).pack(pady=20)
+    ctk.CTkButton(app, text="Download Attachments", command=handle_download).pack(pady=10)
+    ctk.CTkButton(app, text="Aggregate & Save", command=handle_aggregate).pack(pady=10)
+    ctk.CTkButton(app, text="Compare & Show New", command=handle_compare).pack(pady=10)
+
+    app.mainloop()
+
+# === SETUP ===
+outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+inbox = outlook.Folders.Item(1).Folders("Inbox")  # Adjust as needed
+save_dir = r"C:\Temp\aggregated_files"  # Update path as needed
+
+if __name__ == "__main__":
+    os.makedirs(save_dir, exist_ok=True)
+    main_gui()
