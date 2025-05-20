@@ -1,71 +1,32 @@
-import customtkinter as ctk
-import pandas as pd
-import os
-
-def load_aggregated_database(path):
-    if os.path.exists(path):
-        return pd.read_excel(path)
-    else:
-        return pd.DataFrame()
-
-def compare_and_update_database(new_file_path, db_path):
-    """
-    Compares the new attachment file to the aggregated DB and updates the DB file.
-
-    Returns:
-        new_rows: DataFrame containing new "Ticket" rows.
-    """
-    if not os.path.exists(new_file_path):
-        raise FileNotFoundError(f"File does not exist: {new_file_path}")
-
-    new_df = pd.read_excel(new_file_path)
-    db_df = load_aggregated_database(db_path)
-
-    # Merge only on Ticket
-    if not db_df.empty:
-        combined = pd.concat([db_df, new_df], ignore_index=True)
-        combined.drop_duplicates(subset="Ticket", keep="first", inplace=True)
-        new_rows = combined[~combined["Ticket"].isin(db_df["Ticket"])]
-    else:
-        combined = new_df.copy()
-        new_rows = new_df.copy()
-
-    # Save updated database
-    combined.to_excel(db_path, index=False)
-    return new_rows
-
 def show_dataframe_in_gui(df):
     """
-    Displays a DataFrame in a simple customtkinter window.
+    Displays a DataFrame in a customtkinter scrollable table layout.
     """
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
     app = ctk.CTk()
     app.title("New Tickets Found")
-    app.geometry("800x400")
+    app.geometry("1000x500")
 
     if df.empty:
         label = ctk.CTkLabel(app, text="No new rows found.", font=("Arial", 16))
         label.pack(pady=20)
-    else:
-        text = ctk.CTkTextbox(app, width=760, height=340)
-        text.insert("0.0", df.to_string(index=False))
-        text.configure(state="disabled")
-        text.pack(pady=10)
+        app.mainloop()
+        return
+
+    # Create scrollable frame
+    scrollable_frame = ctk.CTkScrollableFrame(app, width=980, height=460)
+    scrollable_frame.pack(pady=10)
+
+    # Show headers
+    for col_idx, column in enumerate(df.columns):
+        header = ctk.CTkLabel(scrollable_frame, text=column, font=("Arial", 12, "bold"))
+        header.grid(row=0, column=col_idx, padx=5, pady=2, sticky="w")
+
+    # Show rows
+    for row_idx, row in df.iterrows():
+        for col_idx, value in enumerate(row):
+            cell = ctk.CTkLabel(scrollable_frame, text=str(value), font=("Arial", 11), anchor="w")
+            cell.grid(row=row_idx+1, column=col_idx, padx=5, pady=2, sticky="w")
 
     app.mainloop()
-
-# Step 1: Save the most recent attachment
-email = find_email_by_subject_and_date(inbox, "Month-To-Date")  # Most recent today
-if email:
-    new_file_path = save_attachment_with_date_prefix(email, "Month-To-Date.xlsx", save_dir)
-
-    # Step 2: Compare & update database
-    db_path = os.path.join(save_dir, "AggregatedATD.xlsx")
-    new_rows = compare_and_update_database(new_file_path, db_path)
-
-    # Step 3: Show GUI if new data found
-    if not new_rows.empty:
-        show_dataframe_in_gui(new_rows)
-    else:
-        print("No new tickets found.")
