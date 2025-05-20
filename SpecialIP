@@ -1,152 +1,71 @@
-import os
-from datetime import datetime
-import win32com.client
+import customtkinter as ctk
 import pandas as pd
+import os
 
-def find_email_by_subject_and_date(folder, subject, received_date=None):
-    """
-    Finds an email in the given folder by subject and received date.
-
-    Parameters:
-        folder: Outlook folder COM object.
-        subject (str): Subject keyword to match.
-        received_date (str or datetime.date, optional): Date in MM/DD/YYYY or datetime.date.
-
-    Returns:
-        MailItem object if found, else None.
-    """
-    if isinstance(received_date, str):
-        received_date = datetime.strptime(received_date, "%m/%d/%Y").date()
-    elif received_date is None:
-        received_date = datetime.today().date()
-
-    messages = folder.Items
-    messages.Sort("[ReceivedTime]", True)
-
-    for message in messages:
-        try:
-            if (hasattr(message, "Subject") and
-                subject.lower() in message.Subject.lower() and
-                message.ReceivedTime.date() == received_date):
-                return message
-        except AttributeError:
-            continue
-
-    return None
-
-def open_email(mail_item):
-    """
-    Opens the specified Outlook mail item in a new window.
-    """
-    if mail_item:
-        mail_item.Display()
-
-def save_attachment_with_date_prefix(mail_item, attachment_name, save_path):
-    """
-    Saves the specified attachment from a mail item with a date-prefixed filename.
-
-    Parameters:
-        mail_item: MailItem object.
-        attachment_name (str): The exact name of the attachment to find.
-        save_path (str): Directory to save the file in.
-    
-    Returns:
-        Full path of saved file if successful, None otherwise.
-    """
-    if not os.path.exists(save_path):
-        raise FileNotFoundError(f"Save path does not exist: {save_path}")
-
-    if not mail_item:
-        raise ValueError("No mail item provided.")
-
-    received_date_str = mail_item.ReceivedTime.strftime("%Y-%m-%d")
-
-    for i in range(1, mail_item.Attachments.Count + 1):
-        attachment = mail_item.Attachments.Item(i)
-        if attachment.FileName.lower() == attachment_name.lower():
-            prefixed_name = f"{received_date_str}_{attachment.FileName}"
-            full_path = os.path.join(save_path, prefixed_name)
-            attachment.SaveAsFile(full_path)
-            return full_path
-
-    return None
-
-def download_month_to_date_attachments(folder, save_path, attachment_name="Month-To-Date.xlsx"):
-    """
-    Downloads attachments with the given name from all emails in the folder,
-    saves them with a date prefix in the given path.
-
-    Parameters:
-        folder: Outlook folder COM object.
-        save_path (str): Directory to save the attachments.
-        attachment_name (str): Target attachment file name.
-    """
-    if not os.path.exists(save_path):
-        raise FileNotFoundError(f"Save path does not exist: {save_path}")
-
-    messages = folder.Items
-    messages.Sort("[ReceivedTime]", True)
-
-    for message in messages:
-        try:
-            if hasattr(message, "Attachments") and message.Attachments.Count > 0:
-                for i in range(1, message.Attachments.Count + 1):
-                    attachment = message.Attachments.Item(i)
-                    if attachment.FileName.lower() == attachment_name.lower():
-                        date_prefix = message.ReceivedTime.strftime("%Y-%m-%d")
-                        file_name = f"{date_prefix}_{attachment.FileName}"
-                        full_path = os.path.join(save_path, file_name)
-                        if not os.path.exists(full_path):
-                            attachment.SaveAsFile(full_path)
-                            print(f"Saved: {file_name}")
-        except Exception as e:
-            print(f"Error processing message: {e}")
-
-def aggregated_read(folder_path):
-    """
-    Reads all Excel files in the specified folder and aggregates them into a single DataFrame,
-    removing duplicates based on the 'Ticket' column.
-
-    Parameters:
-        folder_path (str): Directory containing the Excel files.
-
-    Returns:
-        pandas.DataFrame: Aggregated and deduplicated data.
-    """
-    if not os.path.exists(folder_path):
-        raise FileNotFoundError(f"Path does not exist: {folder_path}")
-
-    frames = []
-    for file in os.listdir(folder_path):
-        if file.endswith(".xlsx"):
-            try:
-                df = pd.read_excel(os.path.join(folder_path, file))
-                frames.append(df)
-            except Exception as e:
-                print(f"Failed to read {file}: {e}")
-
-    if frames:
-        combined_df = pd.concat(frames, ignore_index=True)
-        combined_df.drop_duplicates(subset="Ticket", inplace=True)
-        return combined_df
+def load_aggregated_database(path):
+    if os.path.exists(path):
+        return pd.read_excel(path)
     else:
-        print("No Excel files found.")
         return pd.DataFrame()
 
-# === Example Usage ===
-if __name__ == "__main__":
-    outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
-    inbox = outlook.Folders.Item(1).Folders("Inbox")  # Adjust if needed
-    save_dir = r"C:\Temp\aggregated_files"  # Update this path as needed
+def compare_and_update_database(new_file_path, db_path):
+    """
+    Compares the new attachment file to the aggregated DB and updates the DB file.
 
-    # Step 1: Download all matching attachments
-    download_month_to_date_attachments(inbox, save_dir)
+    Returns:
+        new_rows: DataFrame containing new "Ticket" rows.
+    """
+    if not os.path.exists(new_file_path):
+        raise FileNotFoundError(f"File does not exist: {new_file_path}")
 
-    # Step 2: Aggregate all Excel files into one deduplicated DataFrame
-    df = aggregated_read(save_dir)
+    new_df = pd.read_excel(new_file_path)
+    db_df = load_aggregated_database(db_path)
 
-    if not df.empty:
-        print("Aggregated DataFrame:")
-        print(df.head())
+    # Merge only on Ticket
+    if not db_df.empty:
+        combined = pd.concat([db_df, new_df], ignore_index=True)
+        combined.drop_duplicates(subset="Ticket", keep="first", inplace=True)
+        new_rows = combined[~combined["Ticket"].isin(db_df["Ticket"])]
     else:
-        print("No data aggregated.")
+        combined = new_df.copy()
+        new_rows = new_df.copy()
+
+    # Save updated database
+    combined.to_excel(db_path, index=False)
+    return new_rows
+
+def show_dataframe_in_gui(df):
+    """
+    Displays a DataFrame in a simple customtkinter window.
+    """
+    ctk.set_appearance_mode("System")
+    ctk.set_default_color_theme("blue")
+    app = ctk.CTk()
+    app.title("New Tickets Found")
+    app.geometry("800x400")
+
+    if df.empty:
+        label = ctk.CTkLabel(app, text="No new rows found.", font=("Arial", 16))
+        label.pack(pady=20)
+    else:
+        text = ctk.CTkTextbox(app, width=760, height=340)
+        text.insert("0.0", df.to_string(index=False))
+        text.configure(state="disabled")
+        text.pack(pady=10)
+
+    app.mainloop()
+
+# Step 1: Save the most recent attachment
+email = find_email_by_subject_and_date(inbox, "Month-To-Date")  # Most recent today
+if email:
+    new_file_path = save_attachment_with_date_prefix(email, "Month-To-Date.xlsx", save_dir)
+
+    # Step 2: Compare & update database
+    db_path = os.path.join(save_dir, "AggregatedATD.xlsx")
+    new_rows = compare_and_update_database(new_file_path, db_path)
+
+    # Step 3: Show GUI if new data found
+    if not new_rows.empty:
+        show_dataframe_in_gui(new_rows)
+    else:
+        print("No new tickets found.")
