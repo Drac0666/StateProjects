@@ -1,12 +1,15 @@
+import tkinter as tk
+import customtkinter as ctk
+
 def show_dataframe_in_gui(df):
     """
-    Displays a DataFrame in a customtkinter scrollable table layout.
+    Displays a DataFrame in a scrollable grid layout with horizontal and vertical scrolling.
     """
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
     app = ctk.CTk()
     app.title("New Tickets Found")
-    app.geometry("1000x500")
+    app.geometry("1000x600")
 
     if df.empty:
         label = ctk.CTkLabel(app, text="No new rows found.", font=("Arial", 16))
@@ -14,19 +17,38 @@ def show_dataframe_in_gui(df):
         app.mainloop()
         return
 
-    # Create scrollable frame
-    scrollable_frame = ctk.CTkScrollableFrame(app, width=980, height=460)
-    scrollable_frame.pack(pady=10)
+    # Root canvas and scrollbars
+    outer_frame = ctk.CTkFrame(app)
+    outer_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-    # Show headers
+    canvas = tk.Canvas(outer_frame, bg="#1f1f1f", highlightthickness=0)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    v_scrollbar = ctk.CTkScrollbar(outer_frame, orientation="vertical", command=canvas.yview)
+    v_scrollbar.pack(side="right", fill="y")
+    h_scrollbar = ctk.CTkScrollbar(app, orientation="horizontal", command=canvas.xview)
+    h_scrollbar.pack(fill="x")
+
+    canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+
+    # Frame inside canvas
+    table_frame = tk.Frame(canvas, bg="#1f1f1f")
+    canvas.create_window((0, 0), window=table_frame, anchor="nw")
+
+    # Fill table
     for col_idx, column in enumerate(df.columns):
-        header = ctk.CTkLabel(scrollable_frame, text=column, font=("Arial", 12, "bold"))
-        header.grid(row=0, column=col_idx, padx=5, pady=2, sticky="w")
+        label = tk.Label(table_frame, text=column, font=("Arial", 10, "bold"), bg="#333333", fg="white", padx=5, pady=3, anchor="w")
+        label.grid(row=0, column=col_idx, sticky="nsew")
 
-    # Show rows
     for row_idx, row in df.iterrows():
         for col_idx, value in enumerate(row):
-            cell = ctk.CTkLabel(scrollable_frame, text=str(value), font=("Arial", 11), anchor="w")
-            cell.grid(row=row_idx+1, column=col_idx, padx=5, pady=2, sticky="w")
+            label = tk.Label(table_frame, text=str(value), font=("Arial", 10), bg="#1f1f1f", fg="white", padx=5, pady=2, anchor="w")
+            label.grid(row=row_idx+1, column=col_idx, sticky="nsew")
+
+    # Resize event to reconfigure scroll region
+    def on_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    table_frame.bind("<Configure>", on_configure)
 
     app.mainloop()
