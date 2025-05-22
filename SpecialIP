@@ -8,18 +8,23 @@ def detect_anomaly(db_file: str = DB_FILE):
 
     for isin, row in df.iterrows():
         values = row.astype(float).tolist()
-        for i in range(1, len(values)):
-            prev_val = values[i - 1]
-            curr_val = values[i]
-            if (prev_val > 0 and curr_val == 0) or (prev_val == 0 and curr_val > 0):
-                anomalies.append({
-                    "ISIN": isin,
-                    "Asset Class": asset_class[isin],
-                    "Anomaly Type": "value→0" if prev_val > 0 else "0→value",
-                    "Anomaly Window": f"{date_columns[i-1]} → {date_columns[i]}"
-                })
-                break
-                result_df = pd.DataFrame(anomalies)
+        prev_nonzero = None
+        for i in range(len(values)):
+            if values[i] > 0:
+                if prev_nonzero is not None and i - prev_nonzero > 1:
+                    middle_zeros = values[prev_nonzero + 1:i]
+                    if all(v == 0 for v in middle_zeros):
+                        anomalies.append({
+                            "ISIN": isin,
+                            "Asset Class": asset_class[isin],
+                            "Anomaly Type": "value → 0(s) → value",
+                            "Anomaly Window": f"{date_columns[prev_nonzero]} → ... → {date_columns[i]}"
+                        })
+                        break
+                prev_nonzero = i
+
+    if anomalies:
+        result_df = pd.DataFrame(anomalies)
         result_df.to_excel("anomalies.xlsx", index=False)
         print(f"Anomalies detected and saved to anomalies.xlsx ({len(result_df)} rows)")
     else:
