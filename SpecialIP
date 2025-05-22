@@ -1,90 +1,37 @@
-import pandas as pd
-import os
-import shutil
-from datetime import datetime
-
-# Parameters
-DB_FILE = "pivoted_output.xlsx"
-BACKUP_FILE = "pivoted_output_backup.xlsx"
-CHANGES_FILE = "significant_changes.xlsx"
-ABS_THRESHOLD = 100
-PCT_THRESHOLD = 0.10
-
-def create_pivot_database(input_file: str, output_file: str = DB_FILE):
-    """Create initial pivoted database from a single Excel file."""
-    df = pd.read_excel(input_file)
-    date = df['As of Date'].iloc[0]
-    pivot = df.pivot_table(index="ISIN", values="Par Value", aggfunc="sum")
-    pivot.columns = [date]
-    pivot.to_excel(output_file)
-    print(f"Database created: {output_file}")
-
-def backup_database(file_path: str, backup_path: str = BACKUP_FILE):
-    """Create a backup of the database before overwriting."""
-    if os.path.exists(file_path):
-        shutil.copy(file_path, backup_path)
-        print(f"Backup created: {backup_path}")
-    else:
-        print("No existing database to back up.")
-
 def update_database(new_file: str, db_file: str = DB_FILE):
-    """Update the existing pivot database with a new file."""
-    # Load existing database
-    if os.path.exists(db_file):
-        db = pd.read_excel(db_file, index_col="ISIN")
-    else:
-        print("Database not found. Creating new one instead.")
-        create_pivot_database(new_file, db_file)
-        return
-
-    # Backup before update
-    backup_database(db_file)
-
-    # Load new data
+    """Update the existing pivot database with a new file, with overwrite protection."""
+    # Load new data and extract date
     new_data = pd.read_excel(new_file)
     new_date = new_data['As of Date'].iloc[0]
     new_pivot = new_data.pivot_table(index="ISIN", values="Par Value", aggfunc="sum")
     new_pivot.columns = [new_date]
 
-    # Merge with existing
+    # Load existing database
+    if os.path.exists(db_file):
+        db = pd.read_excel(db_file, index_col="ISIN")
+    else:
+        print("Database not found. Creating new one instead.")
+        new_pivot.to_excel(db_file)
+        print(f"Database created: {db_file}")
+        return
+
+    # Check if date already exists
+    if str(new_date) in db.columns:
+        response = input(f"\n⚠️ Date {new_date} already exists in the database. Overwrite? (y/n): ").strip().lower()
+        if response != 'y':
+            print("Update cancelled.")
+            return
+        else:
+            print(f"Overwriting column for {new_date}.")
+            db.drop(columns=[new_date], inplace=True)
+
+    # Backup before overwrite
+    backup_database(db_file)
+
+    # Merge and update
     updated_db = pd.concat([db, new_pivot], axis=1).fillna(0)
     updated_db = updated_db[sorted(updated_db.columns)]
 
     # Save updated
     updated_db.to_excel(db_file)
     print(f"Database updated with data for {new_date}: {db_file}")
-
-def detect_significant_changes(db_file: str = DB_FILE,
-                                abs_threshold: float = ABS_THRESHOLD,
-                                pct_threshold: float = PCT_THRESHOLD,
-                                output_file: str = CHANGES_FILE):
-    """Detect ISINs with significant changes in Par Value between last two dates."""
-    df = pd.read_excel(db_file, index_col="ISIN")
-
-    if df.shape[1] < 2:
-        print("Not enough dates to compare.")
-        return
-
-    # Get last two dates
-    last_date, prev_date = df.columns[-1], df.columns[-2]
-
-    # Calculate differences
-    diff = df[last_date] - df[prev_date]
-    pct = diff / df[prev_date].replace(0, 1)  # avoid division by 0
-
-    # Filter by thresholds
-    mask = (diff.abs() > abs_threshold) | (pct.abs() > pct_threshold)
-    changed = df.loc[mask, [prev_date, last_date]].copy()
-    changed["Abs Change"] = diff[mask]
-    changed["% Change"] = pct[mask] * 100
-
-    if not changed.empty:
-        changed.to_excel(output_file)
-        print(f"Significant changes saved to: {output_file}")
-    else:
-        print("No significant changes detected.")
-
-# Example usage:
-# create_pivot_database("2022-01-01.xlsx")
-# update_database("2022-01-02.xlsx")
-# detect_significant_changes()
