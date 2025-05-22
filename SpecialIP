@@ -1,20 +1,3 @@
-import pandas as pd
-import os
-import shutil
-import plotly.express as px
-
-# === CONFIGURATION ===
-DB_FILE = "pivoted_output.xlsx"
-BACKUP_FILE = "pivoted_output_backup.xlsx"
-CHANGES_FILE = "significant_changes.xlsx"
-ABS_THRESHOLD = 100
-PCT_THRESHOLD = 0.10
-ISIN_COL = "ISIN"
-PAR_VALUE_COL = "Par Value"
-
-# (existing functions remain unchanged...)
-
-# === FUNCTION 7: PLOT ACTIVITY TIMECHART ===
 def plot_activity_chart(activity_file: str = "activity_log.xlsx"):
     if not os.path.exists(activity_file):
         print("Activity log file not found. Run generate_activity() first.")
@@ -28,11 +11,11 @@ def plot_activity_chart(activity_file: str = "activity_log.xlsx"):
     df["Signed Value"] = df.apply(lambda row: row["Value"] if row["Activity"] == "Purchase" else -row["Value"], axis=1)
 
     # Group by date and sum values
-    daily_summary = df.groupby("Date")["Signed Value"].sum().reset_index()
+    daily_summary = df.groupby(["Date", "Activity"])["Signed Value"].sum().reset_index()
 
     # Plot with plotly
-    fig = px.bar(daily_summary, x="Date", y="Signed Value",
-                 title="Net Activity Over Time",
-                 labels={"Signed Value": "Net Flow (Par Value)"})
+    fig = px.bar(daily_summary, x="Date", y="Signed Value", color="Activity",
+                 title="Activity Over Time: Purchases vs Paidoff",
+                 labels={"Signed Value": "Flow (Par Value)"})"})
     fig.update_layout(xaxis_title="Date", yaxis_title="Par Value Change")
     fig.show()
