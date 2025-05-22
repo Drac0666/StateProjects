@@ -9,34 +9,30 @@ def generate_activity(db_file: str = DB_FILE):
     for isin, row in df.iterrows():
         values = row.tolist()
 
-        # Purchase: first non-zero value
-        for i, val in enumerate(values):
-            if val > 0:
-                activity.append({
-                    "Date": date_columns[i],
-                    "ISIN": isin,
-                    "Asset Class": asset_class[isin],
-                    "Activity": "Purchase",
-                    "Value": val
-                })
-                break
+        # Find first appearance with non-zero value that is not on the first column
+        if values[0] == 0:
+            for i in range(1, len(values)):
+                if values[i] > 0:
+                    activity.append({
+                        "Date": date_columns[i],
+                        "ISIN": isin,
+                        "Asset Class": asset_class[isin],
+                        "Activity": "Purchase",
+                        "Value": values[i]
+                    })
+                    break
 
-        # Paidoff: first 0 after a value > 0
-        had_value = False
-        for i, val in enumerate(values):
-            if val > 0:
-                had_value = True
-            elif val == 0 and had_value:
+        # Find transition from >0 to 0 and capture the last non-zero value
+        for i in range(1, len(values)):
+            if values[i-1] > 0 and values[i] == 0:
                 activity.append({
                     "Date": date_columns[i],
                     "ISIN": isin,
                     "Asset Class": asset_class[isin],
                     "Activity": "Paidoff",
-                    "Value": 0
+                    "Value": values[i-1]
                 })
                 break
-
-    if activity:
         activity_df = pd.DataFrame(activity)
         activity_df.to_excel("activity_log.xlsx", index=False)
         print("Activity log saved to activity_log.xlsx")
