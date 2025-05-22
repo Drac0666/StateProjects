@@ -1,44 +1,38 @@
-def generate_activity(db_file: str = DB_FILE):
-    """Generate a log of Purchase and Paidoff events based on value changes over time."""
-    df = pd.read_excel(db_file, index_col=ISIN_COL)
-    asset_class = df["Asset Class"]
-    df = df.drop(columns="Asset Class")
-    date_columns = list(df.columns)
+import pandas as pd
+import os
+import shutil
+import plotly.express as px
 
-    activity = []
+# === CONFIGURATION ===
+DB_FILE = "pivoted_output.xlsx"
+BACKUP_FILE = "pivoted_output_backup.xlsx"
+CHANGES_FILE = "significant_changes.xlsx"
+ABS_THRESHOLD = 100
+PCT_THRESHOLD = 0.10
+ISIN_COL = "ISIN"
+PAR_VALUE_COL = "Par Value"
 
-    for isin, row in df.iterrows():
-        values = row.tolist()
+# (existing functions remain unchanged...)
 
-        # Find first appearance with non-zero value that is not on the first column
-        if values[0] == 0:
-            for i in range(1, len(values)):
-                if values[i] > 0:
-                    activity.append({
-                        "Date": date_columns[i],
-                        "ISIN": isin,
-                        "Asset Class": asset_class[isin],
-                        "Activity": "Purchase",
-                        "Value": values[i]
-                    })
-                    break
+# === FUNCTION 7: PLOT ACTIVITY TIMECHART ===
+def plot_activity_chart(activity_file: str = "activity_log.xlsx"):
+    if not os.path.exists(activity_file):
+        print("Activity log file not found. Run generate_activity() first.")
+        return
 
-        # Find transition from >0 to 0 and capture the last non-zero value
-        for i in range(1, len(values)):
-            if values[i-1] > 0 and values[i] == 0:
-                activity.append({
-                    "Date": date_columns[i],
-                    "ISIN": isin,
-                    "Asset Class": asset_class[isin],
-                    "Activity": "Paidoff",
-                    "Value": values[i-1]
-                })
-                break
-        
-    else:
-        print("No purchase or paidoff events detected.")
+    df = pd.read_excel(activity_file)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df.sort_values("Date", inplace=True)
 
-    if activity:
-        activity_df = pd.DataFrame(activity)
-        activity_df.to_excel("activity_log.xlsx", index=False)
-        print("Activity log saved to activity_log.xlsx")
+    # Convert purchases to positive and paidoff to negative values
+    df["Signed Value"] = df.apply(lambda row: row["Value"] if row["Activity"] == "Purchase" else -row["Value"], axis=1)
+
+    # Group by date and sum values
+    daily_summary = df.groupby("Date")["Signed Value"].sum().reset_index()
+
+    # Plot with plotly
+    fig = px.bar(daily_summary, x="Date", y="Signed Value",
+                 title="Net Activity Over Time",
+                 labels={"Signed Value": "Net Flow (Par Value)"})
+    fig.update_layout(xaxis_title="Date", yaxis_title="Par Value Change")
+    fig.show()
