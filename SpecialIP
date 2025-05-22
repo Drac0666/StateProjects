@@ -1,31 +1,44 @@
-def detect_anomaly(db_file: str = DB_FILE):
+def generate_activity(db_file: str = DB_FILE):
     df = pd.read_excel(db_file, index_col=ISIN_COL)
     asset_class = df["Asset Class"]
     df = df.drop(columns="Asset Class")
     date_columns = list(df.columns)
 
-    anomalies = []
+    activity = []
 
     for isin, row in df.iterrows():
-        values = row.astype(float).tolist()
-        prev_nonzero = None
-        for i in range(len(values)):
-            if values[i] > 0:
-                if prev_nonzero is not None and i - prev_nonzero > 1:
-                    middle_zeros = values[prev_nonzero + 1:i]
-                    if all(v == 0 for v in middle_zeros):
-                        anomalies.append({
-                            "ISIN": isin,
-                            "Asset Class": asset_class[isin],
-                            "Anomaly Type": "value → 0(s) → value",
-                            "Anomaly Window": f"{date_columns[prev_nonzero]} → ... → {date_columns[i]}"
-                        })
-                        break
-                prev_nonzero = i
+        values = row.tolist()
 
-    if anomalies:
-        result_df = pd.DataFrame(anomalies)
-        result_df.to_excel("anomalies.xlsx", index=False)
-        print(f"Anomalies detected and saved to anomalies.xlsx ({len(result_df)} rows)")
+        # Purchase: first non-zero value
+        for i, val in enumerate(values):
+            if val > 0:
+                activity.append({
+                    "Date": date_columns[i],
+                    "ISIN": isin,
+                    "Asset Class": asset_class[isin],
+                    "Activity": "Purchase",
+                    "Value": val
+                })
+                break
+
+        # Paidoff: first 0 after a value > 0
+        had_value = False
+        for i, val in enumerate(values):
+            if val > 0:
+                had_value = True
+            elif val == 0 and had_value:
+                activity.append({
+                    "Date": date_columns[i],
+                    "ISIN": isin,
+                    "Asset Class": asset_class[isin],
+                    "Activity": "Paidoff",
+                    "Value": 0
+                })
+                break
+
+    if activity:
+        activity_df = pd.DataFrame(activity)
+        activity_df.to_excel("activity_log.xlsx", index=False)
+        print("Activity log saved to activity_log.xlsx")
     else:
-        print("No anomalies detected.")
+        print("No purchase or paidoff events detected.")
