@@ -1,51 +1,49 @@
- === FUNCTION 3: UPDATE DATABASE ===
-def update_database(new_file: str, db_file: str = DB_FILE):
-    new_data = pd.read_excel(new_file)
-    new_date = new_data['As of Date'].iloc[0]
+def detect_significant_changes(db_file: str = DB_FILE,
+                                abs_threshold: float = ABS_THRESHOLD,
+                                pct_threshold: float = PCT_THRESHOLD,
+                                output_file: str = CHANGES_FILE):
+    df = pd.read_excel(db_file, index_col=ISIN_COL)
+    full_df = df.copy()
 
-    # Create new pivot
-    new_pivot = new_data.pivot_table(index=ISIN_COL, values=PAR_VALUE_COL, aggfunc="sum")
-    new_pivot.columns = [new_date]
-
-    # Create asset class for new ISINs
-    new_data["Asset Class"] = new_data["SEC 1"].astype(str) + "_" + new_data["SEC 2"].astype(str) + "_" + new_data["SEC 3"].astype(str)
-    asset_class_map = new_data.drop_duplicates(subset=ISIN_COL)[[ISIN_COL, "Asset Class"]].set_index(ISIN_COL)
-
-    if not os.path.exists(db_file):
-        print("Database not found. Creating new one instead.")
-        create_pivot_database(new_file, db_file)
+    if df.shape[1] < 3:  # One column is Asset Class
+        print("Not enough dates to compare.")
         return
 
-    db = pd.read_excel(db_file, index_col=ISIN_COL)
+    asset_class = df["Asset Class"]
+    df = df.drop(columns="Asset Class")
 
-    if str(new_date) in db.columns:
-        response = input(f"\n⚠️ Date {new_date} already exists. Overwrite? (y/n): ").strip().lower()
-        if response != 'y':
-            print("Update cancelled.")
-            return
-        else:
-            print(f"Overwriting column for {new_date}.")
-            db.drop(columns=[new_date], inplace=True)
+    last_date, prev_date = df.columns[-1], df.columns[-2]
+    prev_vals = df[prev_date]
+    last_vals = df[last_date]
+    diff = last_vals - prev_vals
+    pct_change = diff / prev_vals.replace(0, 1)
 
-    backup_database(db_file)
+    new_mask = (prev_vals == 0) & (last_vals > 0)
+    df_new = df.loc[new_mask, [prev_date, last_date]].copy()
+    df_new["Abs Change"] = diff[new_mask]
+    df_new["% Change"] = pct_change[new_mask] * 100
 
-    # Identify new ISINs
-    new_isins = new_pivot.index.difference(db.index)
-    new_asset_class = asset_class_map.loc[new_isins] if not new_isins.empty else pd.DataFrame()
+    paid_mask = (prev_vals > 0) & (last_vals == 0)
+    df_paidoff = df.loc[paid_mask, [prev_date, last_date]].copy()
+    df_paidoff["Abs Change"] = diff[paid_mask]
+    df_paidoff["% Change"] = pct_change[paid_mask] * 100
 
-    # Ensure Asset Class column exists and update only where needed
-    if "Asset Class" not in db.columns:
-        db.insert(0, "Asset Class", pd.NA)
+    overlap_mask = new_mask | paid_mask
+    sig_mask = ((diff.abs() > abs_threshold) | (pct_change.abs() > pct_threshold)) & (~overlap_mask)
+    df_significant = df.loc[sig_mask, [prev_date, last_date]].copy()
+    df_significant["Abs Change"] = diff[sig_mask]
+    df_significant["% Change"] = pct_change[sig_mask] * 100
 
-    if not new_asset_class.empty:
-        db.update(new_asset_class)
-        db = pd.concat([db, new_asset_class[~new_asset_class.index.isin(db.index)]], axis=0)
+    with pd.ExcelWriter(output_file) as writer:
+        df_significant = df_significant.merge(full_df[["Asset Class"]], left_index=True, right_index=True)
+        df_new = df_new.merge(full_df[["Asset Class"]], left_index=True, right_index=True)
+        df_paidoff = df_paidoff.merge(full_df[["Asset Class"]], left_index=True, right_index=True)
 
-    # Merge pivot
-    db = pd.concat([db, new_pivot], axis=1).fillna(0)
-    non_date_columns = [col for col in db.columns if not isinstance(col, str) or not col.startswith("20")]
-    date_columns = sorted(set(db.columns) - set(non_date_columns))
-    db = db[non_date_columns + date_columns]
+        df_significant.to_excel(writer, sheet_name="Significant")
+        df_new.to_excel(writer, sheet_name="New")
+        df_paidoff.to_excel(writer, sheet_name="Paidoff")
 
-    db.to_excel(db_file)
-    print(f"Database updated with data for {new_date}: {db_file}")
+    print(f"Changes saved to: {output_file}")
+    print(f"  - Significant: {df_significant.shape[0]} rows")
+    print(f"  - New: {df_new.shape[0]} rows")
+    print(f"  - Paidoff: {df_paidoff.shape[0]} rows")
