@@ -1,45 +1,3 @@
-import pandas as pd
-import os
-import shutil
-
-# === CONFIGURATION ===
-DB_FILE = "pivoted_output.xlsx"
-BACKUP_FILE = "pivoted_output_backup.xlsx"
-CHANGES_FILE = "significant_changes.xlsx"
-ABS_THRESHOLD = 100
-PCT_THRESHOLD = 0.10
-ISIN_COL = "ISIN"
-PAR_VALUE_COL = "Par Value"
-
-# === FUNCTION 1: CREATE INITIAL DATABASE ===
-def create_pivot_database(input_file: str, output_file: str = DB_FILE):
-    df = pd.read_excel(input_file)
-
-    # Create Asset Class
-    df["Asset Class"] = df["SEC 1"].astype(str) + "_" + df["SEC 2"].astype(str) + "_" + df["SEC 3"].astype(str)
-
-    # Extract unique ISIN-to-AssetClass mapping
-    asset_class_map = df.drop_duplicates(subset=ISIN_COL)[[ISIN_COL, "Asset Class"]].set_index(ISIN_COL)
-
-    # Create pivot table for par value
-    date = df['As of Date'].iloc[0]
-    pivot = df.pivot_table(index=ISIN_COL, values=PAR_VALUE_COL, aggfunc="sum")
-    pivot.columns = [date]
-
-    # Combine and save
-    result = pd.concat([asset_class_map, pivot], axis=1)
-    result.to_excel(output_file)
-    print(f"Database created with Asset Class: {output_file}")
-
-# === FUNCTION 2: BACKUP DATABASE ===
-def backup_database(file_path: str, backup_path: str = BACKUP_FILE):
-    if os.path.exists(file_path):
-        shutil.copy(file_path, backup_path)
-        print(f"Backup created: {backup_path}")
-    else:
-        print("No existing database to back up.")
-
-# === FUNCTION 3: UPDATE DATABASE ===
 def update_database(new_file: str, db_file: str = DB_FILE):
     new_data = pd.read_excel(new_file)
     new_date = new_data['As of Date'].iloc[0]
@@ -74,61 +32,19 @@ def update_database(new_file: str, db_file: str = DB_FILE):
     new_isins = new_pivot.index.difference(db.index)
     new_asset_class = asset_class_map.loc[new_isins] if not new_isins.empty else pd.DataFrame()
 
-    # Merge asset class if needed
+    # Ensure Asset Class column exists and update only where needed
     if "Asset Class" not in db.columns:
-        db = pd.concat([asset_class_map, db], axis=1).fillna(0)
-    elif not new_asset_class.empty:
-        db = pd.concat([db, new_asset_class], axis=0).fillna(0)
+        db.insert(0, "Asset Class", pd.NA)
+
+    if not new_asset_class.empty:
+        db.update(new_asset_class)
+        db = pd.concat([db, new_asset_class[~new_asset_class.index.isin(db.index)]], axis=0)
 
     # Merge pivot
     db = pd.concat([db, new_pivot], axis=1).fillna(0)
-    db = db[sorted([col for col in db.columns if col != "Asset Class"])]
-    db.insert(1, "Asset Class", db.pop("Asset Class"))
+    non_date_columns = [col for col in db.columns if not isinstance(col, (int, float)) and not col.startswith("20")]
+    date_columns = sorted(set(db.columns) - set(non_date_columns))
+    db = db[non_date_columns + date_columns]
+
     db.to_excel(db_file)
     print(f"Database updated with data for {new_date}: {db_file}")
-
-# === FUNCTION 4: DETECT SIGNIFICANT CHANGES ===
-def detect_significant_changes(db_file: str = DB_FILE,
-                                abs_threshold: float = ABS_THRESHOLD,
-                                pct_threshold: float = PCT_THRESHOLD,
-                                output_file: str = CHANGES_FILE):
-    df = pd.read_excel(db_file, index_col=ISIN_COL)
-
-    if df.shape[1] < 3:  # One column is Asset Class
-        print("Not enough dates to compare.")
-        return
-
-    asset_class = df["Asset Class"]
-    df = df.drop(columns="Asset Class")
-
-    last_date, prev_date = df.columns[-1], df.columns[-2]
-    prev_vals = df[prev_date]
-    last_vals = df[last_date]
-    diff = last_vals - prev_vals
-    pct_change = diff / prev_vals.replace(0, 1)
-
-    new_mask = (prev_vals == 0) & (last_vals > 0)
-    df_new = df.loc[new_mask, [prev_date, last_date]].copy()
-    df_new["Abs Change"] = diff[new_mask]
-    df_new["% Change"] = pct_change[new_mask] * 100
-
-    paid_mask = (prev_vals > 0) & (last_vals == 0)
-    df_paidoff = df.loc[paid_mask, [prev_date, last_date]].copy()
-    df_paidoff["Abs Change"] = diff[paid_mask]
-    df_paidoff["% Change"] = pct_change[paid_mask] * 100
-
-    overlap_mask = new_mask | paid_mask
-    sig_mask = ((diff.abs() > abs_threshold) | (pct_change.abs() > pct_threshold)) & (~overlap_mask)
-    df_significant = df.loc[sig_mask, [prev_date, last_date]].copy()
-    df_significant["Abs Change"] = diff[sig_mask]
-    df_significant["% Change"] = pct_change[sig_mask] * 100
-
-    with pd.ExcelWriter(output_file) as writer:
-        df_significant.to_excel(writer, sheet_name="Significant")
-        df_new.to_excel(writer, sheet_name="New")
-        df_paidoff.to_excel(writer, sheet_name="Paidoff")
-
-    print(f"Changes saved to: {output_file}")
-    print(f"  - Significant: {df_significant.shape[0]} rows")
-    print(f"  - New: {df_new.shape[0]} rows")
-    print(f"  - Paidoff: {df_paidoff.shape[0]} rows")
