@@ -1,4 +1,5 @@
 def generate_activity(db_file: str = DB_FILE):
+    """Generate a log of Purchase and Paidoff events based on value changes over time."""
     df = pd.read_excel(db_file, index_col=ISIN_COL)
     asset_class = df["Asset Class"]
     df = df.drop(columns="Asset Class")
@@ -33,8 +34,12 @@ def generate_activity(db_file: str = DB_FILE):
                     "Value": values[i-1]
                 })
                 break
+        
+    else:
+            else:
+        print("No purchase or paidoff events detected.")
+
+    if activity:
         activity_df = pd.DataFrame(activity)
         activity_df.to_excel("activity_log.xlsx", index=False)
         print("Activity log saved to activity_log.xlsx")
-    else:
-        print("No purchase or paidoff events detected.")
