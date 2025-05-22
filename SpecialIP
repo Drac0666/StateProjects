@@ -36,7 +36,6 @@ def generate_activity(db_file: str = DB_FILE):
                 break
         
     else:
-            else:
         print("No purchase or paidoff events detected.")
 
     if activity:
