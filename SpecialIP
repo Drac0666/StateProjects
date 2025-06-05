@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- Assuming you already have these loaded ---
+# --- Load your data (assuming you already have result & changes_only dataframes)
 # result = pd.read_excel('full_rating_tracking.xlsx')
 # changes_only = pd.read_excel('rating_changes_only.xlsx')
 
@@ -9,13 +9,12 @@ import plotly.graph_objects as go
 flagged_securities = changes_only['Security'].unique()
 
 # Filter full dataset to keep full history for flagged securities
-filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_date'])
+filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_Date'])
 
 # Build mapping for dropdown labels
-# Get one row per security to grab SEC1-SEC3 info
 security_info = filtered_full_data.groupby('Security').first().reset_index()
 
-# Build display label for dropdown
+# Build display label: Security | SEC1 | SEC2 | SEC3
 security_info['DropdownLabel'] = (
     security_info['Security'].astype(str) + ' | ' +
     security_info['SEC1'].astype(str) + ' | ' +
@@ -26,15 +25,13 @@ security_info['DropdownLabel'] = (
 # Build dictionary: Security → DropdownLabel
 security_label_map = dict(zip(security_info['Security'], security_info['DropdownLabel']))
 
-# Use Security list for dropdown options
+# Securities list
 securities = list(security_label_map.keys())
-
-# Initial security to display
 initial_security = securities[0]
 
-# Function to filter data for a given security
+# Function to filter data for given security
 def get_security_data(security):
-    df = filtered_full_data[filtered_full_data['Security'] == security].sort_values(by='As_of_date')
+    df = filtered_full_data[filtered_full_data['Security'] == security].sort_values(by='As_of_Date')
     return df
 
 # Prepare initial data
@@ -43,52 +40,66 @@ df_initial = get_security_data(initial_security)
 # Create figure
 fig = go.Figure()
 
-for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']:
-    fig.add_trace(go.Scatter(
-        x=df_initial['As_of_date'],
-        y=df_initial[col],
-        mode='lines+markers',
-        name=col
-    ))
+# Plot using original agency ratings (Bloomberg columns)
+fig.add_trace(go.Scatter(
+    x=df_initial['As_of_Date'],
+    y=df_initial['Bloomberg_Fitch'],
+    mode='lines+markers',
+    name='Fitch'
+))
 
-# Build dropdown buttons
+fig.add_trace(go.Scatter(
+    x=df_initial['As_of_Date'],
+    y=df_initial['Bloomberg_Moodys'],
+    mode='lines+markers',
+    name='Moody\'s'
+))
+
+fig.add_trace(go.Scatter(
+    x=df_initial['As_of_Date'],
+    y=df_initial['Bloomberg_SP'],
+    mode='lines+markers',
+    name='S&P'
+))
+
+fig.add_trace(go.Scatter(
+    x=df_initial['As_of_Date'],
+    y=df_initial['Bloomberg_DBRS'],
+    mode='lines+markers',
+    name='DBRS'
+))
+
+# Build dropdown buttons for each security
 dropdown_buttons = []
 
 for sec in securities:
     df_sec = get_security_data(sec)
 
     button = dict(
-        label=security_label_map[sec],  # label is now Security | SEC1 | SEC2 | SEC3
+        label=security_label_map[sec],
         method="update",
         args=[
-            {'x': [df_sec['As_of_date']] * 4,
-             'y': [df_sec['RTG_FITCH_MAPPED'],
-                   df_sec['RTG_MOODY_MAPPED'],
-                   df_sec['RTG_SP_MAPPED'],
-                   df_sec['RTG_DBRS_MAPPED']]},
+            {'x': [df_sec['As_of_Date']] * 4,
+             'y': [
+                 df_sec['Bloomberg_Fitch'],
+                 df_sec['Bloomberg_Moodys'],
+                 df_sec['Bloomberg_SP'],
+                 df_sec['Bloomberg_DBRS']
+             ]},
             {'title': f"Security: {security_label_map[sec]}"}
         ]
     )
     dropdown_buttons.append(button)
 
-# Layout
+# Layout updates
 fig.update_layout(
     title=f"Security: {security_label_map[initial_security]}",
     xaxis_title="As of Date",
-    yaxis_title="Rating (Mapped)",
+    yaxis_title="Rating",
     updatemenus=[dict(
         active=0,
         buttons=dropdown_buttons,
         x=1.15,
         y=1.0
     )],
-    legend=dict(x=1.05, y=0.5)
-)
-
-# Show chart
-fig.show()
-
-# Export as standalone HTML
-fig.write_html("ratings_dashboard.html", full_html=True, include_plotlyjs='cdn')
-
-print("✅ Dashboard exported as 'ratings_dashboard.html'")
+    legend=dict(x=1.05, y=0.
