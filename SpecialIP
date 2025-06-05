@@ -11,10 +11,25 @@ flagged_securities = changes_only['Security'].unique()
 # Filter full dataset to keep full history for flagged securities
 filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_date'])
 
-# Create a dropdown list of unique securities
-securities = filtered_full_data['Security'].unique()
+# Build mapping for dropdown labels
+# Get one row per security to grab SEC1-SEC3 info
+security_info = filtered_full_data.groupby('Security').first().reset_index()
 
-# Create an initial security to display
+# Build display label for dropdown
+security_info['DropdownLabel'] = (
+    security_info['Security'].astype(str) + ' | ' +
+    security_info['SEC1'].astype(str) + ' | ' +
+    security_info['SEC2'].astype(str) + ' | ' +
+    security_info['SEC3'].astype(str)
+)
+
+# Build dictionary: Security → DropdownLabel
+security_label_map = dict(zip(security_info['Security'], security_info['DropdownLabel']))
+
+# Use Security list for dropdown options
+securities = list(security_label_map.keys())
+
+# Initial security to display
 initial_security = securities[0]
 
 # Function to filter data for a given security
@@ -25,7 +40,7 @@ def get_security_data(security):
 # Prepare initial data
 df_initial = get_security_data(initial_security)
 
-# Create initial figure with multiple traces (one for each rating column)
+# Create figure
 fig = go.Figure()
 
 for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']:
@@ -36,14 +51,14 @@ for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_M
         name=col
     ))
 
-# Build dropdown buttons for all securities
+# Build dropdown buttons
 dropdown_buttons = []
 
 for sec in securities:
     df_sec = get_security_data(sec)
 
     button = dict(
-        label=str(sec),
+        label=security_label_map[sec],  # label is now Security | SEC1 | SEC2 | SEC3
         method="update",
         args=[
             {'x': [df_sec['As_of_date']] * 4,
@@ -51,14 +66,14 @@ for sec in securities:
                    df_sec['RTG_MOODY_MAPPED'],
                    df_sec['RTG_SP_MAPPED'],
                    df_sec['RTG_DBRS_MAPPED']]},
-            {'title': f"Security: {sec}"}
+            {'title': f"Security: {security_label_map[sec]}"}
         ]
     )
     dropdown_buttons.append(button)
 
-# Update figure layout
+# Layout
 fig.update_layout(
-    title=f"Security: {initial_security}",
+    title=f"Security: {security_label_map[initial_security]}",
     xaxis_title="As of Date",
     yaxis_title="Rating (Mapped)",
     updatemenus=[dict(
@@ -70,5 +85,10 @@ fig.update_layout(
     legend=dict(x=1.05, y=0.5)
 )
 
-# Show interactive chart
+# Show chart
 fig.show()
+
+# Export as standalone HTML
+fig.write_html("ratings_dashboard.html", full_html=True, include_plotlyjs='cdn')
+
+print("✅ Dashboard exported as 'ratings_dashboard.html'")
