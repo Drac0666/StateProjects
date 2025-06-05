@@ -1,101 +1,55 @@
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- Load your data (assuming you already have result & changes_only dataframes)
-# result = pd.read_excel('full_rating_tracking.xlsx')
-# changes_only = pd.read_excel('rating_changes_only.xlsx')
-
-# Extract list of flagged securities
-flagged_securities = changes_only['Security'].unique()
-
-# Filter full dataset to keep full history for flagged securities
-filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_Date'])
-
-# Build mapping for dropdown labels
-security_info = filtered_full_data.groupby('Security').first().reset_index()
-
-# Build display label: Security | SEC1 | SEC2 | SEC3
-security_info['DropdownLabel'] = (
-    security_info['Security'].astype(str) + ' | ' +
-    security_info['SEC1'].astype(str) + ' | ' +
-    security_info['SEC2'].astype(str) + ' | ' +
-    security_info['SEC3'].astype(str)
-)
-
-# Build dictionary: Security → DropdownLabel
-security_label_map = dict(zip(security_info['Security'], security_info['DropdownLabel']))
-
-# Securities list
-securities = list(security_label_map.keys())
-initial_security = securities[0]
-
-# Function to filter data for given security
-def get_security_data(security):
-    df = filtered_full_data[filtered_full_data['Security'] == security].sort_values(by='As_of_Date')
-    return df
-
-# Prepare initial data
+# Load filtered full data (filtered_full_data)
 df_initial = get_security_data(initial_security)
 
-# Create figure
 fig = go.Figure()
 
-# Plot using original agency ratings (Bloomberg columns)
+# Let's plot Fitch MAPPED with text labels from Bloomberg Fitch
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
-    y=df_initial['Bloomberg_Fitch'],
-    mode='lines+markers',
+    y=df_initial['RTG_FITCH_MAPPED'],
+    mode='lines+markers+text',
+    text=df_initial['Bloomberg_Fitch'],  # these are the text labels
+    textposition='top center',
     name='Fitch'
 ))
 
+# You can repeat for Moody's:
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
-    y=df_initial['Bloomberg_Moodys'],
-    mode='lines+markers',
+    y=df_initial['RTG_MOODY_MAPPED'],
+    mode='lines+markers+text',
+    text=df_initial['Bloomberg_Moodys'],
+    textposition='top center',
     name='Moody\'s'
 ))
 
+# Same for SP:
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
-    y=df_initial['Bloomberg_SP'],
-    mode='lines+markers',
+    y=df_initial['RTG_SP_MAPPED'],
+    mode='lines+markers+text',
+    text=df_initial['Bloomberg_SP'],
+    textposition='top center',
     name='S&P'
 ))
 
+# And DBRS:
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
-    y=df_initial['Bloomberg_DBRS'],
-    mode='lines+markers',
+    y=df_initial['RTG_DBRS_MAPPED'],
+    mode='lines+markers+text',
+    text=df_initial['Bloomberg_DBRS'],
+    textposition='top center',
     name='DBRS'
 ))
 
-# Build dropdown buttons for each security
-dropdown_buttons = []
-
-for sec in securities:
-    df_sec = get_security_data(sec)
-
-    button = dict(
-        label=security_label_map[sec],
-        method="update",
-        args=[
-            {'x': [df_sec['As_of_Date']] * 4,
-             'y': [
-                 df_sec['Bloomberg_Fitch'],
-                 df_sec['Bloomberg_Moodys'],
-                 df_sec['Bloomberg_SP'],
-                 df_sec['Bloomberg_DBRS']
-             ]},
-            {'title': f"Security: {security_label_map[sec]}"}
-        ]
-    )
-    dropdown_buttons.append(button)
-
-# Layout updates
 fig.update_layout(
     title=f"Security: {security_label_map[initial_security]}",
     xaxis_title="As of Date",
-    yaxis_title="Rating",
+    yaxis_title="Mapped Rating (higher is better)",
     updatemenus=[dict(
         active=0,
         buttons=dropdown_buttons,
@@ -105,10 +59,7 @@ fig.update_layout(
     legend=dict(x=1.05, y=0.5)
 )
 
-# Show interactive chart
 fig.show()
 
 # Export as standalone HTML
 fig.write_html("ratings_dashboard.html", full_html=True, include_plotlyjs='cdn')
-
-print("✅ Dashboard exported as 'ratings_dashboard.html'")
