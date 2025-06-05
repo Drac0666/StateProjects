@@ -1,39 +1,26 @@
-import pandas as pd
+import os
 
-def split_tables_by_keyword(tables_dict):
-    # Initialize empty lists to collect rows
-    upgrade_rows = []
-    downgrade_rows = []
-    other_rows = []
+def add_full_path_to_file_column(df_upgrade, df_downgrade, df_others, defined_dir):
+    def update_path(df):
+        df = df.copy()  # avoid modifying original df
+        df['file'] = df['file'].apply(lambda f: os.path.join(defined_dir, f))
+        return df
 
-    # Iterate over dictionary items
-    for filename, df in tables_dict.items():
-        # Iterate over dataframe rows
-        for idx, row in df.iterrows():
-            # Flag to check if found upgrade/downgrade
-            found = False
+    df_upgrade_new = update_path(df_upgrade)
+    df_downgrade_new = update_path(df_downgrade)
+    df_others_new = update_path(df_others)
 
-            for value in row:
-                # Check only for non-null values
-                if pd.notnull(value):
-                    value_str = str(value).strip()
-                    if value_str == "Upgrade":
-                        upgrade_rows.append(row.to_dict() | {'file': filename})
-                        found = True
-                        break
-                    elif value_str == "Downgrade":
-                        downgrade_rows.append(row.to_dict() | {'file': filename})
-                        found = True
-                        break
+    return df_upgrade_new, df_downgrade_new, df_others_new
 
-            if not found:
-                other_rows.append(row.to_dict() | {'file': filename})
 
-    # Create DataFrames from collected rows
-    df_upgrade = pd.DataFrame(upgrade_rows)
-    df_downgrade = pd.DataFrame(downgrade_rows)
-    df_others = pd.DataFrame(other_rows)
-
-    return df_upgrade, df_downgrade, df_others
+# After splitting your tables:
 
 df_upgrade, df_downgrade, df_others = split_tables_by_keyword(tables_dict)
+
+# Define your directory:
+defined_dir = r"C:\Your\Path\To\MSG\Folder"
+
+# Apply full path updater:
+df_upgrade_new, df_downgrade_new, df_others_new = add_full_path_to_file_column(
+    df_upgrade, df_downgrade, df_others, defined_dir
+)
