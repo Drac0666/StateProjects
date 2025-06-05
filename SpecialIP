@@ -20,7 +20,26 @@ try:
     tables = pd.read_html(html_body)
     print(f"Found {len(tables)} tables")
     for i, table in enumerate(tables):
-        print(f"\nTable {i+1}")
+        print(f"\nOriginal Table {i+1}:")
         print(table)
+
+        # Drop rows where all columns are NaN
+        table = table.dropna(how='all')
+
+        # Find header row (where first column == "Date")
+        header_row_index = table[table.iloc[:,0] == 'Date'].index
+
+        if not header_row_index.empty:
+            header_row = header_row_index[0]
+
+            # Set new header
+            table.columns = table.iloc[header_row]
+            table = table.drop(index=range(0, header_row+1)).reset_index(drop=True)
+
+            print(f"\nTable {i+1} after setting header from row where column 0 == 'Date':")
+            print(table)
+        else:
+            print(f"\nNo header row with 'Date' found in Table {i+1}")
+
 except Exception as e:
     print("Error parsing HTML tables:", e)
