@@ -1,48 +1,11 @@
 import win32com.client
-import os
-import datetime
 
-def save_emails_from_outlook_folder(folder_name, save_directory):
-    # Create Outlook application object
-    outlook = win32com.client.Dispatch("Outlook.Application")
-    namespace = outlook.GetNamespace("MAPI")
+outlook = win32com.client.Dispatch("Outlook.Application")
+namespace = outlook.GetNamespace("MAPI")
 
-    # Get list of all folders in the default mailbox
-    inbox = namespace.GetDefaultFolder(6)  # 6 = Inbox
-    folders = inbox.Parent.Folders
-
-    # Try to access the specific folder
-    try:
-        target_folder = folders.Item(folder_name)
-    except:
-        print(f"Folder '{folder_name}' not found.")
-        return
-
-    # Make sure save directory exists
-    if not os.path.exists(save_directory):
-        os.makedirs(save_directory)
-
-    messages = target_folder.Items
-    print(f"Found {messages.Count} emails in folder '{folder_name}'.")
-
-    for i, message in enumerate(messages):
-        try:
-            subject = message.Subject
-            received_time = message.ReceivedTime.strftime("%Y-%m-%d_%H-%M-%S")
-            filename = f"{received_time}_{i}.msg"
-
-            # Replace illegal characters in filename
-            filename = "".join([c if c.isalnum() or c in (' ', '.', '_') else '_' for c in filename])
-
-            filepath = os.path.join(save_directory, filename)
-            message.SaveAs(filepath)
-            print(f"Saved: {filepath}")
-
-        except Exception as e:
-            print(f"Could not save email {i}: {e}")
-
-if __name__ == "__main__":
-    folder_name = "YourFolderName"  # <-- Change this to your Outlook folder name
-    save_directory = r"C:\Your\Save\Path"  # <-- Change this to where you want to save emails
-
-    save_emails_from_outlook_folder(folder_name, save_directory)
+# Loop through all top-level stores
+for store in namespace.Folders:
+    print("Store Name:", store.Name)
+    # Optional: list subfolders too
+    for folder in store.Folders:
+        print("  Subfolder:", folder.Name)
