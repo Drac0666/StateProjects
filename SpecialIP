@@ -4,6 +4,9 @@ def add_full_path_to_file_column(df_upgrade, df_downgrade, df_others, defined_di
     def update_path(df):
         df = df.copy()  # avoid modifying original df
         df['file'] = df['file'].apply(lambda f: os.path.join(defined_dir, f))
+        # Reorder columns to have 'file' first
+        columns = ['file'] + [col for col in df.columns if col != 'file']
+        df = df[columns]
         return df
 
     df_upgrade_new = update_path(df_upgrade)
@@ -11,16 +14,3 @@ def add_full_path_to_file_column(df_upgrade, df_downgrade, df_others, defined_di
     df_others_new = update_path(df_others)
 
     return df_upgrade_new, df_downgrade_new, df_others_new
-
-
-# After splitting your tables:
-
-df_upgrade, df_downgrade, df_others = split_tables_by_keyword(tables_dict)
-
-# Define your directory:
-defined_dir = r"C:\Your\Path\To\MSG\Folder"
-
-# Apply full path updater:
-df_upgrade_new, df_downgrade_new, df_others_new = add_full_path_to_file_column(
-    df_upgrade, df_downgrade, df_others, defined_dir
-)
