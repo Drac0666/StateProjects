@@ -1,36 +1,23 @@
-def add_keyboard_navigation(html_file_in, html_file_out):
-    """
-    Inject arrow key navigation into exported Plotly HTML file.
-    """
-    with open(html_file_in, 'r', encoding='utf-8') as f:
-        html = f.read()
-
-    # Prepare the JS injection
-    injected_js = """
+injected_js = """
 <script>
 document.addEventListener('keydown', function(e) {
-    var menus = document.querySelectorAll('.updatemenu');
-    if (menus.length === 0) return;
-    
-    var buttons = menus[0].querySelectorAll('button');
-    var active = Array.from(buttons).findIndex(btn => btn.getAttribute('aria-pressed') === 'true');
-    
+    var gd = document.querySelector('.js-plotly-plot');
+    if (!gd) return;
+
+    var menus = gd.layout.updatemenus;
+    if (!menus || menus.length === 0) return;
+
+    var buttons = menus[0].buttons;
+    var active = menus[0].active;
+
     if (e.key === 'ArrowDown') {
         var next = (active + 1) % buttons.length;
-        buttons[next].click();
+        Plotly.relayout(gd, {'updatemenus[0].active': next});
     }
     if (e.key === 'ArrowUp') {
         var prev = (active - 1 + buttons.length) % buttons.length;
-        buttons[prev].click();
+        Plotly.relayout(gd, {'updatemenus[0].active': prev});
     }
 });
 </script>
-    """
-
-    # Inject just before </body>
-    html = html.replace("</body>", injected_js + "\n</body>")
-
-    with open(html_file_out, 'w', encoding='utf-8') as f:
-        f.write(html)
-
-    print("✅ HTML file updated with keyboard navigation:", html_file_out)
+"""
