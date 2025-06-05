@@ -4,7 +4,17 @@ def compare_group(group):
     for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']:
         shifted = group[col].shift()
         change_col = f'{col}_CHANGE'
-        group[change_col] = ~(group[col].eq(shifted))
-        group.loc[shifted.isna(), change_col] = False  # No previous value -> no change
+
+        # basic change detection
+        change_detected = ~(group[col].eq(shifted))
+
+        # handle first row: no change if no previous value
+        change_detected.loc[shifted.isna()] = False
+
+        # suppress change if either current or previous value is 23
+        suppress_mask = (group[col] == 23) | (shifted == 23)
+        change_detected.loc[suppress_mask] = False
+
+        group[change_col] = change_detected
 
     return group
