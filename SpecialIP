@@ -1,159 +1,36 @@
-import pandas as pd
-import plotly.graph_objects as go
+def add_keyboard_navigation(html_file_in, html_file_out):
+    """
+    Inject arrow key navigation into exported Plotly HTML file.
+    """
+    with open(html_file_in, 'r', encoding='utf-8') as f:
+        html = f.read()
 
-# ================================================
-# 1️⃣ Load your processed data files
-# ================================================
+    # Prepare the JS injection
+    injected_js = """
+<script>
+document.addEventListener('keydown', function(e) {
+    var menus = document.querySelectorAll('.updatemenu');
+    if (menus.length === 0) return;
+    
+    var buttons = menus[0].querySelectorAll('button');
+    var active = Array.from(buttons).findIndex(btn => btn.getAttribute('aria-pressed') === 'true');
+    
+    if (e.key === 'ArrowDown') {
+        var next = (active + 1) % buttons.length;
+        buttons[next].click();
+    }
+    if (e.key === 'ArrowUp') {
+        var prev = (active - 1 + buttons.length) % buttons.length;
+        buttons[prev].click();
+    }
+});
+</script>
+    """
 
-result = pd.read_excel('full_rating_tracking.xlsx')
-changes_only = pd.read_excel('rating_changes_only.xlsx')
+    # Inject just before </body>
+    html = html.replace("</body>", injected_js + "\n</body>")
 
-# ================================================
-# 2️⃣ Filter to only securities where changes happened
-# ================================================
+    with open(html_file_out, 'w', encoding='utf-8') as f:
+        f.write(html)
 
-flagged_securities = changes_only['Security'].unique()
-
-filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_Date'])
-
-# ================================================
-# 3️⃣ Load unified RatingsMap file
-# ================================================
-
-ratings_map = pd.read_excel('RatingsMap.xlsx')  # with columns: 'Final Rating', 'Number #'
-
-# Build universal mapping dictionary
-rating_mapping_dict = dict(zip(ratings_map['Number #'], ratings_map['Final Rating']))
-
-# ================================================
-# 4️⃣ Apply mapping to each agency column
-# ================================================
-
-filtered_full_data['Fitch_Label'] = filtered_full_data['RTG_FITCH_MAPPED'].map(rating_mapping_dict)
-filtered_full_data['Moodys_Label'] = filtered_full_data['RTG_MOODY_MAPPED'].map(rating_mapping_dict)
-filtered_full_data['SP_Label'] = filtered_full_data['RTG_SP_MAPPED'].map(rating_mapping_dict)
-filtered_full_data['DBRS_Label'] = filtered_full_data['RTG_DBRS_MAPPED'].map(rating_mapping_dict)
-
-# ================================================
-# 5️⃣ Build dropdown labels (Security | SEC1 | SEC2 | SEC3)
-# ================================================
-
-security_info = filtered_full_data.groupby('Security').first().reset_index()
-security_info['DropdownLabel'] = (
-    security_info['Security'].astype(str) + ' | ' +
-    security_info['SEC1'].astype(str) + ' | ' +
-    security_info['SEC2'].astype(str) + ' | ' +
-    security_info['SEC3'].astype(str)
-)
-security_label_map = dict(zip(security_info['Security'], security_info['DropdownLabel']))
-securities = list(security_label_map.keys())
-initial_security = securities[0]
-
-# ================================================
-# 6️⃣ Plotting function
-# ================================================
-
-def get_security_data(security):
-    df = filtered_full_data[filtered_full_data['Security'] == security].sort_values(by='As_of_Date')
-    return df
-
-df_initial = get_security_data(initial_security)
-
-fig = go.Figure()
-
-# Fitch
-fig.add_trace(go.Scatter(
-    x=df_initial['As_of_Date'],
-    y=df_initial['RTG_FITCH_MAPPED'],
-    mode='lines+markers+text',
-    text=df_initial['Fitch_Label'],
-    textposition='top center',
-    name='Fitch'
-))
-
-# Moody's
-fig.add_trace(go.Scatter(
-    x=df_initial['As_of_Date'],
-    y=df_initial['RTG_MOODY_MAPPED'],
-    mode='lines+markers+text',
-    text=df_initial['Moodys_Label'],
-    textposition='top center',
-    name="Moody's"
-))
-
-# S&P
-fig.add_trace(go.Scatter(
-    x=df_initial['As_of_Date'],
-    y=df_initial['RTG_SP_MAPPED'],
-    mode='lines+markers+text',
-    text=df_initial['SP_Label'],
-    textposition='top center',
-    name="S&P"
-))
-
-# DBRS
-fig.add_trace(go.Scatter(
-    x=df_initial['As_of_Date'],
-    y=df_initial['RTG_DBRS_MAPPED'],
-    mode='lines+markers+text',
-    text=df_initial['DBRS_Label'],
-    textposition='top center',
-    name="DBRS"
-))
-
-# ================================================
-# 7️⃣ Build dropdown buttons for security selection
-# ================================================
-
-dropdown_buttons = []
-
-for sec in securities:
-    df_sec = get_security_data(sec)
-
-    button = dict(
-        label=security_label_map[sec],
-        method="update",
-        args=[
-            {'x': [df_sec['As_of_Date']] * 4,
-             'y': [
-                 df_sec['RTG_FITCH_MAPPED'],
-                 df_sec['RTG_MOODY_MAPPED'],
-                 df_sec['RTG_SP_MAPPED'],
-                 df_sec['RTG_DBRS_MAPPED']
-             ],
-             'text': [
-                 df_sec['Fitch_Label'],
-                 df_sec['Moodys_Label'],
-                 df_sec['SP_Label'],
-                 df_sec['DBRS_Label']
-             ]},
-            {'title': f"Security: {security_label_map[sec]}"}
-        ]
-    )
-    dropdown_buttons.append(button)
-
-# ================================================
-# 8️⃣ Final plot layout
-# ================================================
-
-fig.update_layout(
-    title=f"Security: {security_label_map[initial_security]}",
-    xaxis_title="As of Date",
-    yaxis_title="Mapped Rating (higher = better)",
-    updatemenus=[dict(
-        active=0,
-        buttons=dropdown_buttons,
-        x=1.15,
-        y=1.0
-    )],
-    legend=dict(x=1.05, y=0.5)
-)
-
-fig.show()
-
-# ================================================
-# 9️⃣ Export to standalone HTML
-# ================================================
-
-fig.write_html("ratings_dashboard.html", full_html=True, include_plotlyjs='cdn')
-print("✅ Dashboard exported as 'ratings_dashboard.html'")
+    print("✅ HTML file updated with keyboard navigation:", html_file_out)
