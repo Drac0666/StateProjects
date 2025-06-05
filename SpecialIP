@@ -1,44 +1,43 @@
 import pandas as pd
-import os
-from openpyxl import load_workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.worksheet.hyperlink import Hyperlink
+import glob
 
-# Let's assume you already have your updated DataFrames:
-# df_upgrade_new, df_downgrade_new, df_others_new
+# 1. Load all Excel files from a folder
+path = 'your_folder_path_here/'  # <-- adjust to your folder
+files = glob.glob(path + '*.xlsx')
 
-# Output file path
-output_path = r"C:\Your\Path\output.xlsx"
+# 2. Read and combine
+dfs = []
+for file in files:
+    df = pd.read_excel(file)
+    df['SourceFile'] = file  # optional: track file of origin
+    dfs.append(df)
 
-# Write dataframes normally first
-with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-    df_upgrade_new.to_excel(writer, sheet_name='Upgrades', index=False)
-    df_downgrade_new.to_excel(writer, sheet_name='Downgrades', index=False)
-    df_others_new.to_excel(writer, sheet_name='Others', index=False)
+# Combine all files
+data = pd.concat(dfs, ignore_index=True)
 
-# Now reopen and apply hyperlinks
-wb = load_workbook(output_path)
+# 3. Keep only necessary columns (if needed)
+columns_to_keep = ['As_of_date', 'Security', 'RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']
+data = data[columns_to_keep]
 
-for sheet_name in ['Upgrades', 'Downgrades', 'Others']:
-    ws = wb[sheet_name]
+# 4. Convert As_of_date to datetime and sort
+data['As_of_date'] = pd.to_datetime(data['As_of_date'])
+data = data.sort_values(by=['Security', 'As_of_date'])
 
-    # Find the column number for 'file'
-    file_col_idx = None
-    for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == 'file':
-            file_col_idx = idx
-            break
+# 5. Group by Security and compare ratings over time
+def compare_group(group):
+    group = group.sort_values(by='As_of_date')
+    group['RTG_FITCH_CHANGE'] = group['RTG_FITCH_MAPPED'].ne(group['RTG_FITCH_MAPPED'].shift())
+    group['RTG_MOODY_CHANGE'] = group['RTG_MOODY_MAPPED'].ne(group['RTG_MOODY_MAPPED'].shift())
+    group['RTG_SP_CHANGE'] = group['RTG_SP_MAPPED'].ne(group['RTG_SP_MAPPED'].shift())
+    group['RTG_DBRS_CHANGE'] = group['RTG_DBRS_MAPPED'].ne(group['RTG_DBRS_MAPPED'].shift())
+    return group
 
-    if file_col_idx is None:
-        continue  # no file column found, skip
+result = data.groupby('Security').apply(compare_group).reset_index(drop=True)
 
-    # Apply hyperlinks to 'file' column
-    for row in ws.iter_rows(min_row=2, min_col=file_col_idx, max_col=file_col_idx):
-        for cell in row:
-            file_path = cell.value
-            if os.path.exists(file_path):  # optional: validate path exists
-                cell.hyperlink = file_path
-                cell.style = "Hyperlink"
+# 6. Optional: filter to only rows where any rating has changed
+result['Any_Change'] = result[['RTG_FITCH_CHANGE', 'RTG_MOODY_CHANGE', 'RTG_SP_CHANGE', 'RTG_DBRS_CHANGE']].any(axis=1)
+changes_only = result[result['Any_Change']]
 
-wb.save(output_path)
-wb.close()
+# 7. Export full result or just changes
+result.to_excel('full_rating_tracking.xlsx', index=False)
+changes_only.to_excel('rating_changes_only.xlsx', index=False)
