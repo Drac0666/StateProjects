@@ -1,45 +1,68 @@
 import win32com.client
 import pandas as pd
+import os
 
-# Path to your MSG file
-msg_path = r"C:\Your\Path\To\YourFile.msg"  # <-- update this path
+# Path to your folder containing .msg files
+folder_path = r"C:\Your\Path\To\MSG\Folder"  # <-- update this
 
-# Open Outlook COM
+# Initialize Outlook COM
 outlook = win32com.client.Dispatch("Outlook.Application")
-msg = outlook.CreateItemFromTemplate(msg_path)
 
-# Extract subject (optional)
-subject = msg.Subject
-print("Subject:", subject)
+# Create empty dictionary to store results
+tables_dict = {}
 
-# Extract HTML body
-html_body = msg.HTMLBody
+# Walk through all files in the folder
+for root, dirs, files in os.walk(folder_path):
+    for file in files:
+        if file.endswith(".msg"):
+            file_path = os.path.join(root, file)
+            print(f"\nProcessing: {file_path}")
 
-# Try to parse HTML tables with pandas
-try:
-    tables = pd.read_html(html_body)
-    print(f"Found {len(tables)} tables")
-    for i, table in enumerate(tables):
-        print(f"\nOriginal Table {i+1}:")
-        print(table)
+            try:
+                # Load MSG file
+                msg = outlook.CreateItemFromTemplate(file_path)
 
-        # Drop rows where all columns are NaN
-        table = table.dropna(how='all')
+                # Extract HTML body
+                html_body = msg.HTMLBody
 
-        # Find header row (where first column == "Date")
-        header_row_index = table[table.iloc[:,0] == 'Date'].index
+                # Parse tables
+                tables = pd.read_html(html_body)
 
-        if not header_row_index.empty:
-            header_row = header_row_index[0]
+                if not tables:
+                    print(f"No tables found in {file}")
+                    continue
 
-            # Set new header
-            table.columns = table.iloc[header_row]
-            table = table.drop(index=range(0, header_row+1)).reset_index(drop=True)
+                # We assume you're only interested in the first table (if multiple)
+                table = tables[0]
 
-            print(f"\nTable {i+1} after setting header from row where column 0 == 'Date':")
-            print(table)
-        else:
-            print(f"\nNo header row with 'Date' found in Table {i+1}")
+                # Drop fully empty rows
+                table = table.dropna(how='all')
 
-except Exception as e:
-    print("Error parsing HTML tables:", e)
+                # Find header row (where first column == "Date")
+                header_row_index = table[table.iloc[:,0] == 'Date'].index
+
+                if not header_row_index.empty:
+                    header_row = header_row_index[0]
+
+                    # Set new header
+                    table.columns = table.iloc[header_row]
+                    table = table.drop(index=range(0, header_row+1)).reset_index(drop=True)
+
+                    print(f"Table extracted from {file}:")
+                    print(table)
+
+                    # Store cleaned table in dictionary
+                    tables_dict[file] = table
+
+                else:
+                    print(f"No header row with 'Date' found in {file}")
+
+            except Exception as e:
+                print(f"Failed to process {file}: {e}")
+
+# Now tables_dict holds all your processed tables
+print("\nSummary of processed files:")
+for filename, df in tables_dict.items():
+    print(f"{filename}: {len(df)} rows")
+
+# (Optional: you can now do further processing with tables_dict)
