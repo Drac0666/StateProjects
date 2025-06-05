@@ -1,43 +1,10 @@
-import pandas as pd
-import glob
-
-# 1. Load all Excel files from a folder
-path = 'your_folder_path_here/'  # <-- adjust to your folder
-files = glob.glob(path + '*.xlsx')
-
-# 2. Read and combine
-dfs = []
-for file in files:
-    df = pd.read_excel(file)
-    df['SourceFile'] = file  # optional: track file of origin
-    dfs.append(df)
-
-# Combine all files
-data = pd.concat(dfs, ignore_index=True)
-
-# 3. Keep only necessary columns (if needed)
-columns_to_keep = ['As_of_date', 'Security', 'RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']
-data = data[columns_to_keep]
-
-# 4. Convert As_of_date to datetime and sort
-data['As_of_date'] = pd.to_datetime(data['As_of_date'])
-data = data.sort_values(by=['Security', 'As_of_date'])
-
-# 5. Group by Security and compare ratings over time
 def compare_group(group):
     group = group.sort_values(by='As_of_date')
-    group['RTG_FITCH_CHANGE'] = group['RTG_FITCH_MAPPED'].ne(group['RTG_FITCH_MAPPED'].shift())
-    group['RTG_MOODY_CHANGE'] = group['RTG_MOODY_MAPPED'].ne(group['RTG_MOODY_MAPPED'].shift())
-    group['RTG_SP_CHANGE'] = group['RTG_SP_MAPPED'].ne(group['RTG_SP_MAPPED'].shift())
-    group['RTG_DBRS_CHANGE'] = group['RTG_DBRS_MAPPED'].ne(group['RTG_DBRS_MAPPED'].shift())
+
+    for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']:
+        shifted = group[col].shift()
+        change_col = f'{col}_CHANGE'
+        group[change_col] = ~(group[col].eq(shifted))
+        group.loc[shifted.isna(), change_col] = False  # No previous value -> no change
+
     return group
-
-result = data.groupby('Security').apply(compare_group).reset_index(drop=True)
-
-# 6. Optional: filter to only rows where any rating has changed
-result['Any_Change'] = result[['RTG_FITCH_CHANGE', 'RTG_MOODY_CHANGE', 'RTG_SP_CHANGE', 'RTG_DBRS_CHANGE']].any(axis=1)
-changes_only = result[result['Any_Change']]
-
-# 7. Export full result or just changes
-result.to_excel('full_rating_tracking.xlsx', index=False)
-changes_only.to_excel('rating_changes_only.xlsx', index=False)
