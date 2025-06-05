@@ -1,20 +1,85 @@
+import pandas as pd
+import glob
+import os
+
+# =============== PARAMETERS ===============
+
+# Folder where your Excel files are located
+folder_path = r'YOUR_FOLDER_PATH_HERE'  # <-- change this to your folder
+
+# Which columns to process
+rating_columns = ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']
+
+# =============== LOAD & MERGE FILES ===============
+
+# Find all Excel files in the folder
+files = glob.glob(os.path.join(folder_path, '*.xlsx'))
+
+# Read all files and add source filename (optional)
+dfs = []
+for file in files:
+    df = pd.read_excel(file)
+    df['SourceFile'] = os.path.basename(file)
+    dfs.append(df)
+
+# Combine into one dataframe
+data = pd.concat(dfs, ignore_index=True)
+
+# Keep only relevant columns (plus As_of_date and Security)
+required_columns = ['As_of_date', 'Security'] + rating_columns
+data = data[required_columns]
+
+# Convert As_of_date to datetime
+data['As_of_date'] = pd.to_datetime(data['As_of_date'])
+
+# Ensure rating columns are pandas nullable Int64
+for col in rating_columns:
+    data[col] = data[col].astype('Int64')
+
+# Sort by Security and As_of_date
+data = data.sort_values(by=['Security', 'As_of_date'])
+
+
+# =============== CHANGE DETECTION FUNCTION ===============
+
 def compare_group(group):
     group = group.sort_values(by='As_of_date')
 
-    for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']:
+    for col in rating_columns:
         shifted = group[col].shift()
         change_col = f'{col}_CHANGE'
 
-        # basic change detection
+        # basic change detection using eq()
         change_detected = ~(group[col].eq(shifted))
 
-        # handle first row: no change if no previous value
+        # handle first row: no previous value → no change
         change_detected.loc[shifted.isna()] = False
 
-        # suppress change if either current or previous value is 23
+        # suppress changes where either previous or current value is 23
         suppress_mask = (group[col] == 23) | (shifted == 23)
         change_detected.loc[suppress_mask] = False
 
         group[change_col] = change_detected
 
     return group
+
+# Apply group-by Security
+result = data.groupby('Security', group_keys=False).apply(compare_group).reset_index(drop=True)
+
+# Flag if any rating changed
+change_cols = [f"{col}_CHANGE" for col in rating_columns]
+result['Any_Change'] = result[change_cols].any(axis=1)
+
+# Filter only rows with any change
+changes_only = result[result['Any_Change']]
+
+# =============== OUTPUT ===============
+
+# Full result
+result.to_excel(os.path.join(folder_path, 'full_rating_tracking.xlsx'), index=False)
+
+# Only changes
+changes_only.to_excel(os.path.join(folder_path, 'rating_changes_only.xlsx'), index=False)
+
+print("✅ Processing complete!")
+print(f"Processed {len(files)} files. Found {len(changes_only)} changes.")
