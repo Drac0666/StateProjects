@@ -1,68 +1,39 @@
-import win32com.client
 import pandas as pd
-import os
 
-# Path to your folder containing .msg files
-folder_path = r"C:\Your\Path\To\MSG\Folder"  # <-- update this
+def split_tables_by_keyword(tables_dict):
+    # Initialize empty lists to collect rows
+    upgrade_rows = []
+    downgrade_rows = []
+    other_rows = []
 
-# Initialize Outlook COM
-outlook = win32com.client.Dispatch("Outlook.Application")
+    # Iterate over dictionary items
+    for filename, df in tables_dict.items():
+        # Iterate over dataframe rows
+        for idx, row in df.iterrows():
+            # Flag to check if found upgrade/downgrade
+            found = False
 
-# Create empty dictionary to store results
-tables_dict = {}
+            for value in row:
+                # Check only for non-null values
+                if pd.notnull(value):
+                    value_str = str(value).strip()
+                    if value_str == "Upgrade":
+                        upgrade_rows.append(row.to_dict() | {'file': filename})
+                        found = True
+                        break
+                    elif value_str == "Downgrade":
+                        downgrade_rows.append(row.to_dict() | {'file': filename})
+                        found = True
+                        break
 
-# Walk through all files in the folder
-for root, dirs, files in os.walk(folder_path):
-    for file in files:
-        if file.endswith(".msg"):
-            file_path = os.path.join(root, file)
-            print(f"\nProcessing: {file_path}")
+            if not found:
+                other_rows.append(row.to_dict() | {'file': filename})
 
-            try:
-                # Load MSG file
-                msg = outlook.CreateItemFromTemplate(file_path)
+    # Create DataFrames from collected rows
+    df_upgrade = pd.DataFrame(upgrade_rows)
+    df_downgrade = pd.DataFrame(downgrade_rows)
+    df_others = pd.DataFrame(other_rows)
 
-                # Extract HTML body
-                html_body = msg.HTMLBody
+    return df_upgrade, df_downgrade, df_others
 
-                # Parse tables
-                tables = pd.read_html(html_body)
-
-                if not tables:
-                    print(f"No tables found in {file}")
-                    continue
-
-                # We assume you're only interested in the first table (if multiple)
-                table = tables[0]
-
-                # Drop fully empty rows
-                table = table.dropna(how='all')
-
-                # Find header row (where first column == "Date")
-                header_row_index = table[table.iloc[:,0] == 'Date'].index
-
-                if not header_row_index.empty:
-                    header_row = header_row_index[0]
-
-                    # Set new header
-                    table.columns = table.iloc[header_row]
-                    table = table.drop(index=range(0, header_row+1)).reset_index(drop=True)
-
-                    print(f"Table extracted from {file}:")
-                    print(table)
-
-                    # Store cleaned table in dictionary
-                    tables_dict[file] = table
-
-                else:
-                    print(f"No header row with 'Date' found in {file}")
-
-            except Exception as e:
-                print(f"Failed to process {file}: {e}")
-
-# Now tables_dict holds all your processed tables
-print("\nSummary of processed files:")
-for filename, df in tables_dict.items():
-    print(f"{filename}: {len(df)} rows")
-
-# (Optional: you can now do further processing with tables_dict)
+df_upgrade, df_downgrade, df_others = split_tables_by_keyword(tables_dict)
