@@ -1,11 +1,26 @@
 import win32com.client
+import pandas as pd
 
+# Path to your MSG file
+msg_path = r"C:\Your\Path\To\YourFile.msg"  # <-- update this path
+
+# Open Outlook COM
 outlook = win32com.client.Dispatch("Outlook.Application")
-namespace = outlook.GetNamespace("MAPI")
+msg = outlook.CreateItemFromTemplate(msg_path)
 
-# Loop through all top-level stores
-for store in namespace.Folders:
-    print("Store Name:", store.Name)
-    # Optional: list subfolders too
-    for folder in store.Folders:
-        print("  Subfolder:", folder.Name)
+# Extract subject (optional)
+subject = msg.Subject
+print("Subject:", subject)
+
+# Extract HTML body
+html_body = msg.HTMLBody
+
+# Try to parse HTML tables with pandas
+try:
+    tables = pd.read_html(html_body)
+    print(f"Found {len(tables)} tables")
+    for i, table in enumerate(tables):
+        print(f"\nTable {i+1}")
+        print(table)
+except Exception as e:
+    print("Error parsing HTML tables:", e)
