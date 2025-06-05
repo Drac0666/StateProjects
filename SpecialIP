@@ -1,85 +1,74 @@
 import pandas as pd
-import glob
-import os
+import plotly.graph_objects as go
 
-# =============== PARAMETERS ===============
+# --- Assuming you already have these loaded ---
+# result = pd.read_excel('full_rating_tracking.xlsx')
+# changes_only = pd.read_excel('rating_changes_only.xlsx')
 
-# Folder where your Excel files are located
-folder_path = r'YOUR_FOLDER_PATH_HERE'  # <-- change this to your folder
+# Extract list of flagged securities
+flagged_securities = changes_only['Security'].unique()
 
-# Which columns to process
-rating_columns = ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']
+# Filter full dataset to keep full history for flagged securities
+filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_date'])
 
-# =============== LOAD & MERGE FILES ===============
+# Create a dropdown list of unique securities
+securities = filtered_full_data['Security'].unique()
 
-# Find all Excel files in the folder
-files = glob.glob(os.path.join(folder_path, '*.xlsx'))
+# Create an initial security to display
+initial_security = securities[0]
 
-# Read all files and add source filename (optional)
-dfs = []
-for file in files:
-    df = pd.read_excel(file)
-    df['SourceFile'] = os.path.basename(file)
-    dfs.append(df)
+# Function to filter data for a given security
+def get_security_data(security):
+    df = filtered_full_data[filtered_full_data['Security'] == security].sort_values(by='As_of_date')
+    return df
 
-# Combine into one dataframe
-data = pd.concat(dfs, ignore_index=True)
+# Prepare initial data
+df_initial = get_security_data(initial_security)
 
-# Keep only relevant columns (plus As_of_date and Security)
-required_columns = ['As_of_date', 'Security'] + rating_columns
-data = data[required_columns]
+# Create initial figure with multiple traces (one for each rating column)
+fig = go.Figure()
 
-# Convert As_of_date to datetime
-data['As_of_date'] = pd.to_datetime(data['As_of_date'])
+for col in ['RTG_FITCH_MAPPED', 'RTG_MOODY_MAPPED', 'RTG_SP_MAPPED', 'RTG_DBRS_MAPPED']:
+    fig.add_trace(go.Scatter(
+        x=df_initial['As_of_date'],
+        y=df_initial[col],
+        mode='lines+markers',
+        name=col
+    ))
 
-# Ensure rating columns are pandas nullable Int64
-for col in rating_columns:
-    data[col] = data[col].astype('Int64')
+# Build dropdown buttons for all securities
+dropdown_buttons = []
 
-# Sort by Security and As_of_date
-data = data.sort_values(by=['Security', 'As_of_date'])
+for sec in securities:
+    df_sec = get_security_data(sec)
 
+    button = dict(
+        label=str(sec),
+        method="update",
+        args=[
+            {'x': [df_sec['As_of_date']] * 4,
+             'y': [df_sec['RTG_FITCH_MAPPED'],
+                   df_sec['RTG_MOODY_MAPPED'],
+                   df_sec['RTG_SP_MAPPED'],
+                   df_sec['RTG_DBRS_MAPPED']]},
+            {'title': f"Security: {sec}"}
+        ]
+    )
+    dropdown_buttons.append(button)
 
-# =============== CHANGE DETECTION FUNCTION ===============
+# Update figure layout
+fig.update_layout(
+    title=f"Security: {initial_security}",
+    xaxis_title="As of Date",
+    yaxis_title="Rating (Mapped)",
+    updatemenus=[dict(
+        active=0,
+        buttons=dropdown_buttons,
+        x=1.15,
+        y=1.0
+    )],
+    legend=dict(x=1.05, y=0.5)
+)
 
-def compare_group(group):
-    group = group.sort_values(by='As_of_date')
-
-    for col in rating_columns:
-        shifted = group[col].shift()
-        change_col = f'{col}_CHANGE'
-
-        # basic change detection using eq()
-        change_detected = ~(group[col].eq(shifted))
-
-        # handle first row: no previous value → no change
-        change_detected.loc[shifted.isna()] = False
-
-        # suppress changes where either previous or current value is 23
-        suppress_mask = (group[col] == 23) | (shifted == 23)
-        change_detected.loc[suppress_mask] = False
-
-        group[change_col] = change_detected
-
-    return group
-
-# Apply group-by Security
-result = data.groupby('Security', group_keys=False).apply(compare_group).reset_index(drop=True)
-
-# Flag if any rating changed
-change_cols = [f"{col}_CHANGE" for col in rating_columns]
-result['Any_Change'] = result[change_cols].any(axis=1)
-
-# Filter only rows with any change
-changes_only = result[result['Any_Change']]
-
-# =============== OUTPUT ===============
-
-# Full result
-result.to_excel(os.path.join(folder_path, 'full_rating_tracking.xlsx'), index=False)
-
-# Only changes
-changes_only.to_excel(os.path.join(folder_path, 'rating_changes_only.xlsx'), index=False)
-
-print("✅ Processing complete!")
-print(f"Processed {len(files)} files. Found {len(changes_only)} changes.")
+# Show interactive chart
+fig.show()
