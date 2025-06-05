@@ -1,55 +1,57 @@
 import pandas as pd
 import plotly.graph_objects as go
 
-# Load filtered full data (filtered_full_data)
+# Example for one Security (expandable for dropdown later)
 df_initial = get_security_data(initial_security)
 
 fig = go.Figure()
 
-# Let's plot Fitch MAPPED with text labels from Bloomberg Fitch
+# Fitch
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
     y=df_initial['RTG_FITCH_MAPPED'],
     mode='lines+markers+text',
-    text=df_initial['Bloomberg_Fitch'],  # these are the text labels
+    text=df_initial['Bloomberg_Fitch'],
     textposition='top center',
     name='Fitch'
 ))
 
-# You can repeat for Moody's:
+# Moody's
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
     y=df_initial['RTG_MOODY_MAPPED'],
     mode='lines+markers+text',
     text=df_initial['Bloomberg_Moodys'],
     textposition='top center',
-    name='Moody\'s'
+    name="Moody's"
 ))
 
-# Same for SP:
+# S&P
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
     y=df_initial['RTG_SP_MAPPED'],
     mode='lines+markers+text',
     text=df_initial['Bloomberg_SP'],
     textposition='top center',
-    name='S&P'
+    name="S&P"
 ))
 
-# And DBRS:
+# DBRS
 fig.add_trace(go.Scatter(
     x=df_initial['As_of_Date'],
     y=df_initial['RTG_DBRS_MAPPED'],
     mode='lines+markers+text',
     text=df_initial['Bloomberg_DBRS'],
     textposition='top center',
-    name='DBRS'
+    name="DBRS"
 ))
 
+# Layout: pure numeric Y-axis
 fig.update_layout(
     title=f"Security: {security_label_map[initial_security]}",
     xaxis_title="As of Date",
-    yaxis_title="Mapped Rating (higher is better)",
+    yaxis_title="Mapped Rating (higher = better)",
+    yaxis=dict(autorange='reversed'),  # optional: if your mapped scale is reversed (lower number = better)
     updatemenus=[dict(
         active=0,
         buttons=dropdown_buttons,
@@ -61,5 +63,5 @@ fig.update_layout(
 
 fig.show()
 
-# Export as standalone HTML
+# Export to standalone HTML
 fig.write_html("ratings_dashboard.html", full_html=True, include_plotlyjs='cdn')
