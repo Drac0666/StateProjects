@@ -17,25 +17,22 @@ flagged_securities = changes_only['Security'].unique()
 filtered_full_data = result[result['Security'].isin(flagged_securities)].sort_values(by=['Security', 'As_of_Date'])
 
 # ================================================
-# 3️⃣ Load RatingsMap file
+# 3️⃣ Load unified RatingsMap file
 # ================================================
 
-ratings_map = pd.read_excel('RatingsMap.xlsx')
+ratings_map = pd.read_excel('RatingsMap.xlsx')  # with columns: 'Final Rating', 'Number #'
 
-# Build mapping dictionaries for each agency from single file
-fitch_mapping_dict = dict(zip(ratings_map['Number #'], ratings_map['Bloomberg_Fitch']))
-moody_mapping_dict = dict(zip(ratings_map['Number #'], ratings_map['Bloomberg_Moodys']))
-sp_mapping_dict = dict(zip(ratings_map['Number #'], ratings_map['Bloomberg_SP']))
-dbrs_mapping_dict = dict(zip(ratings_map['Number #'], ratings_map['Bloomberg_DBRS']))
+# Build universal mapping dictionary
+rating_mapping_dict = dict(zip(ratings_map['Number #'], ratings_map['Final Rating']))
 
 # ================================================
-# 4️⃣ Create label columns directly from mappings
+# 4️⃣ Apply mapping to each agency column
 # ================================================
 
-filtered_full_data['Fitch_Label'] = filtered_full_data['RTG_FITCH_MAPPED'].map(fitch_mapping_dict)
-filtered_full_data['Moodys_Label'] = filtered_full_data['RTG_MOODY_MAPPED'].map(moody_mapping_dict)
-filtered_full_data['SP_Label'] = filtered_full_data['RTG_SP_MAPPED'].map(sp_mapping_dict)
-filtered_full_data['DBRS_Label'] = filtered_full_data['RTG_DBRS_MAPPED'].map(dbrs_mapping_dict)
+filtered_full_data['Fitch_Label'] = filtered_full_data['RTG_FITCH_MAPPED'].map(rating_mapping_dict)
+filtered_full_data['Moodys_Label'] = filtered_full_data['RTG_MOODY_MAPPED'].map(rating_mapping_dict)
+filtered_full_data['SP_Label'] = filtered_full_data['RTG_SP_MAPPED'].map(rating_mapping_dict)
+filtered_full_data['DBRS_Label'] = filtered_full_data['RTG_DBRS_MAPPED'].map(rating_mapping_dict)
 
 # ================================================
 # 5️⃣ Build dropdown labels (Security | SEC1 | SEC2 | SEC3)
