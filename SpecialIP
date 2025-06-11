@@ -25,7 +25,7 @@ def export_activity_summaries(db_file: str = DB_FILE):
     last_cols = df[date_columns[1:]]
 
     # Securities that had value in first column and then became zero
-    paid_off = df[(first_col > 0) & (last_cols.sum(axis=1) == 0)].copy()
+    paid_off = df[(df.sum(axis=1) > 0) & (df.iloc[:, -1] == 0)].copy()
     paid_off["Asset Class"] = asset_class
     paid_off.to_excel("PaidOffSummary.xlsx")
 
