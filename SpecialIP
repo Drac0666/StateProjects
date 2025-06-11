@@ -45,12 +45,13 @@ def plot_asset_class_breakdown(db_file: str = DB_FILE):
     df_long["Date"] = pd.to_datetime(df_long["Date"])
 
     # Aggregate
-    summary = df_long.groupby(["Date", "Asset Class"])["Par Value"].sum().reset_index()
+    df_long["Asset Group"] = df_long["Asset Class"].astype(str).apply(lambda x: "_".join(x.split("_")[:3]))[:3]))
+
+    summary = df_long.groupby(["Date", "Asset Group"])["Par Value"].sum().reset_index()
 
     # Plot
-    fig = px.area(summary, x="Date", y="Par Value", color="Asset Class",
-                  title="Par Value by Asset Class Over Time",
-                  labels={"Par Value": "Total Par Value"})
+    fig = px.area(summary, x="Date", y="Par Value", color="Asset Group",
+                  title="Par Value by Asset Class Group Over Time"
     fig.update_layout(xaxis_title="Date", yaxis_title="Total Par Value")
     fig.write_html("asset_class_breakdown.html")
     print("Chart saved to asset_class_breakdown.html")
