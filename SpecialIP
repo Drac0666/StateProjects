@@ -1,23 +1,61 @@
-injected_js = """
-<script>
-document.addEventListener('keydown', function(e) {
-    var gd = document.querySelector('.js-plotly-plot');
-    if (!gd) return;
+import pandas as pd
+import os
+import shutil
+import plotly.express as px
 
-    var menus = gd.layout.updatemenus;
-    if (!menus || menus.length === 0) return;
+# === CONFIGURATION ===
+DB_FILE = "pivoted_output.xlsx"
+BACKUP_FILE = "pivoted_output_backup.xlsx"
+CHANGES_FILE = "significant_changes.xlsx"
+ABS_THRESHOLD = 100
+PCT_THRESHOLD = 0.10
+ISIN_COL = "ISIN"
+PAR_VALUE_COL = "Par Value"
 
-    var buttons = menus[0].buttons;
-    var active = menus[0].active;
+# (existing functions remain unchanged...)
 
-    if (e.key === 'ArrowDown') {
-        var next = (active + 1) % buttons.length;
-        Plotly.relayout(gd, {'updatemenus[0].active': next});
-    }
-    if (e.key === 'ArrowUp') {
-        var prev = (active - 1 + buttons.length) % buttons.length;
-        Plotly.relayout(gd, {'updatemenus[0].active': prev});
-    }
-});
-</script>
-"""
+# === FUNCTION 8: EXPORT CURRENT ACTIVITY STATE ===
+def export_activity_summaries(db_file: str = DB_FILE):
+    df = pd.read_excel(db_file, index_col=ISIN_COL)
+    asset_class = df["Asset Class"]
+    df = df.drop(columns="Asset Class")
+    date_columns = list(df.columns)
+
+    first_col = df[date_columns[0]]
+    last_cols = df[date_columns[1:]]
+
+    # Securities that had value in first column and then became zero
+    paid_off = df[(first_col > 0) & (last_cols.sum(axis=1) == 0)].copy()
+    paid_off["Asset Class"] = asset_class
+    paid_off.to_excel("PaidOffSummary.xlsx")
+
+    # Securities that had 0 in first column and now have some value
+    active_now = df[(first_col == 0) & (last_cols.sum(axis=1) > 0)].copy()
+    active_now["Asset Class"] = asset_class
+    active_now.to_excel("ActivityToDate.xlsx")
+
+    print(f"Exported {len(paid_off)} paid-off securities to PaidOffSummary.xlsx")
+    print(f"Exported {len(active_now)} active-to-date securities to ActivityToDate.xlsx")
+
+# === FUNCTION 7: PLOT ACTIVITY TIMECHART ===
+def plot_activity_chart(activity_file: str = "activity_log.xlsx"):
+    if not os.path.exists(activity_file):
+        print("Activity log file not found. Run generate_activity() first.")
+        return
+
+    df = pd.read_excel(activity_file)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df.sort_values("Date", inplace=True)
+
+    # Convert purchases to positive and paidoff to negative values
+    df["Signed Value"] = df.apply(lambda row: row["Value"] if row["Activity"] == "Purchase" else -row["Value"], axis=1)
+
+    # Group by date and sum values
+    daily_summary = df.groupby(["Date", "Activity"])["Signed Value"].sum().reset_index()
+
+    # Plot with plotly
+    fig = px.bar(daily_summary, x="Date", y="Signed Value", color="Activity",
+                 title="Activity Over Time: Purchases vs Paidoff",
+                 labels={"Signed Value": "Flow (Par Value)"})"})
+    fig.update_layout(xaxis_title="Date", yaxis_title="Par Value Change")
+    fig.show()
