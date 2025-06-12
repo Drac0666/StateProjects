@@ -24,7 +24,7 @@ def Backup():
     print("All relevant files backed up to:", BackupFolder)
 
 # === ENHANCED FUNCTION: EXPORT MONTHLY ACTIVITY ===
-def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", month: str = None, Chart: bool = False):
+def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", month: str = None):
     if not os.path.exists(activity_file):
         print("Activity log file not found. Run generate_activity() first.")
         return
@@ -63,7 +63,7 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
         df_paidoffs.to_excel(writer, sheet_name="Paidoff", index=False)
 
-        # Generate HTML tables for email
+    # Generate HTML tables for email
     purchases_html = df_purchases.style.set_table_attributes('border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%"')\
         .set_table_styles([\
             {'selector': 'th', 'props': [('background-color', '#003366'), ('color', 'white'), ('font-weight', 'bold')]},\
@@ -81,42 +81,11 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
     paidoffs_count = len(df_paidoffs)
     paidoffs_total = paidoffs["ValueRaw"].sum() / 1_000_000
 
-    # Optional chart export and embed
-    chart_img_tag = ""
-    if Chart:
-        try:
-            import plotly.io as pio
-            from plotly.io import read_html
-
-            fig = read_html("asset_class_breakdown.html")
-            fig.write_image("asset_class_breakdown.png", format="png", engine="orca")
-            print("Chart rendered to asset_class_breakdown.png")
-            chart_img_tag = '<br><img src="cid:chart_image" style="width:100%; max-width:800px;"><br>'
-        except Exception as e:
-            print(f"Could not render chart image: {e}")
-    paidoffs_count = len(df_paidoffs)
-    paidoffs_total = paidoffs["ValueRaw"].sum() / 1_000_000
-
-        if Chart:
-        try:
-            import plotly.io as pio
-            from plotly.io import read_html
-
-            fig = read_html("asset_class_breakdown.html")
-            fig.write_image("asset_class_breakdown.png", format="png", engine="orca")
-            print("Chart rendered to asset_class_breakdown.png")
-            chart_img_tag = '<br><img src="cid:chart_image" style="width:100%; max-width:800px;"><br>'
-        except Exception as e:
-            print(f"Could not render chart image: {e}")
-            chart_img_tag = ""
-    else:
-        chart_img_tag = ""
-
     html_body = f"""
     <html>
     <body>
         <p>Dear Team,</p>
-        <p>Please find below the par value activity summary for <strong>{target_period}</strong>.</p>{chart_img_tag}
+        <p>Please find below the par value activity summary for <strong>{target_period}</strong>.</p>
         <h3>Purchases - {purchases_count} Securities with total Par Value of {purchases_total:,.2f}M</h3>
         {purchases_html}
         <h3>Paidoff - {paidoffs_count} Securities with total Par Value of {paidoffs_total:,.2f}M</h3>
@@ -132,19 +101,8 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         mail = outlook.CreateItem(0)
         mail.Subject = f"Par Value Activity Summary - {target_period}"
         mail.HTMLBody = html_body
-        import os
-                chart_path = os.path.abspath("asset_class_breakdown.png")
-        if Chart and os.path.exists(chart_path):
-            mail.Attachments.Add(chart_path)
-            mail.HTMLBody = mail.HTMLBody.replace("cid:chart_image", "chart_image")
-            attachment = mail.Attachments.Item(mail.Attachments.Count)
-            attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", "chart_image")
-            attachment = mail.Attachments.Item(mail.Attachments.Count)
-            attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", "chart_image")
-
         mail.Display()
         print("Outlook email created and ready for review.")
-
-    Backup()
+        Backup()
     except Exception as e:
         print(f"Could not create Outlook email: {e}")
