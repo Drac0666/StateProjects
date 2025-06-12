@@ -22,32 +22,28 @@ def export_monthly_activity(activity_file: str = "activity_log.xlsx"):
 
     df = pd.read_excel(activity_file)
     df["Date"] = pd.to_datetime(df["Date"])
-    df["Month"] = df["Date"].dt.strftime("%b'%y")  # e.g. May'25
+    df["Month"] = df["Date"].dt.strftime("%b'%y")
 
     # Split purchases and paidoff
-    purchases = df[df["Activity"] == "Purchase"].groupby("Month")["ISIN"].apply(list).reset_index()
-    paidoffs = df[df["Activity"] == "Paidoff"].groupby("Month")["ISIN"].apply(list).reset_index()
+    purchases = df[df["Activity"] == "Purchase"].copy()
+    paidoffs = df[df["Activity"] == "Paidoff"].copy()
 
-    # Convert to column format
-    def expand_grouped_data(df_grouped):
-        out = {}
-        for _, row in df_grouped.iterrows():
-            month = row["Month"]
-            out[month] = row["ISIN"]
-        return pd.DataFrame(dict([(k, pd.Series(v)) for k,v in out.items()]))
-
-        # Sort month keys chronologically
+    # Sort chronologically
     purchases["Month_dt"] = pd.to_datetime(purchases["Month"], format="%b'%y")
-    purchases = purchases.sort_values("Month_dt").drop(columns="Month_dt")
+    purchases = purchases.sort_values("Month_dt")
     paidoffs["Month_dt"] = pd.to_datetime(paidoffs["Month"], format="%b'%y")
-    paidoffs = paidoffs.sort_values("Month_dt").drop(columns="Month_dt")
+    paidoffs = paidoffs.sort_values("Month_dt")
 
-        df_purchases = expand_grouped_data(purchases)
-    df_paidoffs = expand_grouped_data(paidoffs)
+    def pivot_activity(df_activity):
+        grouped = df_activity.groupby("Month")
+        output = {}
+        for month, group in grouped:
+            out = pd.DataFrame({month: group["ISIN"].values, f"{month} Value": group["Value"].values})
+            output[month] = out
+        return pd.concat(output.values(), axis=1)
 
-    # Add totals
-    df_purchases.loc["Total"] = df_purchases.count()
-    df_paidoffs.loc["Total"] = df_paidoffs.count()
+    df_purchases = pivot_activity(purchases)
+    df_paidoffs = pivot_activity(paidoffs)
 
     with pd.ExcelWriter("ActivityPerMonth.xlsx") as writer:
         df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
