@@ -30,6 +30,82 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
     paidoffs = df[df["Activity"] == "Paidoff"]
 
     def clean_output(data):
+        data = data.rename(columns={"ISIN": "Security"})
+        return data[["Security", "SEC_1", "SEC_2", "SEC_3", "Description", "Value"]].reset_index(drop=True)
+
+    df_purchases = clean_output(purchases)
+    df_paidoffs = clean_output(paidoffs)
+
+    with pd.ExcelWriter("MonthlyActivity_Formatted.xlsx", engine="openpyxl") as writer:
+        df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
+        df_paidoffs.to_excel(writer, sheet_name="Paidoff", index=False)
+
+        # Generate HTML tables for email
+    purchases_html = df_purchases.to_html(index=False, border=0)
+    paidoffs_html = df_paidoffs.to_html(index=False, border=0)
+
+    # Build email body
+    purchases_count = len(df_purchases)
+    purchases_total = purchases["Value"].astype(float).sum() / 1_000_000
+    paidoffs_count = len(df_paidoffs)
+    paidoffs_total = paidoffs["Value"].astype(float).sum() / 1_000_000
+
+    html_body = f"""
+    <html>
+    <body>
+        <p>Dear Team,</p>
+        <p>Please find below the par value activity summary for <strong>{target_period}</strong>.</p>
+        <h3>Purchases - {purchases_count} Securities with total Par Value of {purchases_total:,.2f}M</h3>
+        {purchases_html}
+        <h3>Paidoff - {paidoffs_count} Securities with total Par Value of {paidoffs_total:,.2f}M</h3>
+        {paidoffs_html}
+        <p>Best regards,<br>Your Automation Bot</p>
+    </body>
+    </html>
+    """
+
+    try:
+        import win32com.client as win32
+        outlook = win32.Dispatch('Outlook.Application')
+        mail = outlook.CreateItem(0)
+        mail.Subject = f"Par Value Activity Summary - {target_period}"
+        mail.HTMLBody = html_body
+        mail.Display()
+        print("Outlook email created and ready for review.")
+    except Exception as e:
+        print(f"Could not create Outlook email: {e}")
+import pandas as pd
+import os
+from datetime import datetime, timedelta
+
+# === ENHANCED FUNCTION: EXPORT MONTHLY ACTIVITY ===
+def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", month: str = None):
+    if not os.path.exists(activity_file):
+        print("Activity log file not found. Run generate_activity() first.")
+        return
+
+    df = pd.read_excel(activity_file)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Month"] = df["Date"].dt.to_period("M")
+
+    # Determine the target month
+    if month is None:
+        target_period = (datetime.today().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    else:
+        target_period = pd.to_datetime(month).strftime("%Y-%m")
+
+    df = df[df["Month"].astype(str) == target_period]
+    if df.empty:
+        print(f"No data for {target_period}.")
+        return
+
+    df[['SEC_1', 'SEC_2', 'SEC_3', 'Description']] = df['Asset Class'].str.split('_', n=3, expand=True)
+    df["Value"] = df["Value"].map("{:,.2f}".format)
+
+    purchases = df[df["Activity"] == "Purchase"]
+    paidoffs = df[df["Activity"] == "Paidoff"]
+
+    def clean_output(data):
         return data[["ISIN", "SEC_1", "SEC_2", "SEC_3", "Description", "Value"]].reset_index(drop=True)
 
     df_purchases = clean_output(purchases)
