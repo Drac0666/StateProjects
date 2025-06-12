@@ -1,206 +1,42 @@
 import pandas as pd
 import os
-import shutil
-import plotly.express as px
+from datetime import datetime, timedelta
 
-# === CONFIGURATION ===
-DB_FILE = "pivoted_output.xlsx"
-BACKUP_FILE = "pivoted_output_backup.xlsx"
-CHANGES_FILE = "significant_changes.xlsx"
-ABS_THRESHOLD = 100
-PCT_THRESHOLD = 0.10
-ISIN_COL = "ISIN"
-PAR_VALUE_COL = "Par Value"
-
-# (existing functions remain unchanged...)
-
-# === FUNCTION 12: EXPORT MONTHLY ACTIVITY ===
-def export_monthly_activity(activity_file: str = "activity_log.xlsx"):
+# === ENHANCED FUNCTION: EXPORT MONTHLY ACTIVITY ===
+def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", month: str = None):
     if not os.path.exists(activity_file):
         print("Activity log file not found. Run generate_activity() first.")
         return
 
     df = pd.read_excel(activity_file)
     df["Date"] = pd.to_datetime(df["Date"])
-    df["Month"] = df["Date"].dt.strftime("%b'%y")
+    df["Month"] = df["Date"].dt.to_period("M")
 
-    # Split purchases and paidoff
-    purchases = df[df["Activity"] == "Purchase"].copy()
-    paidoffs = df[df["Activity"] == "Paidoff"].copy()
+    # Determine the target month
+    if month is None:
+        target_period = (datetime.today().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    else:
+        target_period = pd.to_datetime(month).strftime("%Y-%m")
 
-    # Sort chronologically
-    purchases["Month_dt"] = pd.to_datetime(purchases["Month"], format="%b'%y")
-    purchases = purchases.sort_values("Month_dt")
-    paidoffs["Month_dt"] = pd.to_datetime(paidoffs["Month"], format="%b'%y")
-    paidoffs = paidoffs.sort_values("Month_dt")
+    df = df[df["Month"].astype(str) == target_period]
+    if df.empty:
+        print(f"No data for {target_period}.")
+        return
 
-    def pivot_activity(df_activity):
-        grouped = df_activity.groupby("Month")
-        ordered_months = sorted(grouped.groups.keys(), key=lambda x: pd.to_datetime(x, format="%b'%y"))
-        output = {}
-        for month in ordered_months:
-            group = grouped.get_group(month)
-            out = pd.DataFrame({month: group["ISIN"].values, f"{month} Value": group["Value"].values})
-            output[month] = out
-        df_combined = pd.concat(output.values(), axis=1)
-        # Append total counts
-        totals = []
-        for month in ordered_months:
-            count = len(grouped.get_group(month))
-            total_value = grouped.get_group(month)["Value"].sum()
-            totals.append(count)
-            totals.append(total_value)
-        df_combined.loc["Total"] = totals
-        return df_combined
+    df[['SEC_1', 'SEC_2', 'SEC_3', 'Description']] = df['Asset Class'].str.split('_', n=3, expand=True)
+    df["Value"] = df["Value"].map("{:,.2f}".format)
 
-    df_purchases = pivot_activity(purchases)
-    df_paidoffs = pivot_activity(paidoffs)
+    purchases = df[df["Activity"] == "Purchase"]
+    paidoffs = df[df["Activity"] == "Paidoff"]
 
-    with pd.ExcelWriter("ActivityPerMonth.xlsx") as writer:
+    def clean_output(data):
+        return data[["ISIN", "SEC_1", "SEC_2", "SEC_3", "Description", "Value"]].reset_index(drop=True)
+
+    df_purchases = clean_output(purchases)
+    df_paidoffs = clean_output(paidoffs)
+
+    with pd.ExcelWriter("MonthlyActivity_Formatted.xlsx", engine="openpyxl") as writer:
         df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
-        df_paidoffs.to_excel(writer, sheet_name="Paid Offs", index=False)
+        df_paidoffs.to_excel(writer, sheet_name="Paidoff", index=False)
 
-    print("Monthly activity exported to ActivityPerMonth.xlsx")
-
-# === FUNCTION 11: VALIDATE AND PREPARE BULK DATA TEMPLATE ===
-def prepare_bulk_search_template(
-    db_file: str = DB_FILE,
-    mdp_db_file: str = "MDPDatabase.xlsx",
-    template_file: str = "Bulk Data Search Template.xlsx",
-    output_file: str = "Bulk Data Search Template - Filled.xlsx",
-    web_url: str = None
-):
-    # Load main database
-    db = pd.read_excel(db_file, index_col=ISIN_COL)
-    asset_class = db["Asset Class"]
-    last_date = db.columns[-1]
-    db = db[["Asset Class", last_date]].rename(columns={last_date: "Last Par Value"})
-    db["SECURITY"] = db.index
-
-    # Load MDP database
-    mdp = pd.read_excel(mdp_db_file)
-    mdp = mdp.drop(columns=[col for col in mdp.columns if col in ["ID_CUSIP", "EXCEPTION"] or mdp[col].isna().all()])
-
-    # Find missing ISINs
-    missing_isins = db.index.difference(mdp[ISIN_COL])
-    print(f"Found {len(missing_isins)} missing ISIN(s).")
-
-    if len(missing_isins) > 0:
-        # Open template and write missing ISINs starting from row 7
-        from openpyxl import load_workbook
-        from openpyxl.utils import get_column_letter
-
-        wb = load_workbook(template_file)
-        ws = wb.active
-
-        start_row = 7
-        for i, isin in enumerate(missing_isins):
-            row = start_row + i
-            ws[f"A{row}"] = isin
-            ws[f"B{row}"] = isin
-
-        # Add END markers
-        end_row = start_row + len(missing_isins)
-        ws[f"A{end_row}"] = "END1"
-        ws[f"A{end_row + 1}"] = "END2"
-
-        wb.save("BulkUpload.xlsx")
-        print("Template filled and saved to: BulkUpload.xlsx")
-
-        if web_url:
-            import webbrowser
-            print(f"Opening browser to: {web_url}")
-            webbrowser.open(web_url)
-
-    # Merge filtered db + mdp and return merged table
-    combined = db.reset_index().merge(mdp, on=ISIN_COL, how="left")
-    combined.to_excel("MergedDatabase.xlsx", index=False)
-    print("Merged database saved to MergedDatabase.xlsx")
-
-# === FUNCTION 9: CUMULATIVE BALANCE OVER TIME ===
-def plot_cumulative_balance(db_file: str = DB_FILE):
-    df = pd.read_excel(db_file, index_col=ISIN_COL)
-    df = df.drop(columns=["Asset Class"])
-
-    # Sum across ISINs for each date
-    cumulative = df.sum().reset_index()
-    cumulative.columns = ["Date", "Total Balance"]
-    cumulative["Date"] = pd.to_datetime(cumulative["Date"])
-    cumulative = cumulative.sort_values("Date")
-
-    fig = px.line(cumulative, x="Date", y="Total Balance",
-                  title="Cumulative Par Value Over Time",
-                  labels={"Total Balance": "Total Par Value"})
-    fig.update_layout(xaxis_title="Date", yaxis_title="Outstanding Par Value")
-    fig.write_html("cumulative_par_value.html")
-    print("Chart saved to cumulative_par_value.html")
-
-# === FUNCTION 10: ASSET CLASS BREAKDOWN OVER TIME ===
-def plot_asset_class_breakdown(db_file: str = DB_FILE):
-    df = pd.read_excel(db_file, index_col=ISIN_COL)
-    asset_class = df["Asset Class"]
-    df = df.drop(columns="Asset Class")
-
-    # Melt to long format
-    df_long = df.reset_index().melt(id_vars=ISIN_COL, var_name="Date", value_name="Par Value")
-    df_long = df_long.merge(asset_class, left_on=ISIN_COL, right_index=True)
-    df_long = df_long[df_long["Par Value"] > 0]
-    df_long["Date"] = pd.to_datetime(df_long["Date"])
-
-    # Aggregate
-    df_long["Asset Group"] = df_long["Asset Class"].astype(str).apply(lambda x: "_".join(x.split("_")[:3]))[:3]))
-
-    summary = df_long.groupby(["Date", "Asset Group"])["Par Value"].sum().reset_index()
-
-    # Plot
-    fig = px.area(summary, x="Date", y="Par Value", color="Asset Group",
-                  title="Par Value by Asset Class Group Over Time"
-    fig.update_layout(xaxis_title="Date", yaxis_title="Total Par Value")
-    fig.write_html("asset_class_breakdown.html")
-    print("Chart saved to asset_class_breakdown.html")
-
-# === FUNCTION 8: EXPORT CURRENT ACTIVITY STATE ===
-def export_activity_summaries(db_file: str = DB_FILE):
-    df = pd.read_excel(db_file, index_col=ISIN_COL)
-    asset_class = df["Asset Class"]
-    df = df.drop(columns="Asset Class")
-    date_columns = list(df.columns)
-
-    first_col = df[date_columns[0]]
-    last_cols = df[date_columns[1:]]
-
-    # Securities that had value in first column and then became zero
-    paid_off = df[(df.sum(axis=1) > 0) & (df.iloc[:, -1] == 0)].copy()
-    paid_off["Asset Class"] = asset_class
-    paid_off.to_excel("PaidOffSummary.xlsx")
-
-    # Securities that had 0 in first column and now have some value
-    active_now = df[(first_col == 0) & (last_cols.sum(axis=1) > 0)].copy()
-    active_now["Asset Class"] = asset_class
-    active_now.to_excel("ActivityToDate.xlsx")
-
-    print(f"Exported {len(paid_off)} paid-off securities to PaidOffSummary.xlsx")
-    print(f"Exported {len(active_now)} active-to-date securities to ActivityToDate.xlsx")
-
-# === FUNCTION 7: PLOT ACTIVITY TIMECHART ===
-def plot_activity_chart(activity_file: str = "activity_log.xlsx"):
-    if not os.path.exists(activity_file):
-        print("Activity log file not found. Run generate_activity() first.")
-        return
-
-    df = pd.read_excel(activity_file)
-    df["Date"] = pd.to_datetime(df["Date"])
-    df.sort_values("Date", inplace=True)
-
-    # Convert purchases to positive and paidoff to negative values
-    df["Signed Value"] = df.apply(lambda row: row["Value"] if row["Activity"] == "Purchase" else -row["Value"], axis=1)
-
-    # Group by date and sum values
-    daily_summary = df.groupby(["Date", "Activity"])["Signed Value"].sum().reset_index()
-
-    # Plot with plotly
-    fig = px.bar(daily_summary, x="Date", y="Signed Value", color="Activity",
-                 title="Activity Over Time: Purchases vs Paidoff",
-                 labels={"Signed Value": "Flow (Par Value)"})"})
-    fig.update_layout(xaxis_title="Date", yaxis_title="Par Value Change")
-    fig.show()
+    print(f"Formatted activity for {target_period} saved to MonthlyActivity_Formatted.xlsx")
