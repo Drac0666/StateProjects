@@ -1,6 +1,27 @@
 import pandas as pd
 import os
 from datetime import datetime, timedelta
+import shutil
+
+# === CONSTANT ===
+BackupFolder = "ParValue_Backups"
+
+# === BACKUP FUNCTION ===
+def Backup():
+    os.makedirs(BackupFolder, exist_ok=True)
+    sources_folder = os.path.join(BackupFolder, "Sources")
+    os.makedirs(sources_folder, exist_ok=True)
+
+    for file in os.listdir():
+        if file.endswith(".xlsx"):
+            if file.startswith("SF"):
+                dest_path = os.path.join(sources_folder, file)
+                if not os.path.exists(dest_path):
+                    shutil.copy2(file, dest_path)
+            else:
+                shutil.copy2(file, os.path.join(BackupFolder, file))
+
+    print("All relevant files backed up to:", BackupFolder)
 
 # === ENHANCED FUNCTION: EXPORT MONTHLY ACTIVITY ===
 def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", month: str = None):
@@ -82,5 +103,7 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         mail.HTMLBody = html_body
         mail.Display()
         print("Outlook email created and ready for review.")
+
+    Backup()
     except Exception as e:
         print(f"Could not create Outlook email: {e}")
