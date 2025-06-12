@@ -43,8 +43,16 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         df_paidoffs.to_excel(writer, sheet_name="Paidoff", index=False)
 
         # Generate HTML tables for email
-    purchases_html = df_purchases.to_html(index=False, border=0)
-    paidoffs_html = df_paidoffs.to_html(index=False, border=0)
+    purchases_html = df_purchases.style.set_table_attributes('border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%"')\
+        .set_table_styles([\
+            {'selector': 'th', 'props': [('background-color', '#003366'), ('color', 'white'), ('font-weight', 'bold')]},\
+            {'selector': 'td', 'props': [('border-bottom', '1px solid #ddd')]}\
+        ]).hide(axis='index').to_html()
+    paidoffs_html = df_paidoffs.style.set_table_attributes('border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%"')\
+        .set_table_styles([\
+            {'selector': 'th', 'props': [('background-color', '#003366'), ('color', 'white'), ('font-weight', 'bold')]},\
+            {'selector': 'td', 'props': [('border-bottom', '1px solid #ddd')]}\
+        ]).hide(axis='index').to_html()
 
     # Build email body
     purchases_count = len(df_purchases)
