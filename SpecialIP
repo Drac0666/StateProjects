@@ -14,6 +14,37 @@ PAR_VALUE_COL = "Par Value"
 
 # (existing functions remain unchanged...)
 
+# === FUNCTION 12: EXPORT MONTHLY ACTIVITY ===
+def export_monthly_activity(activity_file: str = "activity_log.xlsx"):
+    if not os.path.exists(activity_file):
+        print("Activity log file not found. Run generate_activity() first.")
+        return
+
+    df = pd.read_excel(activity_file)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Month"] = df["Date"].dt.strftime("%b'%y")  # e.g. May'25
+
+    # Split purchases and paidoff
+    purchases = df[df["Activity"] == "Purchase"].groupby("Month")["ISIN"].apply(list).reset_index()
+    paidoffs = df[df["Activity"] == "Paidoff"].groupby("Month")["ISIN"].apply(list).reset_index()
+
+    # Convert to column format
+    def expand_grouped_data(df_grouped):
+        out = {}
+        for _, row in df_grouped.iterrows():
+            month = row["Month"]
+            out[month] = row["ISIN"]
+        return pd.DataFrame(dict([(k, pd.Series(v)) for k,v in out.items()]))
+
+    df_purchases = expand_grouped_data(purchases)
+    df_paidoffs = expand_grouped_data(paidoffs)
+
+    with pd.ExcelWriter("ActivityPerMonth.xlsx") as writer:
+        df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
+        df_paidoffs.to_excel(writer, sheet_name="Paid Offs", index=False)
+
+    print("Monthly activity exported to ActivityPerMonth.xlsx")
+
 # === FUNCTION 11: VALIDATE AND PREPARE BULK DATA TEMPLATE ===
 def prepare_bulk_search_template(
     db_file: str = DB_FILE,
