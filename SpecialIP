@@ -81,6 +81,22 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
     paidoffs_count = len(df_paidoffs)
     paidoffs_total = paidoffs["ValueRaw"].sum() / 1_000_000
 
+    # Optional chart export and embed
+    chart_img_tag = ""
+    if Chart:
+        try:
+            import plotly.io as pio
+            from plotly.io import read_html
+
+            fig = read_html("asset_class_breakdown.html")
+            fig.write_image("asset_class_breakdown.png", format="png", engine="orca")
+            print("Chart rendered to asset_class_breakdown.png")
+            chart_img_tag = '<br><img src="cid:chart_image" style="width:100%; max-width:800px;"><br>'
+        except Exception as e:
+            print(f"Could not render chart image: {e}")
+    paidoffs_count = len(df_paidoffs)
+    paidoffs_total = paidoffs["ValueRaw"].sum() / 1_000_000
+
         if Chart:
         try:
             import plotly.io as pio
@@ -117,10 +133,12 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         mail.Subject = f"Par Value Activity Summary - {target_period}"
         mail.HTMLBody = html_body
         import os
-        chart_path = os.path.abspath("asset_class_breakdown.png")
-                if Chart and os.path.exists(chart_path):
+                chart_path = os.path.abspath("asset_class_breakdown.png")
+        if Chart and os.path.exists(chart_path):
             mail.Attachments.Add(chart_path)
             mail.HTMLBody = mail.HTMLBody.replace("cid:chart_image", "chart_image")
+            attachment = mail.Attachments.Item(mail.Attachments.Count)
+            attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", "chart_image")
             attachment = mail.Attachments.Item(mail.Attachments.Count)
             attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", "chart_image")
 
