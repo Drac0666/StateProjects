@@ -14,6 +14,61 @@ PAR_VALUE_COL = "Par Value"
 
 # (existing functions remain unchanged...)
 
+# === FUNCTION 11: VALIDATE AND PREPARE BULK DATA TEMPLATE ===
+def prepare_bulk_search_template(
+    db_file: str = DB_FILE,
+    mdp_db_file: str = "MDPDatabase.xlsx",
+    template_file: str = "Bulk Data Search Template.xlsx",
+    output_file: str = "Bulk Data Search Template - Filled.xlsx",
+    web_url: str = None
+):
+    # Load main database
+    db = pd.read_excel(db_file, index_col=ISIN_COL)
+    asset_class = db["Asset Class"]
+    last_date = db.columns[-1]
+    db = db[["Asset Class", last_date]].rename(columns={last_date: "Last Par Value"})
+    db["SECURITY"] = db.index
+
+    # Load MDP database
+    mdp = pd.read_excel(mdp_db_file)
+    mdp = mdp.drop(columns=[col for col in mdp.columns if col in ["ID_CUSIP", "EXCEPTION"] or mdp[col].isna().all()])
+
+    # Find missing ISINs
+    missing_isins = db.index.difference(mdp[ISIN_COL])
+    print(f"Found {len(missing_isins)} missing ISIN(s).")
+
+    if len(missing_isins) > 0:
+        # Open template and write missing ISINs starting from row 7
+        from openpyxl import load_workbook
+        from openpyxl.utils import get_column_letter
+
+        wb = load_workbook(template_file)
+        ws = wb.active
+
+        start_row = 7
+        for i, isin in enumerate(missing_isins):
+            row = start_row + i
+            ws[f"A{row}"] = isin
+            ws[f"B{row}"] = isin
+
+        # Add END markers
+        end_row = start_row + len(missing_isins)
+        ws[f"A{end_row}"] = "END1"
+        ws[f"A{end_row + 1}"] = "END2"
+
+        wb.save("BulkUpload.xlsx")
+        print("Template filled and saved to: BulkUpload.xlsx")
+
+        if web_url:
+            import webbrowser
+            print(f"Opening browser to: {web_url}")
+            webbrowser.open(web_url)
+
+    # Merge filtered db + mdp and return merged table
+    combined = db.reset_index().merge(mdp, on=ISIN_COL, how="left")
+    combined.to_excel("MergedDatabase.xlsx", index=False)
+    print("Merged database saved to MergedDatabase.xlsx")
+
 # === FUNCTION 9: CUMULATIVE BALANCE OVER TIME ===
 def plot_cumulative_balance(db_file: str = DB_FILE):
     df = pd.read_excel(db_file, index_col=ISIN_COL)
