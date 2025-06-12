@@ -36,8 +36,18 @@ def export_monthly_activity(activity_file: str = "activity_log.xlsx"):
             out[month] = row["ISIN"]
         return pd.DataFrame(dict([(k, pd.Series(v)) for k,v in out.items()]))
 
-    df_purchases = expand_grouped_data(purchases)
+        # Sort month keys chronologically
+    purchases["Month_dt"] = pd.to_datetime(purchases["Month"], format="%b'%y")
+    purchases = purchases.sort_values("Month_dt").drop(columns="Month_dt")
+    paidoffs["Month_dt"] = pd.to_datetime(paidoffs["Month"], format="%b'%y")
+    paidoffs = paidoffs.sort_values("Month_dt").drop(columns="Month_dt")
+
+        df_purchases = expand_grouped_data(purchases)
     df_paidoffs = expand_grouped_data(paidoffs)
+
+    # Add totals
+    df_purchases.loc["Total"] = df_purchases.count()
+    df_paidoffs.loc["Total"] = df_paidoffs.count()
 
     with pd.ExcelWriter("ActivityPerMonth.xlsx") as writer:
         df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
