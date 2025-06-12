@@ -24,7 +24,9 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         return
 
     df[['SEC_1', 'SEC_2', 'SEC_3', 'Description']] = df['Asset Class'].str.split('_', n=3, expand=True)
-    df["Value"] = df["Value"].map("{:,.2f}".format)
+    # Save raw value for calculations before formatting
+    df["ValueRaw"] = df["Value"]
+    df["Value"] = df["ValueRaw"].map("{:,.2f}".format)
 
     purchases = df[df["Activity"] == "Purchase"]
     paidoffs = df[df["Activity"] == "Paidoff"]
@@ -46,9 +48,9 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
 
     # Build email body
     purchases_count = len(df_purchases)
-    purchases_total = purchases["Value"].astype(float).sum() / 1_000_000
+    purchases_total = purchases["ValueRaw"].sum() / 1_000_000
     paidoffs_count = len(df_paidoffs)
-    paidoffs_total = paidoffs["Value"].astype(float).sum() / 1_000_000
+    paidoffs_total = paidoffs["ValueRaw"].sum() / 1_000_000
 
     html_body = f"""
     <html>
