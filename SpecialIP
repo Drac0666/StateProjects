@@ -39,4 +39,32 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
         df_paidoffs.to_excel(writer, sheet_name="Paidoff", index=False)
 
-    print(f"Formatted activity for {target_period} saved to MonthlyActivity_Formatted.xlsx")
+        # Generate HTML tables for email
+    purchases_html = df_purchases.to_html(index=False, border=0)
+    paidoffs_html = df_paidoffs.to_html(index=False, border=0)
+
+    # Build email body
+    html_body = f"""
+    <html>
+    <body>
+        <p>Dear Team,</p>
+        <p>Please find below the par value activity summary for <strong>{target_period}</strong>.</p>
+        <h3>Purchases</h3>
+        {purchases_html}
+        <h3>Paidoff</h3>
+        {paidoffs_html}
+        <p>Best regards,<br>Your Automation Bot</p>
+    </body>
+    </html>
+    """
+
+    try:
+        import win32com.client as win32
+        outlook = win32.Dispatch('Outlook.Application')
+        mail = outlook.CreateItem(0)
+        mail.Subject = f"Par Value Activity Summary - {target_period}"
+        mail.HTMLBody = html_body
+        mail.Display()
+        print("Outlook email created and ready for review.")
+    except Exception as e:
+        print(f"Could not create Outlook email: {e}")
