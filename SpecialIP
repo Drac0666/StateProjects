@@ -36,11 +36,21 @@ def export_monthly_activity(activity_file: str = "activity_log.xlsx"):
 
     def pivot_activity(df_activity):
         grouped = df_activity.groupby("Month")
+        ordered_months = sorted(grouped.groups.keys(), key=lambda x: pd.to_datetime(x, format="%b'%y"))
         output = {}
-        for month, group in grouped:
+        for month in ordered_months:
+            group = grouped.get_group(month)
             out = pd.DataFrame({month: group["ISIN"].values, f"{month} Value": group["Value"].values})
             output[month] = out
-        return pd.concat(output.values(), axis=1)
+        df_combined = pd.concat(output.values(), axis=1)
+        # Append total counts
+        totals = []
+        for month in ordered_months:
+            count = len(grouped.get_group(month))
+            totals.append(count)
+            totals.append("")  # For value column
+        df_combined.loc["Total"] = totals
+        return df_combined
 
     df_purchases = pivot_activity(purchases)
     df_paidoffs = pivot_activity(paidoffs)
