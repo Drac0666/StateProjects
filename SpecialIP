@@ -35,8 +35,8 @@ def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", m
         data = data.rename(columns={"ISIN": "Security"})
         return data[["Security", "SEC_1", "SEC_2", "SEC_3", "Description", "Value"]].reset_index(drop=True)
 
-    df_purchases = clean_output(purchases)
-    df_paidoffs = clean_output(paidoffs)
+    df_purchases = clean_output(purchases).sort_values(by="SEC_1")
+    df_paidoffs = clean_output(paidoffs).sort_values(by="SEC_1")
 
     with pd.ExcelWriter("MonthlyActivity_Formatted.xlsx", engine="openpyxl") as writer:
         df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
