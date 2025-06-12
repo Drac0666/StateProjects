@@ -47,8 +47,9 @@ def export_monthly_activity(activity_file: str = "activity_log.xlsx"):
         totals = []
         for month in ordered_months:
             count = len(grouped.get_group(month))
+            total_value = grouped.get_group(month)["Value"].sum()
             totals.append(count)
-            totals.append("")  # For value column
+            totals.append(total_value)
         df_combined.loc["Total"] = totals
         return df_combined
 
