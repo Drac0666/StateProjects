@@ -50,6 +50,14 @@ def show_excel_gui(file_path, display_columns=None):
         for _, row in filtered.iterrows():
             tree.insert("", "end", values=list(row))
 
+    def copy_selected_row(event):
+        selected = tree.selection()
+        if selected:
+            values = tree.item(selected[0])['values']
+            app.clipboard_clear()
+            app.clipboard_append("	".join(map(str, values)))
+            app.update()
+
     search_entry = ctk.CTkEntry(app, textvariable=search_var, placeholder_text="Search Security")
     search_entry.pack(pady=10)
     search_entry.bind("<KeyRelease>", lambda e: update_table())
@@ -57,11 +65,22 @@ def show_excel_gui(file_path, display_columns=None):
     frame = ctk.CTkFrame(app)
     frame.pack(fill="both", expand=True)
 
-    tree = ttk.Treeview(frame, columns=list(df.columns), show='headings')
+    # Scrollbars
+    x_scroll = ttk.Scrollbar(frame, orient="horizontal")
+    y_scroll = ttk.Scrollbar(frame, orient="vertical")
+    tree = ttk.Treeview(frame, columns=list(df.columns), show='headings', xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set)
+    x_scroll.config(command=tree.xview)
+    y_scroll.config(command=tree.yview)
+
+    x_scroll.pack(side="bottom", fill="x")
+    y_scroll.pack(side="right", fill="y")
+    tree.pack(side="left", fill="both", expand=True)
+
     for col in df.columns:
         tree.heading(col, text=col)
         tree.column(col, width=120)
-    tree.pack(fill="both", expand=True)
+
+    tree.bind("<Button-3>", copy_selected_row)
 
     update_table()
     app.mainloop()
