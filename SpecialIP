@@ -84,6 +84,7 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
 
     multi_filter_box = ctk.CTkTextbox(app, height=80)
     multi_filter_box.pack(pady=5)
+    multi_filter_box.bind("<KeyRelease>", lambda e: update_table())
 
     frame = ctk.CTkFrame(app)
     frame.pack(fill="both", expand=True)
@@ -105,6 +106,42 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
     tree.bind("<Button-3>", copy_selected_row)
 
     update_table()
+        # === Export Buttons ===
+    def export_to_clipboard():
+        export_data = []
+        for row_id in tree.get_children():
+            export_data.append(tree.item(row_id)['values'])
+        if not export_data:
+            return
+        header = "	".join(tree['columns'])
+        lines = ["	".join(map(str, row)) for row in export_data]
+        full_text = header + "
+" + "
+".join(lines)
+        app.clipboard_clear()
+        app.clipboard_append(full_text)
+        app.update()
+        print("Exported to clipboard.")
+
+    def export_to_file():
+        export_data = []
+        for row_id in tree.get_children():
+            export_data.append(tree.item(row_id)['values'])
+        if not export_data:
+            return
+        export_df = pd.DataFrame(export_data, columns=tree['columns'])
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Export_{timestamp}.csv"
+        export_df.to_csv(filename, index=False)
+        print(f"Exported to file: {filename}")
+
+    button_frame = ctk.CTkFrame(app)
+    button_frame.pack(pady=5)
+    copy_btn = ctk.CTkButton(button_frame, text="Copy to Clipboard", command=export_to_clipboard)
+    copy_btn.pack(side="left", padx=5)
+    save_btn = ctk.CTkButton(button_frame, text="Save to CSV", command=export_to_file)
+    save_btn.pack(side="left", padx=5)
+
     app.mainloop()
 
 # === FUNCTION: UPDATE DATABASE ===
