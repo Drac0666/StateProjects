@@ -1,12 +1,131 @@
 import pandas as pd
+import numpy as np
 import os
-from datetime import datetime, timedelta
 import shutil
+from datetime import datetime, timedelta
+import win32com.client as win32
+import plotly.express as px
+from openpyxl import load_workbook
+import customtkinter as ctk
+from tkinter import filedialog
+from tkinter import StringVar, ttk
 
-# === CONSTANT ===
+# === CONFIGURATION ===
 BackupFolder = "ParValue_Backups"
+DB_FILE = "pivoted_output.xlsx"
+BACKUP_FILE = "pivoted_output_backup.xlsx"
+CHANGES_FILE = "significant_changes.xlsx"
+ABS_THRESHOLD = 100
+PCT_THRESHOLD = 0.10
+ISIN_COL = "ISIN"
+PAR_VALUE_COL = "Par Value"
 
-# === BACKUP FUNCTION ===
+# === FUNCTION: CREATE INITIAL DATABASE ===
+def create_database(file_path):
+    df = pd.read_excel(file_path)
+    date = pd.to_datetime(df['As of Date'].iloc[0]).strftime('%Y-%m-%d')
+    df["Asset Class"] = df[["SEC 1", "SEC 2", "SEC 3", "Description"]].astype(str).agg('_'.join, axis=1)
+    pivot = df.groupby([ISIN_COL, "Asset Class"])[PAR_VALUE_COL].sum().unstack().fillna(0)
+    pivot.columns = [date]
+    pivot.to_excel(DB_FILE)
+    print(f"Initial database created with date: {date}")
+
+# === FUNCTION: GUI TO VIEW EXCEL WITH SEARCH ===
+def show_excel_gui(file_path, display_columns=None):
+    df = pd.read_excel(file_path)
+    if display_columns:
+        df = df[display_columns]
+
+    app = ctk.CTk()
+    app.title("Excel Viewer")
+    app.geometry("1000x600")
+
+    search_var = StringVar()
+
+    def update_table():
+        query = search_var.get().lower()
+        for row in tree.get_children():
+            tree.delete(row)
+        filtered = df[df[ISIN_COL].astype(str).str.lower().str.contains(query)]
+        for _, row in filtered.iterrows():
+            tree.insert("", "end", values=list(row))
+
+    search_entry = ctk.CTkEntry(app, textvariable=search_var, placeholder_text="Search Security")
+    search_entry.pack(pady=10)
+    search_entry.bind("<KeyRelease>", lambda e: update_table())
+
+    frame = ctk.CTkFrame(app)
+    frame.pack(fill="both", expand=True)
+
+    tree = ttk.Treeview(frame, columns=list(df.columns), show='headings')
+    for col in df.columns:
+        tree.heading(col, text=col)
+        tree.column(col, width=120)
+    tree.pack(fill="both", expand=True)
+
+    update_table()
+    app.mainloop()
+
+# === FUNCTION: UPDATE DATABASE ===
+def update_database(file_path):
+    df_new = pd.read_excel(file_path)
+    date = pd.to_datetime(df_new['As of Date'].iloc[0]).strftime('%Y-%m-%d')
+    if os.path.exists(DB_FILE):
+        db = pd.read_excel(DB_FILE, index_col=[0,1])
+        if date in db.columns:
+            ans = input(f"Date {date} already exists. Overwrite? (y/n): ")
+            if ans.lower() != 'y':
+                print("Update cancelled.")
+                return
+        shutil.copy(DB_FILE, BACKUP_FILE)
+        df_new["Asset Class"] = df_new[["SEC 1", "SEC 2", "SEC 3", "Description"]].astype(str).agg('_'.join, axis=1)
+        update = df_new.groupby([ISIN_COL, "Asset Class"])[PAR_VALUE_COL].sum().unstack().fillna(0)
+        update.columns = [date]
+        db = db.combine_first(update).fillna(0)
+        db[date] = update[date]
+    else:
+        create_database(file_path)
+        return
+    db.to_excel(DB_FILE)
+    print(f"Database updated with {date}.")
+
+# === FUNCTION: DETECT SIGNIFICANT CHANGES ===
+def detect_significant_changes(threshold_abs=ABS_THRESHOLD, threshold_pct=PCT_THRESHOLD):
+    df = pd.read_excel(DB_FILE, index_col=[0,1])
+    if df.shape[1] < 2:
+        print("Not enough dates to compare.")
+        return
+    prev, curr = df.columns[-2], df.columns[-1]
+    df['diff'] = df[curr] - df[prev]
+    df['pct_change'] = np.where(df[prev] != 0, df['diff'] / df[prev], 0)
+    sig = df[(df['diff'].abs() > threshold_abs) | (df['pct_change'].abs() > threshold_pct)].copy()
+    new = df[(df[prev] == 0) & (df[curr] > 0)].copy()
+    paid = df[(df[prev] > 0) & (df[curr] == 0)].copy()
+
+    with pd.ExcelWriter(CHANGES_FILE) as writer:
+        sig.drop(columns=['pct_change']).to_excel(writer, sheet_name="Significant")
+        new.drop(columns=['pct_change']).to_excel(writer, sheet_name="New")
+        paid.drop(columns=['pct_change']).to_excel(writer, sheet_name="Paidoff")
+    print(f"Significant changes written to {CHANGES_FILE}")
+
+# === FUNCTION: DETECT ANOMALIES ===
+def detect_anomalies():
+    df = pd.read_excel(DB_FILE, index_col=[0,1])
+    results = []
+    for isin in df.index:
+        vals = df.loc[isin].values
+        nonzero = (vals > 0).astype(int)
+        switches = np.diff(nonzero)
+        if np.count_nonzero(switches) >= 2:
+            results.append((isin[0], isin[1], list(df.columns[1:][np.where(switches != 0)[0] + 1])))
+    if results:
+        out = pd.DataFrame(results, columns=["Security", "Asset Class", "Anomaly Dates"])
+        out.to_excel("anomalies.xlsx", index=False)
+        print("Anomalies detected and saved.")
+    else:
+        print("No anomalies found.")
+
+# === FUNCTION: BACKUP ===
 def Backup():
     os.makedirs(BackupFolder, exist_ok=True)
     sources_folder = os.path.join(BackupFolder, "Sources")
@@ -22,87 +141,3 @@ def Backup():
                 shutil.copy2(file, os.path.join(BackupFolder, file))
 
     print("All relevant files backed up to:", BackupFolder)
-
-# === ENHANCED FUNCTION: EXPORT MONTHLY ACTIVITY ===
-def export_monthly_activity_enhanced(activity_file: str = "activity_log.xlsx", month: str = None):
-    if not os.path.exists(activity_file):
-        print("Activity log file not found. Run generate_activity() first.")
-        return
-
-    df = pd.read_excel(activity_file)
-    df["Date"] = pd.to_datetime(df["Date"])
-    df["Month"] = df["Date"].dt.to_period("M")
-
-    # Determine the target month
-    if month is None:
-        target_period = (datetime.today().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-    else:
-        target_period = pd.to_datetime(month).strftime("%Y-%m")
-
-    df = df[df["Month"].astype(str) == target_period]
-    if df.empty:
-        print(f"No data for {target_period}.")
-        return
-
-    df[['SEC_1', 'SEC_2', 'SEC_3', 'Description']] = df['Asset Class'].str.split('_', n=3, expand=True)
-    # Save raw value for calculations before formatting
-    df["ValueRaw"] = df["Value"]
-    df["Value"] = df["ValueRaw"].map("{:,.2f}".format)
-
-    purchases = df[df["Activity"] == "Purchase"]
-    paidoffs = df[df["Activity"] == "Paidoff"]
-
-    def clean_output(data):
-        data = data.rename(columns={"ISIN": "Security"})
-        return data[["Security", "SEC_1", "SEC_2", "SEC_3", "Description", "Value"]].reset_index(drop=True)
-
-    df_purchases = clean_output(purchases).sort_values(by="SEC_1")
-    df_paidoffs = clean_output(paidoffs).sort_values(by="SEC_1")
-
-    with pd.ExcelWriter("MonthlyActivity_Formatted.xlsx", engine="openpyxl") as writer:
-        df_purchases.to_excel(writer, sheet_name="Purchases", index=False)
-        df_paidoffs.to_excel(writer, sheet_name="Paidoff", index=False)
-
-    # Generate HTML tables for email
-    purchases_html = df_purchases.style.set_table_attributes('border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%"')\
-        .set_table_styles([\
-            {'selector': 'th', 'props': [('background-color', '#003366'), ('color', 'white'), ('font-weight', 'bold')]},\
-            {'selector': 'td', 'props': [('border-bottom', '1px solid #ddd')]}\
-        ]).hide(axis='index').to_html()
-    paidoffs_html = df_paidoffs.style.set_table_attributes('border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%"')\
-        .set_table_styles([\
-            {'selector': 'th', 'props': [('background-color', '#003366'), ('color', 'white'), ('font-weight', 'bold')]},\
-            {'selector': 'td', 'props': [('border-bottom', '1px solid #ddd')]}\
-        ]).hide(axis='index').to_html()
-
-    # Build email body
-    purchases_count = len(df_purchases)
-    purchases_total = purchases["ValueRaw"].sum() / 1_000_000
-    paidoffs_count = len(df_paidoffs)
-    paidoffs_total = paidoffs["ValueRaw"].sum() / 1_000_000
-
-    html_body = f"""
-    <html>
-    <body>
-        <p>Dear Team,</p>
-        <p>Please find below the par value activity summary for <strong>{target_period}</strong>.</p>
-        <h3>Purchases - {purchases_count} Securities with total Par Value of {purchases_total:,.2f}M</h3>
-        {purchases_html}
-        <h3>Paidoff - {paidoffs_count} Securities with total Par Value of {paidoffs_total:,.2f}M</h3>
-        {paidoffs_html}
-        <p>Best regards,<br>Your Automation Bot</p>
-    </body>
-    </html>
-    """
-
-    try:
-        import win32com.client as win32
-        outlook = win32.Dispatch('Outlook.Application')
-        mail = outlook.CreateItem(0)
-        mail.Subject = f"Par Value Activity Summary - {target_period}"
-        mail.HTMLBody = html_body
-        mail.Display()
-        print("Outlook email created and ready for review.")
-        Backup()
-    except Exception as e:
-        print(f"Could not create Outlook email: {e}")
