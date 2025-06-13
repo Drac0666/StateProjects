@@ -118,6 +118,7 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
         full_text = header + "
 " + "
 ".join(lines)
+".join(lines)
         app.clipboard_clear()
         app.clipboard_append(full_text)
         app.update()
