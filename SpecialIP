@@ -42,7 +42,24 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
 
     search_var = StringVar()
 
-    
+    def update_table():
+        query = search_var.get().lower()
+        multi_lines = multi_filter_box.get("1.0", "end").strip().splitlines()
+        multi_lines = [line.strip().lower() for line in multi_lines if line.strip()]
+
+        for row in tree.get_children():
+            tree.delete(row)
+
+        if not query and not multi_lines:
+            filtered = df.copy()
+        else:
+            mask = pd.Series([False] * len(df))
+            if query:
+                mask |= df.apply(lambda row: row.astype(str).str.lower().str.contains(query).any(), axis=1)
+            if multi_lines and isin_column in df.columns:
+                mask |= df[isin_column].astype(str).str.lower().isin(multi_lines)
+            filtered = df[mask]
+
         for _, row in filtered.iterrows():
             tree.insert("", "end", values=list(row))
 
@@ -62,10 +79,15 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
     search_entry.pack(pady=5)
     search_entry.bind("<KeyRelease>", lambda e: update_table())
 
+    multi_filter_label = ctk.CTkLabel(app, text="Paste multiple Securities (one per line):")
+    multi_filter_label.pack()
+
+    multi_filter_box = ctk.CTkTextbox(app, height=80)
+    multi_filter_box.pack(pady=5)
+
     frame = ctk.CTkFrame(app)
     frame.pack(fill="both", expand=True)
 
-    # Scrollbars
     x_scroll = ttk.Scrollbar(frame, orient="horizontal")
     y_scroll = ttk.Scrollbar(frame, orient="vertical")
     tree = ttk.Treeview(frame, columns=list(df.columns), show='headings', xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set)
@@ -82,18 +104,7 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
 
     tree.bind("<Button-3>", copy_selected_row)
 
-        multi_filter_label = ctk.CTkLabel(app, text="Paste multiple Securities (one per line):")
-    multi_filter_label.pack()
-
-    multi_filter_box = ctk.CTkTextbox(app, height=80)
-    multi_filter_box.pack(pady=5)
-
-    
-
-        for _, row in filtered.iterrows():
-            tree.insert("", "end", values=list(row))
-
-        update_table()
+    update_table()
     app.mainloop()
 
 # === FUNCTION: UPDATE DATABASE ===
