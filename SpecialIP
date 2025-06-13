@@ -31,7 +31,7 @@ def create_database(file_path):
     print(f"Initial database created with date: {date}")
 
 # === FUNCTION: GUI TO VIEW EXCEL WITH SEARCH ===
-def show_excel_gui(file_path, display_columns=None):
+def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
     df = pd.read_excel(file_path)
     if display_columns:
         df = df[display_columns]
@@ -67,7 +67,7 @@ def show_excel_gui(file_path, display_columns=None):
             app.update()
 
     search_entry = ctk.CTkEntry(app, textvariable=search_var, placeholder_text="Search All Columns")
-    search_entry.pack(pady=10)
+    search_entry.pack(pady=5)
     search_entry.bind("<KeyRelease>", lambda e: update_table())
 
     frame = ctk.CTkFrame(app)
@@ -89,6 +89,33 @@ def show_excel_gui(file_path, display_columns=None):
         tree.column(col, width=120)
 
     tree.bind("<Button-3>", copy_selected_row)
+
+        multi_filter_label = ctk.CTkLabel(app, text="Paste multiple Securities (one per line):")
+    multi_filter_label.pack()
+
+    multi_filter_box = ctk.CTkTextbox(app, height=80)
+    multi_filter_box.pack(pady=5)
+
+    def update_table():
+        query = search_var.get().lower()
+        multi_lines = multi_filter_box.get("1.0", "end").strip().splitlines()
+        multi_lines = [line.strip().lower() for line in multi_lines if line.strip()]
+
+        for row in tree.get_children():
+            tree.delete(row)
+
+        if not query and not multi_lines:
+            filtered = df.copy()
+        else:
+            mask = pd.Series([False] * len(df))
+            if query:
+                mask |= df.apply(lambda row: row.astype(str).str.lower().str.contains(query).any(), axis=1)
+            if multi_lines and isin_column in df.columns:
+                mask |= df[isin_column].astype(str).str.lower().isin(multi_lines)
+            filtered = df[mask]
+
+        for _, row in filtered.iterrows():
+            tree.insert("", "end", values=list(row))
 
     update_table()
     app.mainloop()
