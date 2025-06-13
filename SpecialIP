@@ -46,10 +46,11 @@ def show_excel_gui(file_path, display_columns=None):
         query = search_var.get().lower()
         for row in tree.get_children():
             tree.delete(row)
-        mask = pd.Series([True] * len(df))
-        for col in df.columns:
-            mask &= df[col].astype(str).str.lower().str.contains(query)
-        filtered = df[mask]
+        if not query.strip():
+            filtered = df.copy()
+        else:
+            mask = df.apply(lambda row: row.astype(str).str.lower().str.contains(query).any(), axis=1)
+            filtered = df[mask]
         for _, row in filtered.iterrows():
             tree.insert("", "end", values=list(row))
 
