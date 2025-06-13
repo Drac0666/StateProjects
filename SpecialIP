@@ -46,7 +46,10 @@ def show_excel_gui(file_path, display_columns=None):
         query = search_var.get().lower()
         for row in tree.get_children():
             tree.delete(row)
-        filtered = df[df[ISIN_COL].astype(str).str.lower().str.contains(query)]
+        mask = pd.Series([True] * len(df))
+        for col in df.columns:
+            mask &= df[col].astype(str).str.lower().str.contains(query)
+        filtered = df[mask]
         for _, row in filtered.iterrows():
             tree.insert("", "end", values=list(row))
 
@@ -54,11 +57,15 @@ def show_excel_gui(file_path, display_columns=None):
         selected = tree.selection()
         if selected:
             values = tree.item(selected[0])['values']
+            header = "	".join(tree['columns'])
+            row_data = "	".join(map(str, values))
+            full_data = f"{header}
+{row_data}"
             app.clipboard_clear()
-            app.clipboard_append("	".join(map(str, values)))
+            app.clipboard_append(full_data)
             app.update()
 
-    search_entry = ctk.CTkEntry(app, textvariable=search_var, placeholder_text="Search Security")
+    search_entry = ctk.CTkEntry(app, textvariable=search_var, placeholder_text="Search All Columns")
     search_entry.pack(pady=10)
     search_entry.bind("<KeyRelease>", lambda e: update_table())
 
