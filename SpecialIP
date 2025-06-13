@@ -40,6 +40,10 @@ def show_excel_gui(file_list, display_columns=None, isin_column='ISIN'):
         df = pd.read_excel(choice)
         selected_file.set(choice)
         file_label.configure(text=f"Current File: {os.path.basename(choice)}")
+        tree['columns'] = list(df.columns)
+        for col in tree['columns']:
+            tree.heading(col, text=col)
+            tree.column(col, width=120)
         update_table()
 
     if display_columns:
