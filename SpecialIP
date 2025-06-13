@@ -115,9 +115,8 @@ def show_excel_gui(file_path, display_columns=None, isin_column='ISIN'):
             return
         header = "	".join(tree['columns'])
         lines = ["	".join(map(str, row)) for row in export_data]
-        full_text = header + "
+                full_text = header + "
 " + "
-".join(lines)
 ".join(lines)
         app.clipboard_clear()
         app.clipboard_append(full_text)
