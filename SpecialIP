@@ -31,7 +31,7 @@ def launch_gui():
     frame = ctk.CTkFrame(app)
     frame.pack(padx=10, pady=10, fill="both", expand=True)
     app.title("Par Value Tracker GUI")
-    app.geometry("800x600")
+    app.geometry("900x650")
 
     def run_all():
         if not selected_file[0]:
@@ -92,6 +92,37 @@ def launch_gui():
         status_label = ctk.CTkLabel(frame, text="", width=20, height=10, fg_color="red")
         status_label.grid(row=row, column=col * 2 + 1, padx=2, pady=5)
         status_flags[label] = status_label
+
+    # === Add Dropdown for SF Files ===
+    import re
+    from glob import glob
+
+    dropdown_frame = ctk.CTkFrame(app)
+    dropdown_frame.pack(padx=10, pady=10, fill="x")
+
+    dropdown_label = ctk.CTkLabel(dropdown_frame, text="Open SF File:")
+    dropdown_label.pack(side="left", padx=10)
+
+    sf_files = sorted(
+        [f for f in glob("SF_*.xlsx") if re.match(r"SF_\d{4}-\d{2}-\d{2}\.xlsx", f)],
+        key=lambda f: datetime.strptime(f[3:13], "%Y-%m-%d"),
+        reverse=True
+    )
+
+    selected_sf_file = StringVar()
+    if sf_files:
+        selected_sf_file.set(sf_files[0])
+    dropdown = ctk.CTkOptionMenu(dropdown_frame, values=sf_files, variable=selected_sf_file)
+    dropdown.pack(side="left")
+
+    def open_selected_file():
+        selected = selected_sf_file.get()
+        if selected and os.path.exists(selected):
+            os.startfile(selected)
+            print(f"Opened file: {selected}")
+
+    open_button = ctk.CTkButton(dropdown_frame, text="Open", command=open_selected_file)
+    open_button.pack(side="left", padx=10)
 
     # === Add Live Console ===
     console = tk.Text(app, height=10, wrap="word", bg="#1e1e1e", fg="white")
