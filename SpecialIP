@@ -26,7 +26,8 @@ def launch_gui():
     import tkinter as tk
     status_flags = {}  # Tracks which functions have been executed
     selected_file = [None]  # mutable container to hold file path
-        app = ctk.CTk()
+
+    app = ctk.CTk()
     frame = ctk.CTkFrame(app)
     frame.pack(padx=10, pady=10, fill="both", expand=True)
     app.title("Par Value Tracker GUI")
@@ -53,9 +54,8 @@ def launch_gui():
             update_database(selected_file[0])
         else:
             print("No file selected. Please use 'Read from Drive' first.")
-        update_database(file)
 
-        def handle_read():
+    def handle_read():
         selected_file[0] = ReadingFromDrive()
         print(f"Selected file: {selected_file[0]}")
 
@@ -75,7 +75,7 @@ def launch_gui():
         ("Run All", run_all)
     ]
 
-        button_widgets = {}
+    button_widgets = {}
     for i, (label, command) in enumerate(buttons):
         row = i // 3
         col = i % 3
