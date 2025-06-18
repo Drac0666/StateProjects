@@ -31,7 +31,7 @@ def launch_gui():
     frame = ctk.CTkFrame(app)
     frame.pack(padx=10, pady=10, fill="both", expand=True)
     app.title("Par Value Tracker GUI")
-    app.geometry("600x400")
+    app.geometry("800x600")
 
     def run_all():
         if not selected_file[0]:
@@ -92,6 +92,24 @@ def launch_gui():
         status_label = ctk.CTkLabel(frame, text="", width=20, height=10, fg_color="red")
         status_label.grid(row=row, column=col * 2 + 1, padx=2, pady=5)
         status_flags[label] = status_label
+
+    # === Add Live Console ===
+    console = tk.Text(app, height=10, wrap="word", bg="#1e1e1e", fg="white")
+    console.pack(fill="x", padx=10, pady=(0, 10))
+    
+    def log_message(msg):
+        console.insert("end", msg + "
+")
+        console.see("end")
+    
+    # Override print to also log to console
+    import builtins
+    original_print = print
+    def custom_print(*args, **kwargs):
+        message = ' '.join(str(arg) for arg in args)
+        log_message(message)
+        original_print(*args, **kwargs)
+    builtins.print = custom_print
 
     app.mainloop()
 
