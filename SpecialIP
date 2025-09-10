@@ -1,155 +1,141 @@
-# === FUNCTION: GUI TO VIEW EXCEL WITH SEARCH ===
-def show_excel_gui(file_list, display_columns=None, isin_column='ISIN'):
-    import pandas as pd
-    import os
-    import tkinter.ttk as ttk
+# transition_matrix_ratings.py
+# Python 3.9
 
-    app = ctk.CTk()
-    app.title("Excel Viewer with Search and File Selector")
-    app.geometry("1100x650")
+from __future__ import annotations
+import sys
+import re
+import pandas as pd
+from pathlib import Path
+from typing import Tuple, List
 
-    selected_file = StringVar(master=app, value=file_list[0])
-    df = pd.read_excel(selected_file.get())
+# Docelowy porządek ratingów (możesz dodać/zdjąć D jeśli u Ciebie nie występuje)
+RATING_ORDER: List[str] = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "CC", "C", "D"]
 
-    def reload_file(choice):
-        nonlocal df
-        df = pd.read_excel(choice)
-        selected_file.set(choice)
-        file_label.configure(text=f"Current File: {os.path.basename(choice)}")
-        update_table()
+def read_any(path: str, usecols: List[str]) -> pd.DataFrame:
+    p = Path(path)
+    ext = p.suffix.lower()
+    if ext in [".xlsx", ".xls"]:
+        return pd.read_excel(p, dtype=str, usecols=usecols)
+    elif ext in [".csv", ".txt"]:
+        # spróbuj wykryć separator
+        try:
+            return pd.read_csv(p, dtype=str, usecols=usecols)
+        except Exception:
+            return pd.read_csv(p, dtype=str, usecols=usecols, sep=";")
+    else:
+        raise ValueError(f"Nieobsługiwane rozszerzenie pliku: {ext}")
 
-    if display_columns:
-        df = df[display_columns]
+def bucketize(raw: str) -> str:
+    """
+    Mapuje dowolny rating do bucketa: usuwa +/-, spacje, bierze prefiks pasujący do znanych.
+    Przykłady: 'AA-', 'Aa2', 'bbb+' -> 'AA', 'A', 'BBB'
+    Gdy brak dopasowania -> zwraca None (później to drop).
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip().upper()
 
-    app = ctk.CTk()
-    app.title("Excel Viewer with Search and File Selector")
-    app.geometry("1100x650")
+    # typowe czyszczenie
+    s = s.replace(" ", "").replace("-", "").replace("+", "")
 
-    search_var = StringVar(master=app)
+    # uproszczenia dla Moody's (Aaa -> AAA, Baa -> BBB itd.)
+    s = s.replace("AAA", "AAA").replace("AA", "AA").replace("A", "A")
+    s = s.replace("BAA", "BBB").replace("BB", "BB").replace("B", "B")
+    s = s.replace("CAA", "CCC").replace("CCC", "CCC").replace("CC", "CC").replace("C", "C")
 
-    def update_table():
-        missing_label.configure(text="")
-        query = search_var.get().lower()
-        multi_lines = multi_filter_box.get("1.0", "end").strip().splitlines()
-        multi_lines = [line.strip().lower() for line in multi_lines if line.strip()]
+    # pełny match do któregoś z bucketów
+    for b in RATING_ORDER:
+        if s.startswith(b):
+            return b
 
-        for row in tree.get_children():
-            tree.delete(row)
+    # niektórzy zapisują 'DEFAULT', 'DEF', 'D'
+    if re.fullmatch(r"(D|DEF(AULT)?)", s):
+        return "D"
 
-        if not query and not multi_lines:
-            filtered = df.copy()
-        else:
-            mask = pd.Series([False] * len(df))
-            if query:
-                mask |= df.apply(lambda row: row.astype(str).str.lower().str.contains(query).any(), axis=1)
-            if multi_lines and isin_column in df.columns:
-                mask |= df[isin_column].astype(str).str.lower().isin(multi_lines)
-            filtered = df[mask]
+    return None
 
-        # Show missing ISINs
-        if multi_lines and isin_column in df.columns:
-            isin_set = set(df[isin_column].astype(str).str.lower())
-            missing = [val for val in multi_lines if val not in isin_set]
-            if missing:
-                # Show popup for missing ISINs
-                import tkinter.messagebox as msg
-                full_list = '
-'.join(missing)
-                msg.showinfo("Missing ISINs", f"{len(missing)} ISIN(s) not found:
+def load_ratings(path: str,
+                 id_col: str = "Identifier",
+                 rating_col: str = "Lowest Rating") -> pd.DataFrame:
+    df = read_any(path, usecols=[id_col, rating_col]).copy()
+    df.columns = [c.strip() for c in df.columns]
+    df[id_col] = df[id_col].astype(str).str.strip()
 
-{full_list}")
-                missing_label.configure(text=f"Missing: {len(missing)} | {', '.join(missing[:5]) + ('...' if len(missing) > 5 else '')}")
+    df["bucket"] = df[rating_col].map(bucketize)
+    # wyrzuć wiersze bez mapowalnego ratingu lub identyfikatora
+    df = df.dropna(subset=[id_col, "bucket"])
+    # jeśli są duplikaty Identifier: weź najgorszy (najniższy) rating wg porządku
+    order = {r: i for i, r in enumerate(RATING_ORDER)}
+    df = df.sort_values(by=[id_col, "bucket"], key=lambda s: s.map(order)).groupby(id_col, as_index=False).last()
+    return df[[id_col, "bucket"]]
 
-        for _, row in filtered.iterrows():
-            tree.insert("", "end", values=list(row))
+def transition_matrix(
+    file_t0: str,
+    file_t1: str,
+    id_col: str = "Identifier",
+    rating_col: str = "Lowest Rating",
+    rating_order: List[str] = None
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    if rating_order is None:
+        rating_order = RATING_ORDER
 
-    def copy_selected_row(event):
-        selected = tree.selection()
-        if selected:
-            values = tree.item(selected[0])['values']
-            header = "	".join(tree['columns'])
-            row_data = "	".join(map(str, values))
-            full_data = f"{header}
-{row_data}"
-            app.clipboard_clear()
-            app.clipboard_append(full_data)
-            app.update()
+    d0 = load_ratings(file_t0, id_col, rating_col)
+    d1 = load_ratings(file_t1, id_col, rating_col)
 
-    dropdown = ctk.CTkOptionMenu(app, values=file_list, command=reload_file, variable=selected_file)
-    dropdown.pack(pady=5)
+    # interesuje nas przekrój (tylko wspólne identyfikatory)
+    common = d0.merge(d1, on=id_col, suffixes=("_t0", "_t1"), how="inner")
 
-    file_label = ctk.CTkLabel(app, text=f"Current File: {os.path.basename(selected_file.get())}")
-    file_label.pack(pady=2)
+    # crosstab liczebności
+    counts = pd.crosstab(
+        common["bucket_t0"],
+        common["bucket_t1"],
+        dropna=False
+    ).reindex(index=rating_order, columns=rating_order, fill_value=0)
 
-    search_entry = ctk.CTkEntry(app, textvariable=search_var, placeholder_text="Search All Columns")
-    search_entry.pack(pady=5)
-    search_entry.bind("<KeyRelease>", lambda e: update_table())
+    # procenty w wierszach (sumy wierszy = 100)
+    pct = counts.div(counts.sum(axis=1).replace(0, 1), axis=0) * 100.0
+    pct = pct.round(2)
 
-    multi_filter_label = ctk.CTkLabel(app, text="Paste multiple Securities (one per line):")
-    multi_filter_label.pack()
+    # ładne etykiety
+    counts.index.name = "from\\to"
+    pct.index.name = "from\\to"
 
-    multi_filter_box = ctk.CTkTextbox(app, height=80)
-    multi_filter_box.pack(pady=5)
-    multi_filter_box.bind("<KeyRelease>", lambda e: update_table())
+    return counts, pct
 
-    missing_label = ctk.CTkLabel(app, text="", text_color="orange")
-    missing_label.pack(pady=2)
+def save_outputs(counts: pd.DataFrame, pct: pd.DataFrame, out_prefix: str) -> None:
+    # CSV
+    counts.to_csv(f"{out_prefix}_counts.csv", index=True)
+    pct.to_csv(f\"{out_prefix}_pct.csv\", index=True)
 
-    frame = ctk.CTkFrame(app)
-    frame.pack(fill="both", expand=True)
+    # Excel ze stylowaniem (diagonala pogrubiona)
+    with pd.ExcelWriter(f\"{out_prefix}.xlsx\", engine=\"xlsxwriter\") as xw:
+        counts.to_excel(xw, sheet_name=\"counts\")
+        pct.to_excel(xw, sheet_name=\"percent\")
 
-    x_scroll = ttk.Scrollbar(frame, orient="horizontal")
-    y_scroll = ttk.Scrollbar(frame, orient="vertical")
-    tree = ttk.Treeview(frame, columns=list(df.columns), show='headings', xscrollcommand=x_scroll.set, yscrollcommand=y_scroll.set)
-    x_scroll.config(command=tree.xview)
-    y_scroll.config(command=tree.yview)
+        wb = xw.book
+        bold = wb.add_format({\"bold\": True})
+        # pogrub kątną w arkuszu percent
+        ws = xw.sheets[\"percent\"]
+        # diagonala: wiersze/kolumny przesunięte o nagłówki (1-based w Excelu)
+        n = pct.shape[0]
+        for i in range(n):
+            # w Excelu: rząd = i+2 (bo tytuł + nagłówki), kol = i+2
+            ws.write(i+1+1, i+1+1, pct.iloc[i, i], bold)
 
-    x_scroll.pack(side="bottom", fill="x")
-    y_scroll.pack(side="right", fill="y")
-    tree.pack(side="left", fill="both", expand=True)
+if __name__ == \"__main__\":
+    if len(sys.argv) < 3:
+        print(\"Użycie: python transition_matrix_ratings.py <plik_t0> <plik_t1> [prefix_wyjścia]\")
+        print(\"Obsługuję CSV/XLSX. Kolumny: 'Identifier', 'Lowest Rating'.\")
+        sys.exit(1)
 
-    for col in df.columns:
-        tree.heading(col, text=col)
-        tree.column(col, width=120)
+    file_t0, file_t1 = sys.argv[1], sys.argv[2]
+    out_prefix = sys.argv[3] if len(sys.argv) > 3 else \"transition_matrix\"
 
-    tree.bind("<Button-3>", copy_selected_row)
+    counts_df, pct_df = transition_matrix(file_t0, file_t1)
+    save_outputs(counts_df, pct_df, out_prefix)
 
-    update_table()
-
-    def export_to_clipboard():
-        export_data = []
-        for row_id in tree.get_children():
-            export_data.append(tree.item(row_id)['values'])
-        if not export_data:
-            return
-        export_df = pd.DataFrame(export_data, columns=tree['columns'])
-        export_df.to_clipboard(index=False)
-        print(f"Copied {len(export_df)} rows to clipboard.")
-
-    def export_to_file():
-        export_data = []
-        for row_id in tree.get_children():
-            export_data.append(tree.item(row_id)['values'])
-        if not export_data:
-            return
-        export_df = pd.DataFrame(export_data, columns=tree['columns'])
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Export_{timestamp}.csv"
-        export_df.to_csv(filename, index=False)
-        print(f"Exported to file: {filename}")
-
-    button_frame = ctk.CTkFrame(app)
-    button_frame.pack(pady=5)
-    copy_btn = ctk.CTkButton(button_frame, text="Copy to Clipboard", command=export_to_clipboard)
-    copy_btn.pack(side="left", padx=5)
-    save_btn = ctk.CTkButton(button_frame, text="Save to CSV", command=export_to_file)
-    save_btn.pack(side="left", padx=5)
-
-    app.mainloop()
-
-# === PLACEHOLDER FOR ReadingFromDrive ===
-def ReadingFromDrive():
-    file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
-    return file_path
-
-# EXISTING FUNCTIONS REMAIN UNCHANGED BELOW
+    print(\"=== Macierz liczebności ===\")
+    print(counts_df)
+    print(\"\\n=== Macierz procentowa (wiersze=100%) ===\")
+    print(pct_df)
+    print(f\"\\nZapisano: {out_prefix}_counts.csv, {out_prefix}_pct.csv oraz {out_prefix}.xlsx\")
