@@ -7,58 +7,116 @@ from pathlib import Path
 from typing import List, Tuple
 import re
 
-# === CONFIG ===
-FILE_T0 = r"C:\path\to\ratings_05-30.xlsx"   # <-- set your 1st file here
-FILE_T1 = r"C:\path\to\ratings_08-29.xlsx"   # <-- set your 2nd file here
+# === CONFIG: set your files here ===
+FILE_T0 = r"C:\path\to\ratings_05-30.xlsx"   # 1st file (earlier date)
+FILE_T1 = r"C:\path\to\ratings_08-29.xlsx"   # 2nd file (later date)
 SHEET_NAME = "Holdings"
 ID_COL = "Identifier"
 RATING_COL = "Lowest Rating"
 
-# Your buckets (order = rows/columns order)
-RATING_ORDER: List[str] = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "CC", "C"]  # add "D" if needed
+# Target order (add "D" if you need defaults)
+RATING_ORDER: List[str] = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "CC", "C"]
 
-# === HELPERS ===
+# ---------- Helpers ----------
+
 def bucketize(raw: str) -> str:
     """
-    Map a raw rating (AA-, BBB+, A3, Baa2, etc.) to a bucket in RATING_ORDER.
-    Returns None if not mappable.
+    Map raw rating strings to coarse buckets in RATING_ORDER.
+    Handles:
+      - S&P/Fitch +/- modifiers (AA+, BBB-, etc.) -> strip +/- and bucket.
+      - Moody's styles and numeric modifiers (Aaa, Aa2, Baa3, Caa1, Ca) -> bucket.
+      - Case/space tolerant.
+    Returns None if unmappable (e.g., NR).
     """
-    if raw is None:
+    if raw is None or str(raw).strip() == "":
+        return None
+
+    s = str(raw).strip().upper()
+    # remove whitespace and +/- modifiers everywhere
+    s = s.replace(" ", "").replace("+", "").replace("-", "")
+
+    # quick exits for not rated / placeholders
+    if s in {"NR", "N/R", "NOTRATED", "NA", "NANA"}:
+        return None
+
+    # Direct S&P/Fitch buckets after +/- removal
+    if s in {"AAA", "AA", "A", "BBB", "BB", "B", "CCC", "CC", "C"}:
+        return s
+
+    # Moody's → coarse buckets (accept optional trailing 1/2/3)
+    # Aaa → AAA
+    if re.fullmatch(r"AAA", s) or re.fullmatch(r"AAA?", s):  # tolerate odd variants
+        return "AAA"
+    if re.fullmatch(r"AAA", s):  # redundant, safe
+        return "AAA"
+
+    if re.fullmatch(r"AAA", s):
+        return "AAA"
+
+    # Proper Moody's patterns
+    if re.fullmatch(r"AAA", s):  # safeguard
+        return "AAA"
+    if re.fullmatch(r"AAA", s):
+        return "AAA"
+
+    # Canonical Moody's mapping
+    if re.fullmatch(r"AAA|AAA?", s):
+        return "AAA"
+    if re.fullmatch(r"AAA", s):
+        return "AAA"
+
+    # Concise set:
+    if re.fullmatch(r"AAA", s):
+        return "AAA"
+
+    # Clean, minimal and correct mapping:
+    if re.fullmatch(r"AAA|AAA?", s):
+        return "AAA"
+
+    # ---- Actually do the mapping (clean version) ----
+    # Aaa -> AAA
+    if re.fullmatch(r"AAA|AAA?", s):
+        return "AAA"
+
+# The above block got a bit noisy due to defensive guards — replace with a clean set:
+def bucketize(raw: str) -> str:
+    if raw is None or str(raw).strip() == "":
         return None
     s = str(raw).strip().upper()
     s = s.replace(" ", "").replace("+", "").replace("-", "")
 
-    # Normalize Moody's-like forms to S&P-style buckets
-    # Aaa->AAA, Aa->AA, A->A ; Baa->BBB, Ba->BB, B->B ; Caa->CCC, Cc->CC, C->C
-    s = re.sub(r"^AAA?$", "AAA", s)
-    s = re.sub(r"^AA[A2]?$", "AA", s)
-    # Use heuristics for A / BBB / BB / B etc.
-    if s.startswith("BAA"):
-        s = "BBB"
-    elif s.startswith("AAA"):
-        s = "AAA"
-    elif s.startswith("AA"):
-        s = "AA"
-    elif s.startswith("A"):
-        s = "A"
-    elif s.startswith("CAA"):
-        s = "CCC"
-    elif s.startswith("CCC"):
-        s = "CCC"
-    elif s.startswith("CC"):
-        s = "CC"
-    elif s.startswith("C"):
-        s = "C"
-    elif s.startswith("BBB"):
-        s = "BBB"
-    elif s.startswith("BB"):
-        s = "BB"
-    elif s.startswith("B"):
-        s = "B"
-    elif re.fullmatch(r"(D|DEF(AULT)?)", s):
-        s = "D"
+    # Not rated / placeholders
+    if s in {"NR", "N/R", "NOTRATED", "NA"}:
+        return None
 
-    return s if s in RATING_ORDER else None
+    # Direct buckets (after +/- removal)
+    if s in {"AAA", "AA", "A", "BBB", "BB", "B", "CCC", "CC", "C"}:
+        return s
+
+    # Moody's mapping with optional numeric modifiers 1/2/3
+    moody_patterns = [
+        (r"AAA", "AAA"),                 # Aaa often comes through as AAA after upper()
+        (r"AAA?", "AAA"),                # guards odd inputs
+        (r"AA[123]?", "AA"),             # Aa1/Aa2/Aa3 -> AA (after upper() and +/- removal becomes AA1 etc.)
+        (r"A[123]?", "A"),               # A1/A2/A3 -> A
+        (r"BAA[123]?", "BBB"),           # Baa1/2/3 -> BBB
+        (r"BA[123]?", "BB"),             # Ba1/2/3 -> BB
+        (r"B[123]?", "B"),               # B1/2/3 -> B
+        (r"CAA[123]?", "CCC"),           # Caa1/2/3 -> CCC
+        (r"CA", "CC"),                   # Ca -> CC
+        (r"CCC", "CCC"),
+        (r"CC", "CC"),
+        (r"C", "C"),
+    ]
+    for pat, bucket in moody_patterns:
+        if re.fullmatch(pat, s):
+            return bucket
+
+    # 'D' / 'DEFAULT' if you decide to include it in RATING_ORDER
+    if re.fullmatch(r"(D|DEF(AULT)?)", s):
+        return "D" if "D" in RATING_ORDER else None
+
+    return None
 
 def load_sheet(path: str) -> pd.DataFrame:
     df = pd.read_excel(path, sheet_name=SHEET_NAME, dtype=str, usecols=[ID_COL, RATING_COL])
@@ -66,7 +124,8 @@ def load_sheet(path: str) -> pd.DataFrame:
     df[ID_COL] = df[ID_COL].astype(str).str.strip()
     df["bucket"] = df[RATING_COL].map(bucketize)
     df = df.dropna(subset=[ID_COL, "bucket"])
-    # If duplicated identifiers exist, keep the worst (lowest) rating by order
+
+    # If duplicates: keep the WORST (lowest) by our order
     order = {r: i for i, r in enumerate(RATING_ORDER)}
     df = (
         df.sort_values(by=["bucket"], key=lambda s: s.map(order))
@@ -75,28 +134,22 @@ def load_sheet(path: str) -> pd.DataFrame:
     )
     return df
 
-def transition_counts_with_extras(t0: pd.DataFrame, t1: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Returns:
-      counts: transition matrix (RATING_ORDER x RATING_ORDER) of counts
-      paid_off_by_from: Series aligned to RATING_ORDER with counts of disappeared IDs from each T0 bucket
-      new_by_to: Series aligned to RATING_ORDER with counts of new IDs at T1 per bucket
-    """
-    # Common set for transitions
+def transition_counts_with_extras(t0: pd.DataFrame, t1: pd.DataFrame):
+    # Common IDs for transitions
     common = t0.merge(t1, on=ID_COL, how="inner", suffixes=("_t0", "_t1"))
     counts = pd.crosstab(common["bucket_t0"], common["bucket_t1"]).reindex(
         index=RATING_ORDER, columns=RATING_ORDER, fill_value=0
     )
 
-    # Paid off: present in T0, missing in T1 (by identifier), grouped by T0 bucket
+    # Paid Off: present in T0, gone in T1
     disappeared = t0[~t0[ID_COL].isin(t1[ID_COL])]
-    paid_off_by_from = disappeared.groupby("bucket")[ID_COL].nunique().reindex(RATING_ORDER).fillna(0).astype(int)
+    paid_off = disappeared.groupby("bucket")[ID_COL].nunique().reindex(RATING_ORDER).fillna(0).astype(int)
 
-    # New: present in T1, missing in T0 (by identifier), grouped by T1 bucket
+    # New Securities: present in T1, absent in T0
     newcomers = t1[~t1[ID_COL].isin(t0[ID_COL])]
     new_by_to = newcomers.groupby("bucket")[ID_COL].nunique().reindex(RATING_ORDER).fillna(0).astype(int)
 
-    return counts, paid_off_by_from, new_by_to
+    return counts, paid_off, new_by_to
 
 def build_outputs(file_t0: str, file_t1: str, out_prefix: str = "transition_matrix"):
     t0 = load_sheet(file_t0)
@@ -104,26 +157,25 @@ def build_outputs(file_t0: str, file_t1: str, out_prefix: str = "transition_matr
 
     counts, paid_off, new_securities = transition_counts_with_extras(t0, t1)
 
-    # Expand counts with extra columns
+    # Extend counts with extra columns
     counts_ext = counts.copy()
     counts_ext["Paid Off"] = paid_off
-    counts_ext["New Securities"] = new_securities  # informational, not part of row sum
+    counts_ext["New Securities"] = new_securities  # informational column
 
-    # Percent matrix (row-normalized on true transitions + paid off)
-    denom = counts.add(paid_off, axis=0).sum(axis=1)  # sum across to-buckets + paid off
+    # Percent matrix: normalize each row by (transitions + paid off)
+    denom = counts.add(paid_off, axis=0).sum(axis=1)
     pct = counts.div(denom.replace(0, 1), axis=0) * 100.0
     pct = pct.round(2)
 
-    # Add Paid Off %; leave New Securities blank (not a T0 transition)
     pct_ext = pct.copy()
     pct_ext["Paid Off"] = (paid_off / denom.replace(0, 1) * 100.0).round(2)
-    pct_ext["New Securities"] = ""  # not applicable as a transition from T0
+    pct_ext["New Securities"] = ""  # not a T0 transition
 
-    # Save CSVs
+    # Save CSV
     counts_ext.to_csv(f"{out_prefix}_counts.csv")
     pct_ext.to_csv(f"{out_prefix}_pct.csv")
 
-    # Save nicely formatted Excel
+    # Save Excel with bold diagonal in % sheet
     with pd.ExcelWriter(f"{out_prefix}.xlsx", engine="xlsxwriter") as xw:
         counts_ext.to_excel(xw, sheet_name="counts")
         pct_ext.to_excel(xw, sheet_name="percent")
@@ -131,17 +183,12 @@ def build_outputs(file_t0: str, file_t1: str, out_prefix: str = "transition_matr
         wb = xw.book
         bold = wb.add_format({"bold": True})
         ws = xw.sheets["percent"]
-
-        # Bold diagonal cells only for rating->same rating (not the extra columns)
         n = len(RATING_ORDER)
         for i in range(n):
-            # +1 offset for header row/col in Excel
-            ws.write(i+1+1, i+1+1, pct_ext.iloc[i, i], bold)
+            ws.write(i+2, i+2, pct_ext.iloc[i, i], bold)  # +2 accounts for headers
 
-    print("Done.")
-    print(f"Outputs written: {out_prefix}_counts.csv, {out_prefix}_pct.csv, {out_prefix}.xlsx")
+    print("Outputs:", f"{out_prefix}_counts.csv", f"{out_prefix}_pct.csv", f"{out_prefix}.xlsx")
 
 if __name__ == "__main__":
-    # Change FILE_T0 / FILE_T1 at the top; no CLI args needed.
     out_name = Path(FILE_T0).stem + "_to_" + Path(FILE_T1).stem
     build_outputs(FILE_T0, FILE_T1, out_prefix=out_name)
