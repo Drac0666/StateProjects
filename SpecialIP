@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-Generate an HTML report with Plotly bar charts:
-For each CUSIP -> Collateral Loss by scenario.
+Generate per-Asset-Class HTML reports with Plotly bar charts:
+For each Asset Class -> for each CUSIP -> Collateral Loss by scenario.
 
 Usage:
-  python cusip_collateral_loss_report.py --csv path/to/data.csv [--out report.html] [--title "My Report"]
+  python cusip_collateral_loss_by_asset_class.py --csv path/to/data.csv
+    [--outdir ./cusip_reports]
+    [--title-prefix "CUSIP Collateral Loss Report"]
+    [--sort value_desc|scenario_asc|none]
 """
 
 import argparse
 import html
+import re
 import sys
 from pathlib import Path
 
@@ -17,9 +21,14 @@ import plotly.express as px
 import plotly.io as pio
 
 
+def slugify(s: str) -> str:
+    s = str(s).strip().lower()
+    s = re.sub(r"[^\w\s-]", "", s)
+    s = re.sub(r"[\s/]+", "_", s)
+    return s[:80] or "unknown"
+
+
 def build_report_html(fig_divs, title="CUSIP Collateral Loss Report"):
-    """Wrap multiple Plotly figure <div>s into a single HTML document with a simple TOC."""
-    # Minimal CSS for readability
     css = """
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
     .toc { margin-bottom: 24px; padding: 16px; background: #f7f7f7; border-radius: 12px; }
@@ -67,10 +76,10 @@ def build_report_html(fig_divs, title="CUSIP Collateral Loss Report"):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Build Plotly HTML report of Collateral Loss by scenario for each CUSIP.")
-    ap.add_argument("--csv", required=True, help="Path to input CSV with columns: CUSIP, scenario, Collateral Loss")
-    ap.add_argument("--out", default=None, help="Path to output HTML file (default: <csv_stem>_cusip_report.html)")
-    ap.add_argument("--title", default="CUSIP Collateral Loss Report", help="Title for the HTML report")
+    ap = argparse.ArgumentParser(description="Build Plotly HTML reports of Collateral Loss by scenario, split by Asset Class.")
+    ap.add_argument("--csv", required=True, help="Path to input CSV with columns: CUSIP, scenario, Collateral Loss, Asset Class")
+    ap.add_argument("--outdir", default="cusip_reports", help="Directory to write HTML files into (created if missing)")
+    ap.add_argument("--title-prefix", default="CUSIP Collateral Loss Report", help="Title prefix for each HTML report")
     ap.add_argument("--sort", choices=["value_desc", "scenario_asc", "none"], default="scenario_asc",
                     help="How to order bars within each chart")
     args = ap.parse_args()
@@ -80,14 +89,15 @@ def main():
         print(f"❌ CSV not found: {csv_path}", file=sys.stderr)
         sys.exit(1)
 
-    out_path = Path(args.out) if args.out else csv_path.with_name(f"{csv_path.stem}_cusip_report.html")
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    # Read data
+    # Load CSV
     df = pd.read_csv(csv_path)
 
-    # Normalize column names to find required fields robustly
+    # Normalize column names
     colmap = {c.lower().strip(): c for c in df.columns}
-    required = {"cusip", "scenario", "collateral loss"}
+    required = {"cusip", "scenario", "collateral loss", "asset class"}
     missing = [c for c in required if c not in colmap]
     if missing:
         print(f"❌ Missing required columns: {missing}\n"
@@ -97,69 +107,80 @@ def main():
     C_CUSIP = colmap["cusip"]
     C_SCEN = colmap["scenario"]
     C_LOSS = colmap["collateral loss"]
+    C_ASSET = colmap["asset class"]
 
     # Clean & coerce
-    work = df[[C_CUSIP, C_SCEN, C_LOSS]].copy()
+    work = df[[C_CUSIP, C_SCEN, C_LOSS, C_ASSET]].copy()
     work[C_SCEN] = work[C_SCEN].astype(str)
-    # Coerce Collateral Loss to numeric, keep NaN if not convertible
+    work[C_ASSET] = work[C_ASSET].astype(str)
     work[C_LOSS] = pd.to_numeric(work[C_LOSS], errors="coerce").fillna(0.0)
 
-    # Build figures per CUSIP
-    fig_divs = []
-    # Keep a stable scenario order as it first appears (unless overridden)
+    # Global first-seen order for scenarios (used if --sort none)
     scenario_order_global = list(work[C_SCEN].drop_duplicates())
 
-    for cusip, g in work.groupby(C_CUSIP, sort=False):
-        g = g.copy()
+    # Iterate per Asset Class
+    asset_classes = work[C_ASSET].dropna().unique().tolist()
+    if not asset_classes:
+        print("❌ No Asset Class values found.", file=sys.stderr)
+        sys.exit(3)
 
-        if args.sort == "value_desc":
-            # order scenarios by Collateral Loss descending (sum per scenario)
-            order = (g.groupby(C_SCEN, as_index=False)[C_LOSS]
-                       .sum()
-                       .sort_values(C_LOSS, ascending=False)[C_SCEN]
-                       .tolist())
-        elif args.sort == "scenario_asc":
-            order = sorted(g[C_SCEN].unique().tolist(), key=lambda x: (str(x).lower(), str(x)))
-        else:  # "none" -> keep appearance order
-            order = [s for s in scenario_order_global if s in set(g[C_SCEN])]
+    for asset in asset_classes:
+        subset = work[work[C_ASSET] == asset].copy()
+        if subset.empty:
+            continue
 
-        # enforce categorical order
-        g[C_SCEN] = pd.Categorical(g[C_SCEN], categories=order, ordered=True)
+        fig_divs = []
 
-        # If multiple rows per scenario for a CUSIP, aggregate (sum) to one bar each
-        plot_df = g.groupby(C_SCEN, as_index=False)[C_LOSS].sum()
+        for cusip, g in subset.groupby(C_CUSIP, sort=False):
+            g = g.copy()
 
-        fig = px.bar(
-            plot_df,
-            x=C_SCEN,
-            y=C_LOSS,
-            text=C_LOSS,
-            labels={C_SCEN: "Scenario", C_LOSS: "Collateral Loss"},
-            title=f"CUSIP {cusip} — Collateral Loss by Scenario",
-        )
-        # Nice formatting
-        fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-        fig.update_layout(
-            xaxis_title="Scenario",
-            yaxis_title="Collateral Loss",
-            uniformtext_minsize=8,
-            uniformtext_mode="hide",
-            bargap=0.25,
-            margin=dict(l=40, r=20, t=60, b=40),
-            height=420,
-        )
+            if args.sort == "value_desc":
+                order = (g.groupby(C_SCEN, as_index=False)[C_LOSS]
+                           .sum()
+                           .sort_values(C_LOSS, ascending=False)[C_SCEN]
+                           .tolist())
+            elif args.sort == "scenario_asc":
+                order = sorted(g[C_SCEN].unique().tolist(), key=lambda x: (str(x).lower(), str(x)))
+            else:
+                order = [s for s in scenario_order_global if s in set(g[C_SCEN])]
 
-        # Create an id and section label
-        sec_id = f"cusip_{str(cusip).strip().replace(' ', '_').replace('/', '_')}"
-        label = f"CUSIP {cusip}"
+            g[C_SCEN] = pd.Categorical(g[C_SCEN], categories=order, ordered=True)
 
-        # Convert to a div without adding plotly.js (we include once globally)
-        div_html = pio.to_html(fig, include_plotlyjs=False, full_html=False)
-        fig_divs.append((sec_id, label, div_html))
+            plot_df = g.groupby(C_SCEN, as_index=False)[C_LOSS].sum()
 
-    html_doc = build_report_html(fig_divs, title=args.title)
-    out_path.write_text(html_doc, encoding="utf-8")
-    print(f"✅ Report written to: {out_path.resolve()}")
+            fig = px.bar(
+                plot_df,
+                x=C_SCEN,
+                y=C_LOSS,
+                text=C_LOSS,
+                labels={C_SCEN: "Scenario", C_LOSS: "Collateral Loss"},
+                title=f"CUSIP {cusip} — Collateral Loss by Scenario",
+            )
+            fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig.update_layout(
+                xaxis_title="Scenario",
+                yaxis_title="Collateral Loss",
+                uniformtext_minsize=8,
+                uniformtext_mode="hide",
+                bargap=0.25,
+                margin=dict(l=40, r=20, t=60, b=40),
+                height=420,
+            )
+
+            sec_id = f"cusip_{slugify(cusip)}"
+            label = f"CUSIP {cusip}"
+            div_html = pio.to_html(fig, include_plotlyjs=False, full_html=False)
+            fig_divs.append((sec_id, label, div_html))
+
+        # Build and write one HTML per Asset Class
+        title = f"{args.title_prefix} — Asset Class: {asset}"
+        html_doc = build_report_html(fig_divs, title=title)
+        fname = f"{csv_path.stem}_{slugify(asset)}_report.html"
+        out_path = outdir / fname
+        out_path.write_text(html_doc, encoding="utf-8")
+        print(f"✅ Wrote: {out_path.resolve()}")
+
+    print(f"🎉 Done. Reports per Asset Class are in: {outdir.resolve()}")
 
 
 if __name__ == "__main__":
