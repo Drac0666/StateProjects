@@ -1,8 +1,312 @@
-# Remove commas (thousands separators) before conversion
-work[C_LOSS] = (
-    work[C_LOSS]
-    .astype(str)
-    .str.replace(",", "", regex=False)
-    .pipe(pd.to_numeric, errors="coerce")
-    .fillna(0.0)
-)
+#!/usr/bin/env python3
+"""
+CUSIP Collateral Loss reports (per Asset Class) + exceptions check.
+
+Generates one HTML report per Asset Class:
+  - For each CUSIP: a Plotly bar chart of Collateral Loss by scenario.
+
+Also creates 'exceptions.csv' in the output folder:
+  - Rows where DOWNSIDE loss is LOWER than BASELINE loss (case-insensitive match).
+
+Usage:
+  python cusip_collateral_loss_reports.py --csv path/to/data.csv
+      [--outdir ./cusip_reports]
+      [--title-prefix "Collateral Loss by Scenario"]
+      [--sort scenario_asc|value_desc|none]
+      [--only-asset-classes RMBS CMBS]   (optional, filter)
+
+Dependencies:
+  pip install pandas plotly
+"""
+
+import argparse
+import html
+import re
+import sys
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+
+
+# ------------------------------
+# Helpers
+# ------------------------------
+
+def slugify(s: str) -> str:
+    s = str(s).strip().lower()
+    s = re.sub(r"[^\w\s-]", "", s)
+    s = re.sub(r"[\s/]+", "_", s)
+    return s[:80] or "unknown"
+
+
+def build_report_html(fig_divs, title="CUSIP Collateral Loss Report") -> str:
+    """Wrap multiple Plotly figure <div>s into a single HTML with a simple TOC."""
+    css = """
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+    .toc { margin-bottom: 24px; padding: 16px; background: #f7f7f7; border-radius: 12px; }
+    .toc h2 { margin: 0 0 8px 0; font-size: 18px; }
+    .toc a { margin: 0 8px 8px 0; display: inline-block; text-decoration: none; }
+    .chart { margin: 28px 0; }
+    .chart h2 { font-size: 18px; margin: 0 0 8px 0; }
+    hr { border: 0; height: 1px; background: #e6e6e6; margin: 24px 0; }
+    """
+
+    toc_links = "\n".join(f'<a href="#{sec_id}">{html.escape(label)}</a>'
+                          for sec_id, label, _ in fig_divs)
+
+    sections = []
+    for sec_id, label, div_html in fig_divs:
+        sections.append(
+            f'<section class="chart" id="{sec_id}">'
+            f'<h2>{html.escape(label)}</h2>'
+            f'{div_html}'
+            f'</section>'
+            f'<hr/>'
+        )
+
+    sections_html = "\n".join(sections)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{html.escape(title)}</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>{css}</style>
+</head>
+<body>
+  <h1>{html.escape(title)}</h1>
+  <div class="toc">
+    <h2>Jump to CUSIP</h2>
+    {toc_links}
+  </div>
+  {sections_html}
+</body>
+</html>
+"""
+
+
+def build_exceptions_table(work: pd.DataFrame,
+                           C_ASSET: str, C_CUSIP: str, C_SCEN: str, C_LOSS: str) -> pd.DataFrame:
+    """
+    Return rows where DOWNSIDE loss < BASELINE loss.
+    - Scenario matching is case-insensitive, trimmed.
+    - Uses SUM of losses per (Asset Class, CUSIP, scenario).
+    """
+    tmp = work.copy()
+    tmp["_SCEN_NORM_"] = tmp[C_SCEN].astype(str).str.strip().str.upper()
+
+    agg = (tmp.groupby([C_ASSET, C_CUSIP, "_SCEN_NORM_"], as_index=False)[C_LOSS]
+              .sum())
+
+    piv = agg.pivot_table(
+        index=[C_ASSET, C_CUSIP],
+        columns="_SCEN_NORM_",
+        values=C_LOSS,
+        aggfunc="sum",
+        fill_value=pd.NA
+    ).reset_index()
+
+    if "BASELINE" not in piv.columns:
+        piv["BASELINE"] = pd.NA
+    if "DOWNSIDE" not in piv.columns:
+        piv["DOWNSIDE"] = pd.NA
+
+    subset = piv.dropna(subset=["BASELINE", "DOWNSIDE"]).copy()
+    subset["DIFF"] = subset["DOWNSIDE"] - subset["BASELINE"]
+
+    exceptions = subset[subset["DOWNSIDE"] < subset["BASELINE"]].copy()
+    exceptions = exceptions.rename(columns={
+        C_ASSET: "Asset Class",
+        C_CUSIP: "CUSIP",
+        "BASELINE": "Baseline Loss",
+        "DOWNSIDE": "Downside Loss",
+        "DIFF": "Downside - Baseline",
+    })
+    with pd.option_context("mode.use_inf_as_na", True):
+        exceptions["Downside/Baseline"] = (exceptions["Downside Loss"] / exceptions["Baseline Loss"])
+
+    exceptions = exceptions.sort_values(
+        by=["Asset Class", "Downside - Baseline", "CUSIP"],
+        ascending=[True, True, True]
+    ).reset_index(drop=True)
+
+    return exceptions
+
+
+def generate_reports_by_asset_class(
+    csv_path: Path,
+    outdir: Path,
+    title_prefix: str = "CUSIP Collateral Loss Report",
+    sort: str = "scenario_asc",
+    only_asset_classes: Optional[List[str]] = None,
+) -> Tuple[List[str], Optional[str], int]:
+    """
+    Create one HTML file per Asset Class with per-CUSIP bar charts.
+    Also writes exceptions.csv if any (DOWNSIDE < BASELINE).
+
+    Returns:
+      (generated_html_files, exceptions_csv_path_or_None, exceptions_count)
+    """
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    df = pd.read_csv(csv_path)
+
+    # Robust column detection
+    colmap = {c.lower().strip(): c for c in df.columns}
+    required = {"cusip", "scenario", "collateral loss", "asset class"}
+    missing = [c for c in required if c not in colmap]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}\nFound: {list(df.columns)}")
+
+    C_CUSIP = colmap["cusip"]
+    C_SCEN  = colmap["scenario"]
+    C_LOSS  = colmap["collateral loss"]
+    C_ASSET = colmap["asset class"]
+
+    # Clean & coerce (handle thousands separators like 2,556,221.01)
+    work = df[[C_CUSIP, C_SCEN, C_LOSS, C_ASSET]].copy()
+    work[C_SCEN]  = work[C_SCEN].astype(str)
+    work[C_ASSET] = work[C_ASSET].astype(str)
+    work[C_LOSS]  = (
+        work[C_LOSS]
+        .astype(str)
+        .str.replace(",", "", regex=False)
+        .pipe(pd.to_numeric, errors="coerce")
+        .fillna(0.0)
+    )
+
+    if only_asset_classes:
+        work = work[work[C_ASSET].isin(only_asset_classes)].copy()
+
+    if work.empty:
+        raise ValueError("No rows to process (after filtering or due to empty file).")
+
+    # Exceptions
+    exceptions_df = build_exceptions_table(work, C_ASSET, C_CUSIP, C_SCEN, C_LOSS)
+    exceptions_path = None
+    if not exceptions_df.empty:
+        exceptions_path = str((outdir / "exceptions.csv").resolve())
+        exceptions_df.to_csv(exceptions_path, index=False)
+
+    # Global first-seen scenario order (used when sort == "none")
+    scenario_order_global = list(work[C_SCEN].drop_duplicates())
+
+    generated_files: List[str] = []
+
+    # Per-Asset Class reports
+    asset_classes = work[C_ASSET].dropna().unique().tolist()
+    for asset in asset_classes:
+        subset = work[work[C_ASSET] == asset].copy()
+        if subset.empty:
+            continue
+
+        fig_divs = []
+
+        for cusip, g in subset.groupby(C_CUSIP, sort=False):
+            g = g.copy()
+
+            if sort == "value_desc":
+                order = (g.groupby(C_SCEN, as_index=False)[C_LOSS]
+                           .sum()
+                           .sort_values(C_LOSS, ascending=False)[C_SCEN]
+                           .tolist())
+            elif sort == "scenario_asc":
+                order = sorted(g[C_SCEN].unique().tolist(), key=lambda x: (str(x).lower(), str(x)))
+            else:  # "none" -> keep first-seen order
+                order = [s for s in scenario_order_global if s in set(g[C_SCEN])]
+
+            g[C_SCEN] = pd.Categorical(g[C_SCEN], categories=order, ordered=True)
+
+            # Aggregate duplicates to one bar per scenario
+            plot_df = g.groupby(C_SCEN, as_index=False)[C_LOSS].sum()
+
+            fig = px.bar(
+                plot_df,
+                x=C_SCEN,
+                y=C_LOSS,
+                text=C_LOSS,
+                labels={C_SCEN: "Scenario", C_LOSS: "Collateral Loss"},
+                title=f"CUSIP {cusip} — Collateral Loss by Scenario",
+            )
+            fig.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            fig.update_layout(
+                xaxis_title="Scenario",
+                yaxis_title="Collateral Loss",
+                uniformtext_minsize=8,
+                uniformtext_mode="hide",
+                bargap=0.25,
+                margin=dict(l=40, r=20, t=60, b=40),
+                height=420,
+            )
+
+            sec_id = f"cusip_{slugify(cusip)}"
+            label = f"CUSIP {cusip}"
+            div_html = pio.to_html(fig, include_plotlyjs=False, full_html=False)
+            fig_divs.append((sec_id, label, div_html))
+
+        # Write HTML per Asset Class
+        title = f"{title_prefix} — Asset Class: {asset}"
+        html_doc = build_report_html(fig_divs, title=title)
+        fname = f"{csv_path.stem}_{slugify(asset)}_report.html"
+        out_path = outdir / fname
+        out_path.write_text(html_doc, encoding="utf-8")
+        generated_files.append(str(out_path.resolve()))
+
+    return generated_files, exceptions_path, int(len(exceptions_df))
+
+
+# ------------------------------
+# CLI
+# ------------------------------
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Build per-Asset-Class HTML charts + exceptions from a CSV.")
+    p.add_argument("--csv", required=True, help="Path to input CSV with columns: CUSIP, scenario, Collateral Loss, Asset Class")
+    p.add_argument("--outdir", default="cusip_reports", help="Directory to write outputs (created if missing)")
+    p.add_argument("--title-prefix", default="Collateral Loss by Scenario", help="HTML title prefix")
+    p.add_argument("--sort", choices=["value_desc", "scenario_asc", "none"], default="scenario_asc",
+                   help="Bar ordering within each chart")
+    p.add_argument("--only-asset-classes", nargs="*", default=None,
+                   help="Optional list of Asset Class values to include (exact match)")
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    csv_path = Path(args.csv)
+    if not csv_path.exists():
+        print(f"❌ CSV not found: {csv_path}", file=sys.stderr)
+        sys.exit(1)
+
+    outdir = Path(args.outdir)
+
+    try:
+        html_files, exceptions_path, exceptions_count = generate_reports_by_asset_class(
+            csv_path=csv_path,
+            outdir=outdir,
+            title_prefix=args.title_prefix,
+            sort=args.sort,
+            only_asset_classes=args.only_asset_classes,
+        )
+    except Exception as e:
+        print(f"❌ Error: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    print("✅ HTML reports:")
+    for f in html_files:
+        print("  -", f)
+
+    if exceptions_path:
+        print(f"\n⚠️ Exceptions found: {exceptions_count}")
+        print("   Saved to:", exceptions_path)
+    else:
+        print("\n✅ No exceptions found (no cases where DOWNSIDE < BASELINE).")
+
+
+if __name__ == "__main__":
+    main()
