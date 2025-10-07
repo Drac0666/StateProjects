@@ -1,120 +1,29 @@
-#!/usr/bin/env python3
-"""
-CUSIP Collateral Loss reports (per Asset Class) + exceptions check.
-
-Outputs:
-  1) One HTML report per Asset Class:
-     - For each CUSIP: Plotly bar chart of Collateral Loss by scenario.
-  2) exceptions.csv:
-     - Rows where DOWNSIDE loss < BASELINE loss.
-  3) exceptions_report.html (if any exceptions):
-     - Same charts but only for the exception CUSIPs.
-
-Each HTML includes:
-  - A search bar: type/paste a CUSIP (or part of it) → page scrolls & filters charts.
-
-Usage:
-  python cusip_collateral_loss_reports.py --csv path/to/data.csv
-"""
-
-import argparse
-import html
-import re
-import sys
-from pathlib import Path
-from typing import List, Optional, Tuple
-
+import requests
 import pandas as pd
-import plotly.express as px
-import plotly.io as pio
 
+# New ECB Data Portal API endpoint
+url = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A"
 
-# ------------------------------
-# Helpers
-# ------------------------------
+params = {
+    "format": "jsondata",
+    "startPeriod": "2024-01-01"
+}
 
-def slugify(s: str) -> str:
-    s = str(s).strip().lower()
-    s = re.sub(r"[^\w\s-]", "", s)
-    s = re.sub(r"[\s/]+", "_", s)
-    return s[:80] or "unknown"
+r = requests.get(url, params=params)
+r.raise_for_status()
+data = r.json()
 
+# The structure under the new ECB Data Portal looks like:
+# data["structure"] -> metadata
+# data["dataSets"] -> actual series and observations
+series = data["dataSets"][0]["series"]["0:0:0:0:0"]
+obs = series["observations"]
 
-def build_report_html(fig_divs, title="CUSIP Collateral Loss Report") -> str:
-    """Wrap multiple Plotly figure <div>s into a single HTML with a TOC + search bar."""
-    css = """
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
-    .toc { margin: 12px 0 24px 0; padding: 12px; background: #f7f7f7; border-radius: 12px; }
-    .toc h2 { margin: 0 0 8px 0; font-size: 18px; }
-    .toc a { margin: 0 8px 8px 0; display: inline-block; text-decoration: none; }
-    .chart { margin: 28px 0; }
-    .chart h2 { font-size: 18px; margin: 0 0 8px 0; }
-    hr { border: 0; height: 1px; background: #e6e6e6; margin: 24px 0; }
-    #searchBox { padding: 8px; width: 280px; border-radius: 6px; border: 1px solid #aaa; margin-bottom: 12px; }
-    """
+# Dates are defined in structure->dimensions->observation
+dates = [v["id"] for v in data["structure"]["dimensions"]["observation"][0]["values"]]
 
-    js = """
-    function searchCusip() {
-        var input = document.getElementById("searchBox").value.toLowerCase();
-        var sections = document.getElementsByClassName("chart");
-        var firstMatch = null;
-        for (var i = 0; i < sections.length; i++) {
-            var h2 = sections[i].getElementsByTagName("h2")[0];
-            if (h2) {
-                var txt = h2.textContent || h2.innerText;
-                if (txt.toLowerCase().indexOf(input) > -1) {
-                    sections[i].style.display = "";
-                    if (!firstMatch) { firstMatch = sections[i]; }
-                } else {
-                    sections[i].style.display = "none";
-                }
-            }
-        }
-        if (firstMatch) {
-            firstMatch.scrollIntoView({behavior: "smooth", block: "start"});
-        }
-    }
-    """
+# Convert to pandas Series
+values = [float(obs[str(i)][0]) if str(i) in obs else None for i in range(len(dates))]
+rates = pd.Series(values, index=pd.to_datetime(dates), name="EURUSD (USD per 1 EUR)")
 
-    toc_links = "\n".join(f'<a href="#{sec_id}">{html.escape(label)}</a>'
-                          for sec_id, label, _ in fig_divs)
-
-    sections = []
-    for sec_id, label, div_html in fig_divs:
-        sections.append(
-            f'<section class="chart" id="{sec_id}">'
-            f'<h2>{html.escape(label)}</h2>'
-            f'{div_html}'
-            f'</section>'
-            f'<hr/>'
-        )
-
-    sections_html = "\n".join(sections)
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{html.escape(title)}</title>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <style>{css}</style>
-</head>
-<body>
-  <h1>{html.escape(title)}</h1>
-  <input id="searchBox" type="text" placeholder="Search CUSIP..." onkeyup="searchCusip()" />
-  <div class="toc">
-    <h2>Jump to CUSIP</h2>
-    {toc_links}
-  </div>
-  {sections_html}
-  <script>{js}</script>
-</body>
-</html>
-"""
-
-
-# === (rest of the script: exceptions check + report generation, unchanged) ===
-# -- SNIP FOR BREVITY --
-# Use the same `generate_reports_by_asset_class`, `parse_args`, `main` 
-# as I sent in the previous message.
+print(rates.tail())
