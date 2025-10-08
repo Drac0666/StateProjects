@@ -1,59 +1,140 @@
 import pandas as pd
 
-# Example of your wide-format structure
+# =========================
+# 1) Example data (replace with your load)
+# =========================
+# Two dates, multiple tenors; columns like "Euro Area | <Country> | <tenor> | Mid Yield"
 data = {
-    "Euro Area | Austria | 2 year | Mid Yield": [3.10],
-    "Euro Area | Austria | 5 year | Mid Yield": [3.20],
-    "Euro Area | Austria | 10 year | Mid Yield": [3.40],
-    "Euro Area | Austria | 30 year | Mid Yield": [3.60],
-    "Euro Area | Germany | 2 year | Mid Yield": [2.90],
-    "Euro Area | Germany | 5 year | Mid Yield": [2.95],
-    "Euro Area | Germany | 10 year | Mid Yield": [3.10],
-    "Euro Area | Germany | 30 year | Mid Yield": [3.25],
-    "Euro Area | France | 2 year | Mid Yield": [3.25],
-    "Euro Area | France | 5 year | Mid Yield": [3.35],
-    "Euro Area | France | 10 year | Mid Yield": [3.45],
-    "Euro Area | France | 30 year | Mid Yield": [3.55],
-    "Euro Area | Italy | 2 year | Mid Yield": [3.90],
-    "Euro Area | Italy | 5 year | Mid Yield": [4.00],
-    "Euro Area | Italy | 10 year | Mid Yield": [4.10],
-    "Euro Area | Italy | 30 year | Mid Yield": [4.20]
+    "Date": ["2025-10-07", "2025-10-08"],
+    "Euro Area | Austria | 2 year | Mid Yield": [3.05, 3.10],
+    "Euro Area | Austria | 5 year | Mid Yield": [3.15, 3.20],
+    "Euro Area | Austria | 10 year | Mid Yield": [3.35, 3.40],
+    "Euro Area | Austria | 30 year | Mid Yield": [3.55, 3.60],
+    "Euro Area | Belgium | 2 year | Mid Yield": [3.00, 3.02],
+    "Euro Area | Belgium | 5 year | Mid Yield": [3.10, 3.12],
+    "Euro Area | Belgium | 10 year | Mid Yield": [3.25, 3.27],
+    "Euro Area | Belgium | 30 year | Mid Yield": [3.40, 3.42],
+    "Euro Area | France | 2 year | Mid Yield": [3.22, 3.25],
+    "Euro Area | France | 5 year | Mid Yield": [3.30, 3.35],
+    "Euro Area | France | 10 year | Mid Yield": [3.40, 3.45],
+    "Euro Area | France | 30 year | Mid Yield": [3.50, 3.55],
+    "Euro Area | Germany | 2 year | Mid Yield": [2.90, 2.92],
+    "Euro Area | Germany | 5 year | Mid Yield": [3.00, 3.02],
+    "Euro Area | Germany | 10 year | Mid Yield": [3.08, 3.10],
+    "Euro Area | Germany | 30 year | Mid Yield": [3.22, 3.25],
+    "Euro Area | Italy | 2 year | Mid Yield": [3.85, 3.90],
+    "Euro Area | Italy | 5 year | Mid Yield": [3.95, 4.00],
+    "Euro Area | Italy | 10 year | Mid Yield": [4.05, 4.10],
+    "Euro Area | Italy | 30 year | Mid Yield": [4.15, 4.20],
+    "Euro Area | Netherlands | 2 year | Mid Yield": [3.10, 3.12],
+    "Euro Area | Netherlands | 5 year | Mid Yield": [3.18, 3.20],
+    "Euro Area | Netherlands | 10 year | Mid Yield": [3.30, 3.32],
+    "Euro Area | Netherlands | 30 year | Mid Yield": [3.45, 3.47],
+    "Euro Area | Spain | 2 year | Mid Yield": [3.40, 3.45],
+    "Euro Area | Spain | 5 year | Mid Yield": [3.55, 3.60],
+    "Euro Area | Spain | 10 year | Mid Yield": [3.70, 3.75],
+    "Euro Area | Spain | 30 year | Mid Yield": [3.90, 3.95],
+    "Euro Area | Portugal | 2 year | Mid Yield": [3.45, 3.50],
+    "Euro Area | Portugal | 5 year | Mid Yield": [3.60, 3.65],
+    "Euro Area | Portugal | 10 year | Mid Yield": [3.75, 3.80],
+    "Euro Area | Portugal | 30 year | Mid Yield": [3.95, 4.00],
 }
-
 df = pd.DataFrame(data)
 
-# Step 1️⃣ — Unpivot / reshape the data
-df_long = df.melt(var_name="Column", value_name="Yield")
+# If loading your real file, comment the dataset above and use:
+# df = pd.read_excel("your_file.xlsx")   # or pd.read_csv("your_file.csv")
 
-# Step 2️⃣ — Extract components from the column name
-parts = df_long["Column"].str.split(" \| ", expand=True)
-df_long["Region"] = parts[0]
-df_long["Country"] = parts[1]
-df_long["Tenor"] = parts[2]
-df_long["Field"] = parts[3]
+# =========================
+# 2) Config
+# =========================
+FIELD = "Mid Yield"
+# If you want to force a specific tenor order, list them below; otherwise it will auto-detect from columns.
+TENORS = ["2 year", "5 year", "10 year", "30 year"]  # or set to None to auto-detect
 
-# Step 3️⃣ — Pivot to get Country x Tenor matrix
-pivot = df_long.pivot(index="Country", columns="Tenor", values="Yield")
+# =========================
+# 3) Prep & reshape
+# =========================
+df["Date"] = pd.to_datetime(df["Date"])
+df = df.sort_values("Date")
 
-# Step 4️⃣ — Compute spreads vs Germany by tenor
-germany = pivot.loc["Germany"]
-spreads = pivot.subtract(germany)
+# Melt wide columns into long format
+long = df.melt(id_vars="Date", var_name="Column", value_name="Yield")
 
-# Step 5️⃣ — Rename spread columns
-spread_cols = {col: col.replace("year", "Y Spread") for col in spreads.columns}
-spreads = spreads.rename(columns=spread_cols)
+# Drop any non-string columns that may have melted (e.g., if Date got included)
+long = long[long["Column"].apply(lambda x: isinstance(x, str))]
 
-# Step 6️⃣ — Combine yields + spreads
-result = pd.concat([pivot, spreads], axis=1)
+# Split "Euro Area | Country | Tenor | Field"
+parts = long["Column"].str.split(" \| ", expand=True)
+# Expecting 4 parts; if not, drop malformed
+mask_good = parts.shape[1] == 4
+if not mask_good:
+    # Fallback: drop rows where split didn't produce 4 parts
+    long = long[parts.notna().all(axis=1)]
 
-# Step 7️⃣ — Order columns nicely
-ordered_cols = []
-for tenor in ["2 year", "5 year", "10 year", "30 year"]:
-    if tenor in result.columns:
-        ordered_cols += [tenor, tenor.replace("year", "Y Spread")]
-result = result[ordered_cols]
+parts = long["Column"].str.split(" \| ", expand=True)
+long["Region"] = parts[0].str.strip()
+long["Country"] = parts[1].str.strip()
+long["Tenor"] = parts[2].str.strip()
+long["Field"] = parts[3].str.strip()
 
-# Step 8️⃣ — Optional rounding for clarity
-result = result.round(2)
+# Keep only the requested field
+long = long[long["Field"].eq(FIELD)]
 
-print(result)
+# Auto-detect tenors if not provided
+if not TENORS:
+    TENORS = list(long["Tenor"].dropna().unique())
+
+# Keep only desired tenors (if provided)
+long = long[long["Tenor"].isin(TENORS)]
+
+# =========================
+# 4) Compute latest yield and 1-day change per (Country, Tenor)
+# =========================
+long = long.sort_values(["Country", "Tenor", "Date"])
+long["Change"] = long.groupby(["Country", "Tenor"])["Yield"].diff()
+
+# Take the latest observation per (Country, Tenor)
+idx_latest = long.groupby(["Country", "Tenor"])["Date"].idxmax()
+latest = long.loc[idx_latest].copy()
+
+# Convert change to bps
+latest["1d Change (bps)"] = (latest["Change"] * 100).round(0).astype("Int64")
+
+# =========================
+# 5) Build final table with interleaved columns per tenor
+# =========================
+def tenor_label(t: str) -> str:
+    # "2 year" -> "2Y"
+    return t.replace(" year", "Y").replace(" years", "Y")
+
+# Pivot yields and changes separately
+pivot_y = latest.pivot(index="Country", columns="Tenor", values="Yield")
+pivot_c = latest.pivot(index="Country", columns="Tenor", values="1d Change (bps)")
+
+# Assemble interleaved columns in desired tenor order
+cols = []
+final = pd.DataFrame(index=pivot_y.index).sort_index()
+for t in TENORS:
+    if t in pivot_y.columns:
+        y_col = f"{tenor_label(t)}"
+        c_col = f"{tenor_label(t)} 1d Chg (bps)"
+        final[y_col] = pivot_y[t]
+        final[c_col] = pivot_c.get(t)  # may be NA if only one date available
+
+# Round yields
+for t in TENORS:
+    y_col = f"{tenor_label(t)}"
+    if y_col in final.columns:
+        final[y_col] = final[y_col].round(2)
+
+# Reset index so Country is a column
+final = final.reset_index()
+
+# =========================
+# 6) Display / export
+# =========================
+print(final.to_string(index=False))
+
+# Optional exports:
+# final.to_csv("yields_and_1d_changes_all_tenors.csv", index=False)
+# final.to_excel("yields_and_1d_changes_all_tenors.xlsx", index=False)
