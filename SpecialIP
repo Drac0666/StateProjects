@@ -1,221 +1,31 @@
-"""
-Time-series spreads vs Germany by tenor (Plotly version)
-
-What it does:
-1) (Example) Build 7-day sample data for 8 countries x 4 tenors.
-2) Drop dates older than 2025-09-30 (keep >= cutoff).
-3) Parse wide columns -> long tidy (Date, Country, Tenor, Yield).
-4) Compute Spread_bps = (Yield_country - Yield_Germany_same_tenor) * 100, per date.
-5) Produce:
-   - spreads_tidy: Date | Country | Tenor | Spread (bps) | Yield | Germany_Yield
-   - spreads_wide: Date-indexed wide table with columns like "France 2Y (bps)", "Italy 10Y (bps)", etc.
-6) Plotly charts:
-   - For a chosen TENOR: spreads over time for all countries (lines).
-   - For a chosen COUNTRY: spreads over time across all tenors (lines).
-"""
-
+# --- After you have `spreads_tidy` and `spreads_wide` DataFrames ---
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import plotly.express as px
-import plotly.graph_objects as go
+from datetime import datetime
 
-# =========================
-# CONFIG
-# =========================
-CUTOFF_DATE = "2025-09-30"   # drop anything older than this (keep >=)
-FIELD = "Mid Yield"
-TENORS = ["2 year", "5 year", "10 year", "30 year"]  # set to None to auto-detect from columns
-COUNTRIES = ["Austria", "Belgium", "France", "Germany", "Italy", "Netherlands", "Spain", "Portugal"]
+outfile = f"spreads_{datetime.now().date()}.xlsx"
 
-# Plot controls
-PLOT_TENOR = "2 year"     # chart 1: spread by country for this tenor
-PLOT_COUNTRY = "France"   # chart 2: spread by tenor for this country
-INCLUDE_GERMANY_LINE = False  # Germany spread is zero; set True if you want it drawn
+with pd.ExcelWriter(
+    outfile,
+    engine="xlsxwriter",
+    datetime_format="yyyy-mm-dd",
+    date_format="yyyy-mm-dd",
+) as writer:
+    # Write sheets
+    spreads_tidy.to_excel(writer, sheet_name="Spreads_Tidy", index=False)
+    spreads_wide.reset_index().to_excel(writer, sheet_name="Spreads_Wide", index=False)
 
-# =========================
-# HELPERS
-# =========================
-def tenor_label(t: str) -> str:
-    return t.replace(" year", "Y").replace(" years", "Y").strip()
+    # Basic formatting: freeze header + auto width
+    wb = writer.book
+    for sheet_name, df_ in {
+        "Spreads_Tidy": spreads_tidy,
+        "Spreads_Wide": spreads_wide.reset_index(),
+    }.items():
+        ws = writer.sheets[sheet_name]
+        ws.freeze_panes(1, 0)  # freeze header row
+        for col_idx, col_name in enumerate(df_.columns):
+            # heuristic for width: max of header and sample cell lengths
+            sample = df_[col_name].astype(str).str.len().clip(upper=40).max()
+            width = max(len(str(col_name)) + 2, int(sample) + 2 if pd.notna(sample) else 12, 12)
+            ws.set_column(col_idx, col_idx, width)
 
-def make_zero_line(fig):
-    fig.add_hline(y=0, line_width=1, line_dash="dash", line_color="gray")
-
-# =========================
-# (A) EXAMPLE DATA (7 days >= 2025-09-30)
-#     Replace this with your real file load.
-# =========================
-def build_example_df():
-    start = pd.to_datetime("2025-09-30")
-    dates = pd.date_range(start, periods=7, freq="D")
-    tenors = ["2 year", "5 year", "10 year", "30 year"]
-    countries = COUNTRIES
-
-    # Baseline Germany yields + small drift
-    base_de = {"2 year": 2.90, "5 year": 3.00, "10 year": 3.10, "30 year": 3.25}
-    drift_per_day = {"2 year": 0.01, "5 year": 0.01, "10 year": 0.01, "30 year": 0.015}
-
-    # Country spread offsets vs DE (made-up) + tenor tweaks
-    base_spreads = {
-        "Austria": 0.18, "Belgium": 0.12, "France": 0.33, "Germany": 0.00,
-        "Italy": 1.00, "Netherlands": 0.22, "Spain": 0.48, "Portugal": 0.55
-    }
-    tenor_tweak = {"2 year": 0.00, "5 year": 0.02, "10 year": 0.03, "30 year": 0.05}
-
-    rows = []
-    for d_idx, dt in enumerate(dates):
-        row = {"Date": dt.strftime("%Y-%m-%d")}
-        for c in countries:
-            for t in tenors:
-                germany_y = base_de[t] + drift_per_day[t] * d_idx
-                country_y = germany_y + base_spreads[c] + tenor_tweak[t]
-                col = f"Euro Area | {c} | {t} | {FIELD}"
-                row[col] = round(country_y, 3)
-        rows.append(row)
-    return pd.DataFrame(rows)
-
-# Load your data:
-# df = pd.read_excel("your_wide_file.xlsx")  # or pd.read_csv("your_wide_file.csv")
-df = build_example_df()
-
-# =========================
-# (B) FILTER BY DATE
-# =========================
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-cutoff = pd.to_datetime(CUTOFF_DATE)
-df = df[df["Date"] >= cutoff].sort_values("Date")
-if df.empty:
-    raise ValueError("No data on/after the cutoff date. Check your Date values and CUTOFF_DATE.")
-
-# =========================
-# (C) RESHAPE: WIDE -> LONG
-# =========================
-def is_value_col(c):
-    return isinstance(c, str) and " | " in c and c.endswith(f" | {FIELD}")
-
-value_cols = [c for c in df.columns if is_value_col(c)]
-
-long = df.melt(id_vars="Date", value_vars=value_cols, var_name="Column", value_name="Yield").dropna()
-
-# Parse "Euro Area | Country | Tenor | Field"
-parts = long["Column"].str.split(" \| ", expand=True)
-if parts.shape[1] != 4:
-    long = long[parts.notna().all(axis=1)]
-    parts = long["Column"].str.split(" \| ", expand=True)
-
-long["Region"]  = parts[0].str.strip()
-long["Country"] = parts[1].str.strip()
-long["Tenor"]   = parts[2].str.strip()
-long["Field"]   = parts[3].str.strip()
-
-# Keep only the requested field
-long = long[long["Field"].eq(FIELD)]
-
-# Optional: limit to a specific country set
-if COUNTRIES:
-    long = long[long["Country"].isin(COUNTRIES)]
-
-# Auto-detect tenors if not provided
-if not TENORS:
-    TENORS = list(long["Tenor"].dropna().unique())
-
-# Keep desired tenors
-long = long[long["Tenor"].isin(TENORS)]
-
-# =========================
-# (D) COMPUTE SPREADS VS GERMANY (match on Date & Tenor)
-# =========================
-de = long[long["Country"].eq("Germany")][["Date", "Tenor", "Yield"]].rename(columns={"Yield": "Germany_Yield"})
-
-merged = long.merge(de, on=["Date", "Tenor"], how="left")
-# If some dates/tenors have no Germany reference, they will be NaN; drop them for spreads:
-merged = merged.dropna(subset=["Germany_Yield"])
-
-merged["Spread (bps)"] = (merged["Yield"] - merged["Germany_Yield"]) * 100
-
-# Tidy table
-spreads_tidy = (
-    merged[["Date", "Country", "Tenor", "Spread (bps)", "Yield", "Germany_Yield"]]
-    .sort_values(["Country", "Tenor", "Date"])
-    .reset_index(drop=True)
-)
-
-# Wide table (Date index, columns like "France 2Y (bps)")
-merged["ColLabel"] = merged["Country"].astype(str) + " " + merged["Tenor"].map(tenor_label) + " (bps)"
-spreads_wide = merged.pivot(index="Date", columns="ColLabel", values="Spread (bps)").sort_index()
-
-# =========================
-# (E) DISPLAY TABLES (optional prints)
-# =========================
-print("\n=== TIDY SPREADS (first 20 rows) ===")
-print(spreads_tidy.head(20).to_string(index=False))
-
-print("\n=== WIDE SPREADS (bps) ===")
-print(spreads_wide.round(1).to_string())
-
-# =========================
-# (F) PLOTLY CHARTS
-# =========================
-
-# 1) Spreads vs Germany — selected TENOR across all countries
-mask_tenor = merged["Tenor"].eq(PLOT_TENOR)
-mask_countries = mask_tenor & (merged["Country"].ne("Germany") | (INCLUDE_GERMANY_LINE))
-tenor_df = merged.loc[mask_countries, ["Date", "Country", "Spread (bps)"]].copy()
-if not tenor_df.empty:
-    fig1 = px.line(
-        tenor_df,
-        x="Date",
-        y="Spread (bps)",
-        color="Country",
-        markers=True,
-        title=f"Spreads vs Germany — {tenor_label(PLOT_TENOR)}"
-    )
-    fig1.update_layout(yaxis_title="Spread (bps)", xaxis_title="Date", legend_title="Country")
-    make_zero_line(fig1)
-    fig1.show()
-
-# 2) Spreads vs Germany — selected COUNTRY across all TENORS
-mask_country = merged["Country"].eq(PLOT_COUNTRY)
-country_df = merged.loc[mask_country, ["Date", "Tenor", "Spread (bps)"]].copy()
-if not country_df.empty:
-    # Order tenors and relabel to 2Y/5Y/...
-    category_order = { "Tenor": TENORS }
-    country_df["TenorLabel"] = country_df["Tenor"].map(tenor_label)
-    fig2 = px.line(
-        country_df,
-        x="Date",
-        y="Spread (bps)",
-        color="TenorLabel",
-        category_orders={"TenorLabel": [tenor_label(t) for t in TENORS]},
-        markers=True,
-        title=f"{PLOT_COUNTRY} — Spreads vs Germany by Tenor"
-    )
-    fig2.update_layout(yaxis_title="Spread (bps)", xaxis_title="Date", legend_title="Tenor")
-    make_zero_line(fig2)
-    fig2.show()
-
-# 3) (Optional) Faceted chart: all tenors, each panel shows spreads by country for that tenor
-facet_df = merged[merged["Country"].ne("Germany") | (INCLUDE_GERMANY_LINE)]
-if not facet_df.empty:
-    facet_df["TenorLabel"] = facet_df["Tenor"].map(tenor_label)
-    fig3 = px.line(
-        facet_df,
-        x="Date",
-        y="Spread (bps)",
-        color="Country",
-        facet_col="TenorLabel",
-        facet_col_wrap=2,
-        category_orders={"TenorLabel": [tenor_label(t) for t in TENORS]},
-        title="Spreads vs Germany — All Tenors (faceted)"
-    )
-    fig3.update_layout(yaxis_title="Spread (bps)", xaxis_title="Date", legend_title="Country")
-    # Add zero line to each facet
-    for ax in fig3.select_yaxes():
-        pass  # Plotly Express doesn't support per-facet hlines easily; keeping a clean layout
-    fig3.show()
-
-# Optional: save figures as standalone HTML
-fig1.write_html("D:\ppp\spreads_by_tenor.html")
-fig2.write_html("D:\ppp\spreads_by_country.html")
-fig3.write_html("D:\ppp\spreads_faceted.html")
+print(f"Excel written to: {outfile}")
