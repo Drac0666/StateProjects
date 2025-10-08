@@ -1,29 +1,59 @@
-import requests
 import pandas as pd
 
-# New ECB Data Portal API endpoint
-url = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A"
-
-params = {
-    "format": "jsondata",
-    "startPeriod": "2024-01-01"
+# Example of your wide-format structure
+data = {
+    "Euro Area | Austria | 2 year | Mid Yield": [3.10],
+    "Euro Area | Austria | 5 year | Mid Yield": [3.20],
+    "Euro Area | Austria | 10 year | Mid Yield": [3.40],
+    "Euro Area | Austria | 30 year | Mid Yield": [3.60],
+    "Euro Area | Germany | 2 year | Mid Yield": [2.90],
+    "Euro Area | Germany | 5 year | Mid Yield": [2.95],
+    "Euro Area | Germany | 10 year | Mid Yield": [3.10],
+    "Euro Area | Germany | 30 year | Mid Yield": [3.25],
+    "Euro Area | France | 2 year | Mid Yield": [3.25],
+    "Euro Area | France | 5 year | Mid Yield": [3.35],
+    "Euro Area | France | 10 year | Mid Yield": [3.45],
+    "Euro Area | France | 30 year | Mid Yield": [3.55],
+    "Euro Area | Italy | 2 year | Mid Yield": [3.90],
+    "Euro Area | Italy | 5 year | Mid Yield": [4.00],
+    "Euro Area | Italy | 10 year | Mid Yield": [4.10],
+    "Euro Area | Italy | 30 year | Mid Yield": [4.20]
 }
 
-r = requests.get(url, params=params)
-r.raise_for_status()
-data = r.json()
+df = pd.DataFrame(data)
 
-# The structure under the new ECB Data Portal looks like:
-# data["structure"] -> metadata
-# data["dataSets"] -> actual series and observations
-series = data["dataSets"][0]["series"]["0:0:0:0:0"]
-obs = series["observations"]
+# Step 1️⃣ — Unpivot / reshape the data
+df_long = df.melt(var_name="Column", value_name="Yield")
 
-# Dates are defined in structure->dimensions->observation
-dates = [v["id"] for v in data["structure"]["dimensions"]["observation"][0]["values"]]
+# Step 2️⃣ — Extract components from the column name
+parts = df_long["Column"].str.split(" \| ", expand=True)
+df_long["Region"] = parts[0]
+df_long["Country"] = parts[1]
+df_long["Tenor"] = parts[2]
+df_long["Field"] = parts[3]
 
-# Convert to pandas Series
-values = [float(obs[str(i)][0]) if str(i) in obs else None for i in range(len(dates))]
-rates = pd.Series(values, index=pd.to_datetime(dates), name="EURUSD (USD per 1 EUR)")
+# Step 3️⃣ — Pivot to get Country x Tenor matrix
+pivot = df_long.pivot(index="Country", columns="Tenor", values="Yield")
 
-print(rates.tail())
+# Step 4️⃣ — Compute spreads vs Germany by tenor
+germany = pivot.loc["Germany"]
+spreads = pivot.subtract(germany)
+
+# Step 5️⃣ — Rename spread columns
+spread_cols = {col: col.replace("year", "Y Spread") for col in spreads.columns}
+spreads = spreads.rename(columns=spread_cols)
+
+# Step 6️⃣ — Combine yields + spreads
+result = pd.concat([pivot, spreads], axis=1)
+
+# Step 7️⃣ — Order columns nicely
+ordered_cols = []
+for tenor in ["2 year", "5 year", "10 year", "30 year"]:
+    if tenor in result.columns:
+        ordered_cols += [tenor, tenor.replace("year", "Y Spread")]
+result = result[ordered_cols]
+
+# Step 8️⃣ — Optional rounding for clarity
+result = result.round(2)
+
+print(result)
