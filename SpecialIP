@@ -1,20 +1,18 @@
 import pandas as pd
 
-# Define your desired column order (including missing ones)
+# Define desired orders
 column_order = [1, 2, 3, 4, 5, 6, 7]
-
-# Define your desired row order
 row_order = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C']
 
-# Convert both columns to categorical with defined order
+# Convert to categorical to preserve order
 df['LowesRating'] = pd.Categorical(df['LowesRating'], categories=column_order, ordered=True)
 df['AbecRating'] = pd.Categorical(df['AbecRating'], categories=row_order, ordered=True)
 
-# (Optional) filter AssetClass
+# Optional filtering
 excluded_classes = ['Equity', 'Derivative']
 filtered_df = df[~df['AssetClass'].isin(excluded_classes)]
 
-# Create pivot table with totals
+# Create pivot (absolute values)
 pivot = pd.pivot_table(
     filtered_df,
     values='ParValue',
@@ -26,4 +24,13 @@ pivot = pd.pivot_table(
     margins_name='Total'
 )
 
-print(pivot)
+# Convert to millions
+pivot = pivot / 1_000_000
+
+# Compute % of total
+pivot_pct = (pivot / pivot.loc['Total', 'Total']) * 100
+
+# Optional: round nicely
+pivot_pct = pivot_pct.round(2)
+
+print(pivot_pct)
