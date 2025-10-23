@@ -1,6 +1,6 @@
 import pandas as pd
 
-# Replace zeros in percentage pivots with blanks (optional)
+# Replace zeros with blanks (optional)
 pivot_pct = pivot_pct.replace(0, "")
 bolipivot_pct = bolipivot_pct.replace(0, "")
 
@@ -18,14 +18,8 @@ with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
         'border': 1,
         'bg_color': '#DCE6F1'
     })
-    number_fmt = workbook.add_format({
-        'num_format': '#,##0',  # 0 decimals
-        'border': 1
-    })
-    percent_fmt = workbook.add_format({
-        'num_format': '0.00%',  # 2 decimals for percentages
-        'border': 1
-    })
+    number_fmt = workbook.add_format({'num_format': '#,##0', 'border': 1})
+    percent_fmt = workbook.add_format({'num_format': '0.00%', 'border': 1})
 
     # ---------- Helper Function ----------
     def write_table(sheet_name, df, start_row, start_col, body_format):
@@ -38,20 +32,22 @@ with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
         for col_num, col_name in enumerate(headers):
             ws.write(start_row, start_col + col_num, col_name, header_fmt)
 
-        # Apply cell formatting (to all columns)
+        # Apply cell formatting to columns (safe since tables now don’t overlap)
         ws.set_column(start_col, start_col + len(headers) - 1, 12, body_format)
 
-        # Return next empty row (with one-row gap)
+        # Return next available row position
         return start_row + len(df) + 3
 
     # ---------- Sheet: IP ----------
     next_row = 0
+    # Value pivot on the left
     next_row = write_table('IP', pivot, start_row=next_row, start_col=0, body_format=number_fmt)
-    write_table('IP', pivot_pct, start_row=next_row, start_col=0, body_format=percent_fmt)
+    # Percentage pivot on the right
+    write_table('IP', pivot_pct, start_row=0, start_col=len(pivot.columns) + 4, body_format=percent_fmt)
 
     # ---------- Sheet: BOLI ----------
     next_row = 0
     next_row = write_table('BOLI', bolipivot, start_row=next_row, start_col=0, body_format=number_fmt)
-    write_table('BOLI', bolipivot_pct, start_row=next_row, start_col=0, body_format=percent_fmt)
+    write_table('BOLI', bolipivot_pct, start_row=0, start_col=len(bolipivot.columns) + 4, body_format=percent_fmt)
 
-print(f"✅ Excel file created successfully with formatted pivots → {output_path}")
+print(f"✅ Excel file created successfully → {output_path}")
