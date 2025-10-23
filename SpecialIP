@@ -1,17 +1,16 @@
 import pandas as pd
 
-# Example pivot tables (replace with yours)
-# pivot1, pivot2, pivot3, pivot4 = your DataFrames
+# Replace zeros in percentage pivots with blanks (optional)
+pivot_pct = pivot_pct.replace(0, "")
+bolipivot_pct = bolipivot_pct.replace(0, "")
 
 output_path = "output.xlsx"
 
 with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
-    workbook = writer.book  # access workbook object
+    workbook = writer.book
 
-    # --------------------------
-    # Define formatting styles
-    # --------------------------
-    header_format = workbook.add_format({
+    # ---------- Define Formats ----------
+    header_fmt = workbook.add_format({
         'bold': True,
         'text_wrap': True,
         'valign': 'middle',
@@ -19,44 +18,40 @@ with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
         'border': 1,
         'bg_color': '#DCE6F1'
     })
-
-    cell_format = workbook.add_format({
-        'num_format': '#,##0.00',   # 2 decimal places
+    number_fmt = workbook.add_format({
+        'num_format': '#,##0',  # 0 decimals
+        'border': 1
+    })
+    percent_fmt = workbook.add_format({
+        'num_format': '0.00%',  # 2 decimals for percentages
         'border': 1
     })
 
-    percent_format = workbook.add_format({
-        'num_format': '0.00%',      # percentage style
-        'border': 1
-    })
+    # ---------- Helper Function ----------
+    def write_table(sheet_name, df, start_row, start_col, body_format):
+        """Writes a DataFrame and applies header/body formatting."""
+        df.to_excel(writer, sheet_name=sheet_name, startrow=start_row, startcol=start_col)
+        ws = writer.sheets[sheet_name]
 
-    # --------------------------
-    # Write IP sheet
-    # --------------------------
-    pivot1.to_excel(writer, sheet_name='IP', startrow=0, startcol=0)
-    pivot2.to_excel(writer, sheet_name='IP', startrow=len(pivot1) + 4, startcol=0)
+        # Header formatting
+        headers = df.reset_index().columns.tolist()
+        for col_num, col_name in enumerate(headers):
+            ws.write(start_row, start_col + col_num, col_name, header_fmt)
 
-    # Format IP sheet
-    sheet_ip = writer.sheets['IP']
-    for pivot, start_row in zip([pivot1, pivot2], [0, len(pivot1) + 4]):
-        # Apply header format
-        for col_num, value in enumerate(pivot.reset_index().columns.values):
-            sheet_ip.write(start_row, col_num, value, header_format)
+        # Apply cell formatting (to all columns)
+        ws.set_column(start_col, start_col + len(headers) - 1, 12, body_format)
 
-        # Apply cell formatting
-        sheet_ip.set_column(1, len(pivot.columns) + 1, 12, cell_format)
+        # Return next empty row (with one-row gap)
+        return start_row + len(df) + 3
 
-    # --------------------------
-    # Write BOLI sheet
-    # --------------------------
-    pivot3.to_excel(writer, sheet_name='BOLI', startrow=0, startcol=0)
-    pivot4.to_excel(writer, sheet_name='BOLI', startrow=len(pivot3) + 4, startcol=0)
+    # ---------- Sheet: IP ----------
+    next_row = 0
+    next_row = write_table('IP', pivot, start_row=next_row, start_col=0, body_format=number_fmt)
+    write_table('IP', pivot_pct, start_row=next_row, start_col=0, body_format=percent_fmt)
 
-    # Format BOLI sheet
-    sheet_boli = writer.sheets['BOLI']
-    for pivot, start_row in zip([pivot3, pivot4], [0, len(pivot3) + 4]):
-        for col_num, value in enumerate(pivot.reset_index().columns.values):
-            sheet_boli.write(start_row, col_num, value, header_format)
-        sheet_boli.set_column(1, len(pivot.columns) + 1, 12, percent_format)
+    # ---------- Sheet: BOLI ----------
+    next_row = 0
+    next_row = write_table('BOLI', bolipivot, start_row=next_row, start_col=0, body_format=number_fmt)
+    write_table('BOLI', bolipivot_pct, start_row=next_row, start_col=0, body_format=percent_fmt)
 
-print("✅ Excel file created with full formatting:", output_path)
+print(f"✅ Excel file created successfully with formatted pivots → {output_path}")
