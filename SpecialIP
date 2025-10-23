@@ -1,1 +1,6 @@
-ws.set_column(start_col, start_col, 20, body_format)
+# Set A column (index column) width = 20
+        ws.set_column(start_col, start_col, 20, body_format)
+
+        # Set remaining columns width = 12
+        if len(headers) > 1:
+            ws.set_column(start_col + 1, start_col + len(headers) - 1, 12, body_format)
