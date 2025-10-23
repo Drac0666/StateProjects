@@ -1,1 +1,17 @@
-pivot_pct = pivot_pct.round(2).replace(0, "")
+import pandas as pd
+
+# Example pivot tables (replace with yours)
+# pivot1, pivot2, pivot3, pivot4 are your existing DataFrames
+
+with pd.ExcelWriter('output.xlsx', engine='xlsxwriter') as writer:
+    
+    # --- Write first two to "IP" ---
+    pivot1.to_excel(writer, sheet_name='IP', startrow=0, startcol=0)
+    pivot2.to_excel(writer, sheet_name='IP', startrow=len(pivot1) + 4, startcol=0)
+    # (adds a 4-row space between the two tables)
+    
+    # --- Write next two to "BOLI" ---
+    pivot3.to_excel(writer, sheet_name='BOLI', startrow=0, startcol=0)
+    pivot4.to_excel(writer, sheet_name='BOLI', startrow=len(pivot3) + 4, startcol=0)
+
+print("✅ All pivots written successfully to output.xlsx")
