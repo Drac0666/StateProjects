@@ -1,45 +1,29 @@
-# pip install sdmx1 pandas
-import sdmx
 import pandas as pd
 
-# 1) Connect to ECB
-ecb = sdmx.Client("ECB")  # official source id
+# Define your desired column order (including missing ones)
+column_order = [1, 2, 3, 4, 5, 6, 7]
 
-# EXR = ECB Exchange Rates; dimensions are:
-# FREQ • CURRENCY • CURRENCY_DENOM • EXR_TYPE • EXR_SUFFIX
-# We'll fetch daily spot (SP00) rates, EUR as denominator, series variation 'A'.
-key = {
-    "FREQ": "D",
-    "CURRENCY": "USD",         # change or pass a list like ["USD", "CHF"]
-    "CURRENCY_DENOM": "EUR",
-    "EXR_TYPE": "SP00",
-    "EXR_SUFFIX": "A",
-}
+# Define your desired row order
+row_order = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B', 'CCC', 'CC', 'C']
 
-# 2) Optional query params (time window + make time the observation dimension)
-params = {
-    "startPeriod": "2020",                 # or e.g. "2024-01"
-    "dimensionAtObservation": "TIME_PERIOD"
-}
+# Convert both columns to categorical with defined order
+df['LowesRating'] = pd.Categorical(df['LowesRating'], categories=column_order, ordered=True)
+df['AbecRating'] = pd.Categorical(df['AbecRating'], categories=row_order, ordered=True)
 
-# 3) Fetch data and convert to pandas
-msg = ecb.get(resource_type="data", resource_id="EXR", key=key, params=params)
-df = sdmx.to_pandas(msg)  # Time index, columns = other dims
+# (Optional) filter AssetClass
+excluded_classes = ['Equity', 'Derivative']
+filtered_df = df[~df['AssetClass'].isin(excluded_classes)]
 
-# 4) Get a clean Series for EURUSD (daily)
-eurusd = df.xs(("D","USD","EUR","SP00","A"), level=df.columns.names, axis=1).squeeze()
-eurusd.name = "EURUSD_ECB_SP00"
-
-# Latest value
-latest_date = eurusd.index.max()
-latest_value = eurusd.loc[latest_date]
-print(latest_date, latest_value)
-
-# If you want multiple currencies in one go:
-key_multi = {**key, "CURRENCY": ["USD", "CHF", "GBP", "JPY"]}
-msg2 = ecb.get("data", "EXR", key=key_multi, params=params)
-wide = sdmx.to_pandas(msg2)
-panel = wide.stack().rename("rate").reset_index().rename(
-    columns={"TIME_PERIOD": "date", "CURRENCY": "currency"}
+# Create pivot table with totals
+pivot = pd.pivot_table(
+    filtered_df,
+    values='ParValue',
+    index='AbecRating',
+    columns='LowesRating',
+    aggfunc='sum',
+    fill_value=0,
+    margins=True,
+    margins_name='Total'
 )
-# panel -> tidy: date, other dims..., rate
+
+print(pivot)
