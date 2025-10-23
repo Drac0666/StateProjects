@@ -1,17 +1,62 @@
 import pandas as pd
 
 # Example pivot tables (replace with yours)
-# pivot1, pivot2, pivot3, pivot4 are your existing DataFrames
+# pivot1, pivot2, pivot3, pivot4 = your DataFrames
 
-with pd.ExcelWriter('output.xlsx', engine='xlsxwriter') as writer:
-    
-    # --- Write first two to "IP" ---
+output_path = "output.xlsx"
+
+with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
+    workbook = writer.book  # access workbook object
+
+    # --------------------------
+    # Define formatting styles
+    # --------------------------
+    header_format = workbook.add_format({
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'middle',
+        'align': 'center',
+        'border': 1,
+        'bg_color': '#DCE6F1'
+    })
+
+    cell_format = workbook.add_format({
+        'num_format': '#,##0.00',   # 2 decimal places
+        'border': 1
+    })
+
+    percent_format = workbook.add_format({
+        'num_format': '0.00%',      # percentage style
+        'border': 1
+    })
+
+    # --------------------------
+    # Write IP sheet
+    # --------------------------
     pivot1.to_excel(writer, sheet_name='IP', startrow=0, startcol=0)
     pivot2.to_excel(writer, sheet_name='IP', startrow=len(pivot1) + 4, startcol=0)
-    # (adds a 4-row space between the two tables)
-    
-    # --- Write next two to "BOLI" ---
+
+    # Format IP sheet
+    sheet_ip = writer.sheets['IP']
+    for pivot, start_row in zip([pivot1, pivot2], [0, len(pivot1) + 4]):
+        # Apply header format
+        for col_num, value in enumerate(pivot.reset_index().columns.values):
+            sheet_ip.write(start_row, col_num, value, header_format)
+
+        # Apply cell formatting
+        sheet_ip.set_column(1, len(pivot.columns) + 1, 12, cell_format)
+
+    # --------------------------
+    # Write BOLI sheet
+    # --------------------------
     pivot3.to_excel(writer, sheet_name='BOLI', startrow=0, startcol=0)
     pivot4.to_excel(writer, sheet_name='BOLI', startrow=len(pivot3) + 4, startcol=0)
 
-print("✅ All pivots written successfully to output.xlsx")
+    # Format BOLI sheet
+    sheet_boli = writer.sheets['BOLI']
+    for pivot, start_row in zip([pivot3, pivot4], [0, len(pivot3) + 4]):
+        for col_num, value in enumerate(pivot.reset_index().columns.values):
+            sheet_boli.write(start_row, col_num, value, header_format)
+        sheet_boli.set_column(1, len(pivot.columns) + 1, 12, percent_format)
+
+print("✅ Excel file created with full formatting:", output_path)
