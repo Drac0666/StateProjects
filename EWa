@@ -1,13 +1,40 @@
-Private Function GetLastFolderName(ByVal folderPath As String) As String
-    Dim tempPath As String, pos As Long
-    tempPath = Replace(folderPath, "/", "\") ' normalize
-    ' Remove trailing backslash if exists
-    If Right$(tempPath, 1) = "\" Then tempPath = Left$(tempPath, Len(tempPath) - 1)
-    ' Find last backslash and extract after it
-    pos = InStrRev(tempPath, "\")
-    If pos > 0 Then
-        GetLastFolderName = Mid$(tempPath, pos + 1)
-    Else
-        GetLastFolderName = tempPath
+Public Sub SendIfNotLoggedToday_File()
+    Dim keyText As String
+    keyText = BuildKey(Date, ALIAS, SUBJECT_TAG)
+
+    If AlreadyLoggedToday_File(LOG_PATH, keyText) Then
+        MsgBox "Dziś już wysłano ten e-mail (log plikowy). Wysyłka zatrzymana.", vbInformation
+        Exit Sub
     End If
-End Function
+
+    If Not AppendLog_FileAtomic(LOG_PATH, keyText) Then
+        MsgBox "Nie udało się zapisać do logu. Przerywam, aby uniknąć duplikatu.", vbExclamation
+        Exit Sub
+    End If
+
+    ' === Get folder 2 levels up ===
+    Dim base2Up As String, base2UpUrl As String
+    base2Up = PathUpFromFile(ThisWorkbook.FullName, 2)
+    base2UpUrl = "file:///" & Replace(base2Up, "\", "/") ' make it clickable
+
+    ' === Create email ===
+    Dim olApp As Object, olMail As Object
+    Set olApp = CreateObject("Outlook.Application")
+    Set olMail = olApp.CreateItem(0)
+
+    With olMail
+        .To = TO_ADDRESS
+        .Subject = SUBJECT_TAG & " — " & Format(Date, "yyyy-mm-dd")
+
+        ' === HTML body (with blank lines exactly as requested) ===
+        .HTMLBody = _
+            "<p>Hi Team,</p>" & _
+            "<p>Could you please review Post Trade Checks under:</p>" & _
+            "<p><a href='" & base2UpUrl & "'>" & base2Up & "</a></p>" & _
+            "<p><br></p>"
+
+        .Send
+    End With
+
+    MsgBox "Wysłano e-mail (i zarejestrowano w logu).", vbInformation
+End Sub
