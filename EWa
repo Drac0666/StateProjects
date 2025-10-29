@@ -1,11 +1,13 @@
-private Function PathUpFromFile(ByVal fileFullName As String, ByVal levelsUp As Long) As String
-    Dim p As String, i As Long, pos As Long
-    p = fileFullName
-    ' Go up "levelsUp" times starting from the file (first strip filename)
-    For i = 1 To levelsUp
-        pos = InStrRev(p, "\")
-        If pos <= 1 Then Exit For
-        p = Left$(p, pos - 1)
-    Next i
-    PathUpFromFile = p
+Private Function GetLastFolderName(ByVal folderPath As String) As String
+    Dim tempPath As String, pos As Long
+    tempPath = Replace(folderPath, "/", "\") ' normalize
+    ' Remove trailing backslash if exists
+    If Right$(tempPath, 1) = "\" Then tempPath = Left$(tempPath, Len(tempPath) - 1)
+    ' Find last backslash and extract after it
+    pos = InStrRev(tempPath, "\")
+    If pos > 0 Then
+        GetLastFolderName = Mid$(tempPath, pos + 1)
+    Else
+        GetLastFolderName = tempPath
+    End If
 End Function
