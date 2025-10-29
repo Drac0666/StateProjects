@@ -1,53 +1,225 @@
-from openpyxl import load_workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-import pandas as pd
+'=== Module1: Wysyłka z prostym logiem plikowym (late binding do Outlook) ===
+Option Explicit
 
-# Load the workbook
-workbook = load_workbook('example.xlsx')
+'--- KONFIGURACJA ---
+Private Const LOG_PATH As String = "C:\Shared\send_log.txt" ' lub \\serwer\udział\send_log.txt
+Private Const ALIAS As String = "team-alerts"               ' alias do logowania/klucza
+Private Const TO_ADDRESS As String = "team-alerts@firma.com"
+Private Const SUBJECT_TAG As String = "Dzisiejszy raport sprzedaży" ' fragment wyróżniający tę wysyłkę
 
-# Iterate through each worksheet
-for sheet in workbook.sheetnames:
-    ws = workbook[sheet]
-    # Convert formulas to values
-    for row in ws.iter_rows(values_only=True):
-        for cell in row:
-            if cell.data_type == 'f':  # Check if cell contains a formula
-                cell.value = cell.value
+'=== PUBLIC ENTRYPOINT ===
+Public Sub SendIfNotLoggedToday_File()
+    Dim keyText As String
+    keyText = BuildKey(Date, ALIAS, SUBJECT_TAG) ' np. 2025-10-20|team-alerts|Dzisiejszy raport sprzedaży
 
-# Save the workbook as values only
-workbook.save('example_values_only.xlsx')
+    If AlreadyLoggedToday_File(LOG_PATH, keyText) Then
+        MsgBox "Dziś już wysłano ten e-mail (log plikowy). Wysyłka zatrzymana.", vbInformation
+        Exit Sub
+    End If
 
+    ' ZALOGUJ najpierw (by uniknąć wyścigu) i dopiero wtedy wyślij
+    If Not AppendLog_FileAtomic(LOG_PATH, keyText) Then
+        MsgBox "Nie udało się zapisać do logu. Przerywam, aby uniknąć duplikatu.", vbExclamation
+        Exit Sub
+    End If
 
+    ' --- Wysyłka Outlook ---
+    Dim olApp As Object, olMail As Object
+    On Error GoTo SendFail
+    Set olApp = CreateObject("Outlook.Application")
+    Set olMail = olApp.CreateItem(0) ' olMailItem
 
-import os
-from openpyxl import load_workbook
-from openpyxl import Workbook
+    With olMail
+        .To = TO_ADDRESS
+        .Subject = SUBJECT_TAG & " — " & Format(Date, "yyyy-mm-dd")
+        .Body = "Cześć," & vbCrLf & vbCrLf & "Załączam raport..." & vbCrLf
+        ' .Attachments.Add "C:\ścieżka\plik.xlsx"
+        .Send
+    End With
 
-def extract_data(filename):
-    # Load the workbook
-    wb = load_workbook(filename)
-    # Get the sheet named "MC"
-    sheet = wb["MC"]
-    # Extract data from specified cells
-    data = [sheet["A1"].value, sheet["C5"].value, sheet["C10"].value]
-    return data
+    MsgBox "Wysłano e-mail (i zarejestrowano w logu).", vbInformation
+    Exit Sub
 
-def process_files(input_folder, output_filename):
-    # Create a new workbook
-    output_wb = Workbook()
-    output_ws = output_wb.active
-    # Iterate over each file in the input folder
-    for filename in os.listdir(input_folder):
-        if filename.endswith(".xlsx"):
-            filepath = os.path.join(input_folder, filename)
-            # Extract data from the "MC" sheet
-            data = extract_data(filepath)
-            # Write the data to the output workbook
-            output_ws.append(data)
-    # Save the output workbook
-    output_wb.save(output_filename)
+SendFail:
+    ' Jeśli wysyłka się nie uda, możesz opcjonalnie usunąć ostatnią linię z logu,
+    ' ale to wymaga dodatkowego kodu. Zwykle wystarczy ręczna korekta.
+    MsgBox "Błąd podczas wysyłki: " & Err.Description, vbCritical
+End Sub
 
-# Example usage
-input_folder = "input_folder"
-output_filename = "output.xlsx"
-process_files(input_folder, output_filename)
+'=== LOGIKA KLUCZA ===
+Private Function BuildKey(d As Date, aliasOrTag As String, subjectTag As String) As String
+    ' Format klucza: RRRR-MM-DD|alias|subjectTag (bez znaków nowej linii)
+    BuildKey = Format$(d, "yyyy-mm-dd") & "|" & aliasOrTag & "|" & subjectTag
+End Function
+
+'=== ODCZYT: Czy dziś już zarejestrowano? ===
+Private Function AlreadyLoggedToday_File(ByVal logPath As String, ByVal keyText As String) As Boolean
+    Dim f As Integer, lineTxt As String
+    On Error GoTo SafeExit
+
+    If Dir$(logPath, vbNormal) = "" Then
+        AlreadyLoggedToday_File = False
+        Exit Function
+    End If
+
+    f = FreeFile
+    Open logPath For Input As #f
+    Do While Not EOF(f)
+        Line Input #f, lineTxt
+        If StrComp(Trim$(lineTxt), keyText, vbTextCompare) = 0 Then
+            AlreadyLoggedToday_File = True
+            Exit Do
+        End If
+    Loop
+    Close #f
+    Exit Function
+
+SafeExit:
+    On Error Resume Next
+    If f <> 0 Then Close #f
+    AlreadyLoggedToday_File = False  ' w razie błędu nie blokujemy nadmiernie
+End Function
+
+'=== ZAPIS ATOMICZNY: dopisz linię z prostym lockiem pliku ===
+Private Function AppendLog_FileAtomic(ByVal logPath As String, ByVal keyText As String) As Boolean
+    ' Próbuje zarezerwować wyłączny dostęp do pliku loga i dopisać linię.
+    ' Działa też, gdy pliku jeszcze nie ma.
+    ' Zwraca True, jeśli zapisano; False, jeśli nie udało się zablokować/zapisać.
+
+    Dim dirPath As String
+    Dim fh As Integer
+    Dim attempts As Long
+
+    On Error GoTo Fail
+
+    ' Upewnij się, że katalog istnieje
+    dirPath = GetFolderFromPath(logPath)
+    If Len(dirPath) > 0 Then
+        If Dir$(dirPath, vbDirectory) = "" Then
+            MkDirRecursive dirPath
+        End If
+    End If
+
+    ' Otwórz/binarnie, zablokuj, dopisz, odblokuj — prosta sekcja krytyczna
+    For attempts = 1 To 20
+        fh = FreeFile
+        Open logPath For Binary As #fh
+        ' Próba wyłącznej blokady całego pliku
+        Lock #fh
+
+        ' Jeszcze raz sprawdź (po blokadzie), czy ktoś wcześniej nie dopisał tej samej linii
+        If Not FileContainsLine(fh, keyText) Then
+            ' Dopisz EOL jeżeli plik nie kończy się \r\n
+            EnsureTrailingNewline fh
+            Put #fh, LOF(fh) + 1, keyText & vbCrLf
+        End If
+
+        ' Zwolnij i zamknij
+        Unlock #fh
+        Close #fh
+
+        AppendLog_FileAtomic = True
+        Exit Function
+
+RetrySmallWait:
+        ' krótka pauza i ponów
+        DoEvents
+        Application.Wait Now + TimeSerial(0, 0, 0) ' ~0s, oddaje czas
+    Next attempts
+
+Fail:
+    On Error Resume Next
+    If fh <> 0 Then
+        Unlock #fh
+        Close #fh
+    End If
+    AppendLog_FileAtomic = False
+End Function
+
+'=== POMOCNICZE: odczyt pliku binarnego linia-po-linii ===
+Private Function FileContainsLine(ByVal fh As Integer, ByVal target As String) As Boolean
+    Dim bytes() As Byte
+    Dim txt As String
+    Dim fileLen As Long
+
+    On Error GoTo SafeExit
+
+    fileLen = LOF(fh)
+    If fileLen = 0 Then
+        FileContainsLine = False
+        Exit Function
+    End If
+
+    ReDim bytes(1 To fileLen)
+    Get #fh, 1, bytes
+    txt = StrConv(bytes, vbUnicode)
+
+    ' Szukamy całej linii (z lub bez CRLF na końcu)
+    Dim needle As String
+    needle = vbCrLf & target & vbCrLf
+    If InStr(1, vbCrLf & txt & vbCrLf, needle, vbTextCompare) > 0 Then
+        FileContainsLine = True
+    Else
+        FileContainsLine = False
+    End If
+    Exit Function
+
+SafeExit:
+    FileContainsLine = False
+End Function
+
+Private Sub EnsureTrailingNewline(ByVal fh As Integer)
+    Dim bytes() As Byte
+    Dim fileLen As Long
+    Dim last2 As String
+
+    On Error GoTo SafeExit
+
+    fileLen = LOF(fh)
+    If fileLen = 0 Then Exit Sub
+
+    If fileLen >= 2 Then
+        ReDim bytes(1 To 2)
+        Get #fh, fileLen - 1, bytes
+        last2 = StrConv(bytes, vbUnicode)
+        If last2 <> vbCrLf Then
+            Put #fh, fileLen + 1, vbCrLf
+        End If
+    Else
+        ' plik 1-bajtowy — po prostu dopisz CRLF
+        Put #fh, fileLen + 1, vbCrLf
+    End If
+    Exit Sub
+
+SafeExit:
+    ' w razie problemu po prostu nic nie rób — dopiszemy linię z CRLF i tak
+End Sub
+
+'=== NARZĘDZIA FS ===
+Private Function GetFolderFromPath(ByVal fullPath As String) As String
+    Dim i As Long
+    For i = Len(fullPath) To 1 Step -1
+        If Mid$(fullPath, i, 1) = "\" Or Mid$(fullPath, i, 1) = "/" Then
+            GetFolderFromPath = Left$(fullPath, i - 1)
+            Exit Function
+        End If
+    Next i
+    GetFolderFromPath = ""
+End Function
+
+Private Sub MkDirRecursive(ByVal folderPath As String)
+    Dim parts() As String, i As Long, cur As String
+    parts = Split(folderPath, "\")
+    cur = parts(0)
+    For i = 1 To UBound(parts)
+        cur = cur & "\" & parts(i)
+        If Len(cur) >= 3 Then ' omijamy "C:\" jako istniejące
+            If Dir$(cur, vbDirectory) = "" Then
+                On Error Resume Next
+                MkDir cur
+                On Error GoTo 0
+            End If
+        End If
+    Next i
+End Sub
+
