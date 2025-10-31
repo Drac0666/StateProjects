@@ -1,4 +1,4 @@
-# rating_transition_exclude_7to11_no_starting.py
+# rating_transition_include_starting_exclude_7to11.py
 # Python 3.9
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ COL_DATE = "Date"
 COL_SEC  = "Security"
 COL_RATE = "Rating"                    # integer 1..15
 
-# Use only these ratings (exclude 7..11):
+# Use only these ratings (exclude 7..11)
 RATING_ORDER = [1, 2, 3, 4, 5, 6, 12, 13, 14, 15]
 ALLOWED_SET = set(RATING_ORDER)
 
@@ -32,7 +32,7 @@ def _read_ratings(path, sheet, col_date, col_sec, col_rate):
     df[col_rate] = pd.to_numeric(df[col_rate], errors="coerce").round().astype("Int64")
     df = df.dropna(subset=[col_sec, col_rate])
     df[col_rate] = df[col_rate].astype(int)
-    # keep only 1..15 first, then filter to allowed ratings (exclude 7..11)
+    # keep 1..15 then filter to allowed set (excludes 7..11)
     df = df[(df[col_rate] >= 1) & (df[col_rate] <= 15)]
     df = df[df[col_rate].isin(ALLOWED_SET)]
     # if duplicates per security exist, keep the latest by Date
@@ -56,26 +56,34 @@ def _new_secs(t1, t2):
     s = new.groupby("rate")["sec"].nunique()
     return s.reindex(RATING_ORDER).fillna(0).astype(int)
 
+def _starting_counts(t1):
+    s = t1.groupby("rate")["sec"].nunique()
+    return s.reindex(RATING_ORDER).fillna(0).astype(int)
+
 def _ending_counts(t2):
     s = t2.groupby("rate")["sec"].nunique()
     return s.reindex(RATING_ORDER).fillna(0).astype(int)
 
-def _build_counts_table(counts, paid_off, new_secs, ending):
+def _build_counts_table(counts, starting, paid_off, new_secs, ending):
+    # Order: Starting | [ratings grid] | Paid Off | New Securities | Ending
     grid = counts.reindex(index=RATING_ORDER, columns=RATING_ORDER, fill_value=0).copy()
+    grid.insert(0, "Starting", starting)
     grid["Paid Off"] = paid_off
     grid["New Securities"] = new_secs
     grid["Ending"] = ending
     grid.loc["Total"] = grid.sum(axis=0, numeric_only=True)
     return grid
 
-def _build_percent_table(counts, paid_off, ending):
-    denom = counts.sum(axis=1).add(paid_off, fill_value=0)  # row totals incl. Paid Off
+def _build_percent_table(counts, starting, paid_off, ending):
+    # Row-normalized on Starting (transitions + paid off)
+    denom = counts.sum(axis=1).add(paid_off, fill_value=0)
     pct = counts.div(denom.replace(0, np.nan), axis=0) * 100.0
     pct = pct.reindex(index=RATING_ORDER, columns=RATING_ORDER, fill_value=0).fillna(0.0).round(2)
     pct_ext = pct.copy()
+    pct_ext.insert(0, "Starting", starting)                          # counts for reference
     pct_ext["Paid Off"] = (paid_off / denom.replace(0, 1) * 100.0).round(2)
-    pct_ext["New Securities"] = ""     # not a T1 transition
-    pct_ext["Ending"] = ending         # counts for reference
+    pct_ext["New Securities"] = ""                                   # not a T1 transition
+    pct_ext["Ending"] = ending                                       # counts for reference
     return pct_ext
 
 # ======= EXCEL OUTPUTS =======
@@ -83,13 +91,14 @@ def _save_raw_workbook(counts_ext, pct_ext, out_path):
     with pd.ExcelWriter(out_path, engine="xlsxwriter") as xw:
         counts_ext.to_excel(xw, sheet_name="counts", merge_cells=False)
         pct_ext.to_excel(xw, sheet_name="percent", merge_cells=False)
+        # Bold diagonal on percent (transition grid only)
         wb = xw.book
         ws = xw.sheets["percent"]
         n = len(RATING_ORDER)
         bold = wb.add_format({"bold": True})
-        # Transition grid starts at column B (A = index label). Data starts at row 2 (1-based).
+        # Index col = A, 'Starting' = B, transition grid starts at C => (row i -> col i+2), 1-based rows start at 2
         for i in range(n):
-            ws.write(i + 2, i + 2, pct_ext.iloc[i, i], bold)
+            ws.write(i + 2, i + 2, pct_ext.iloc[i, i + 1], bold)
 
 def _shade_transition_grid(ws, wb, start_row, start_col, n):
     fmt_grey  = wb.add_format({"bg_color": CLR_GREY})
@@ -111,14 +120,16 @@ def _save_styled_workbook(counts_ext, pct_ext, out_path):
         ws_c = xw.sheets["counts"]
         ws_p = xw.sheets["percent"]
         n = len(RATING_ORDER)
+        # Index = col A, 'Starting' = col B, transition grid begins at col C (0-based col idx = 2)
         trans_start_row = 2  # first data row
-        trans_start_col = 1  # column B (after index)
+        trans_start_col = 2  # column C
         _shade_transition_grid(ws_c, wb, trans_start_row, trans_start_col, n)
         _shade_transition_grid(ws_p, wb, trans_start_row, trans_start_col, n)
         for ws in (ws_c, ws_p):
             ws.set_column(0, 0, 9)                       # index
-            ws.set_column(1, 1 + n - 1, 6.5)             # transition grid (allowed ratings)
-            ws.set_column(1 + n, 1 + n + 2, 14)          # Paid Off, New Securities, Ending
+            ws.set_column(1, 1, 10)                      # Starting
+            ws.set_column(2, 2 + n - 1, 6.5)             # transition grid
+            ws.set_column(2 + n, 2 + n + 2, 14)          # Paid Off, New Securities, Ending
 
 # ======= RUN =======
 def run(file_t1: str, file_t2: str, out_prefix: str = None):
@@ -126,12 +137,13 @@ def run(file_t1: str, file_t2: str, out_prefix: str = None):
     t2 = _read_ratings(file_t2, SHEET_T2, COL_DATE, COL_SEC, COL_RATE)
 
     counts   = _counts_matrix(t1, t2)
-    paid_off = _paid_off(t1, t2)        # in T1, not in T2 (after filtering to allowed ratings)
-    new_secs = _new_secs(t1, t2)        # in T2, not in T1 (after filtering to allowed ratings)
+    starting = _starting_counts(t1)
+    paid_off = _paid_off(t1, t2)        # in T1, not in T2
+    new_secs = _new_secs(t1, t2)        # in T2, not in T1
     ending   = _ending_counts(t2)
 
-    counts_ext = _build_counts_table(counts, paid_off, new_secs, ending)
-    pct_ext    = _build_percent_table(counts, paid_off, ending)
+    counts_ext = _build_counts_table(counts, starting, paid_off, new_secs, ending)
+    pct_ext    = _build_percent_table(counts, starting, paid_off, ending)
 
     base = out_prefix or (Path(file_t1).stem + "_to_" + Path(file_t2).stem)
 
