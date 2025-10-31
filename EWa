@@ -1,40 +1,177 @@
-Public Sub SendIfNotLoggedToday_File()
-    Dim keyText As String
-    keyText = BuildKey(Date, ALIAS, SUBJECT_TAG)
+# rating_transition_1to15.py
+# Python 3.9
 
-    If AlreadyLoggedToday_File(LOG_PATH, keyText) Then
-        MsgBox "Dziś już wysłano ten e-mail (log plikowy). Wysyłka zatrzymana.", vbInformation
-        Exit Sub
-    End If
+from __future__ import annotations
+import pandas as pd
+import numpy as np
+from pathlib import Path
 
-    If Not AppendLog_FileAtomic(LOG_PATH, keyText) Then
-        MsgBox "Nie udało się zapisać do logu. Przerywam, aby uniknąć duplikatu.", vbExclamation
-        Exit Sub
-    End If
+# ========= CONFIG =========
+FILE_T1 = r"C:\path\to\file_T1.xlsx"   # earlier snapshot
+FILE_T2 = r"C:\path\to\file_T2.xlsx"   # later snapshot
+SHEET_T1 = 0                           # sheet name or index
+SHEET_T2 = 0
+COL_DATE = "Date"
+COL_SEC  = "Security"
+COL_RATE = "Rating"                    # integer 1..15
 
-    ' === Get folder 2 levels up ===
-    Dim base2Up As String, base2UpUrl As String
-    base2Up = PathUpFromFile(ThisWorkbook.FullName, 2)
-    base2UpUrl = "file:///" & Replace(base2Up, "\", "/") ' make it clickable
+# Ratings order: best (1) -> worst (15)
+RATING_ORDER = list(range(1, 16))
 
-    ' === Create email ===
-    Dim olApp As Object, olMail As Object
-    Set olApp = CreateObject("Outlook.Application")
-    Set olMail = olApp.CreateItem(0)
+# Colors for styled workbook
+CLR_GREY  = "#D9D9D9"  # diagonal
+CLR_RED   = "#F8CBAD"  # downgrade (to worse rating number)
+CLR_GREEN = "#C6EFCE"  # upgrade (to better rating number)
 
-    With olMail
-        .To = TO_ADDRESS
-        .Subject = SUBJECT_TAG & " — " & Format(Date, "yyyy-mm-dd")
+# ========= HELPERS =========
+def _read_ratings(path, sheet, col_date, col_sec, col_rate):
+    df = pd.read_excel(path, sheet_name=sheet, dtype={col_sec: str})
+    # Keep only needed cols and coerce rating to int within [1,15]
+    df = df[[col_date, col_sec, col_rate]].copy()
+    df[col_sec] = df[col_sec].astype(str).str.strip()
+    df[col_rate] = pd.to_numeric(df[col_rate], errors="coerce").round().astype("Int64")
+    df = df.dropna(subset=[col_sec, col_rate])
+    df[col_rate] = df[col_rate].astype(int)
+    df = df[(df[col_rate] >= 1) & (df[col_rate] <= 15)]
+    # If duplicates per security exist, keep the last by Date (assuming Date sortable)
+    if col_date in df.columns:
+        df = df.sort_values(col_date).drop_duplicates(subset=[col_sec], keep="last")
+    return df[[col_sec, col_rate]].rename(columns={col_sec:"sec", col_rate:"rate"})
 
-        ' === HTML body (with blank lines exactly as requested) ===
-        .HTMLBody = _
-            "<p>Hi Team,</p>" & _
-            "<p>Could you please review Post Trade Checks under:</p>" & _
-            "<p><a href='" & base2UpUrl & "'>" & base2Up & "</a></p>" & _
-            "<p><br></p>"
+def _counts_matrix(t1, t2):
+    common = t1.merge(t2, on="sec", how="inner", suffixes=("_t1", "_t2"))
+    counts = pd.crosstab(common["rate_t1"], common["rate_t2"])
+    counts = counts.reindex(index=RATING_ORDER, columns=RATING_ORDER, fill_value=0)
+    return counts
 
-        .Send
-    End With
+def _paid_off(t1, t2):
+    gone = t1[~t1["sec"].isin(t2["sec"])]
+    s = gone.groupby("rate")["sec"].nunique()
+    return s.reindex(RATING_ORDER).fillna(0).astype(int)
 
-    MsgBox "Wysłano e-mail (i zarejestrowano w logu).", vbInformation
-End Sub
+def _new_secs(t1, t2):
+    new = t2[~t2["sec"].isin(t1["sec"])]
+    s = new.groupby("rate")["sec"].nunique()
+    return s.reindex(RATING_ORDER).fillna(0).astype(int)
+
+def _starting(t1):
+    s = t1.groupby("rate")["sec"].nunique()
+    return s.reindex(RATING_ORDER).fillna(0).astype(int)
+
+def _ending(t2):
+    s = t2.groupby("rate")["sec"].nunique()
+    return s.reindex(RATING_ORDER).fillna(0).astype(int)
+
+def _build_counts_ext(counts, starting, paid_off, new_secs, ending):
+    # Order: Starting | [1..15] | Paid Off | New Securities | Ending
+    grid = counts.reindex(index=RATING_ORDER, columns=RATING_ORDER, fill_value=0).copy()
+    grid.insert(0, "Starting", starting)
+    grid["Paid Off"] = paid_off
+    grid["New Securities"] = new_secs
+    grid["Ending"] = ending
+    # Bottom totals (column-wise)
+    totals = grid.sum(axis=0, numeric_only=True)
+    grid.loc["Total"] = totals
+    return grid
+
+def _build_percent_ext(counts, paid_off, starting, ending):
+    # Row-normalized on Starting (transitions + paid off)
+    denom = counts.sum(axis=1).add(paid_off, fill_value=0)
+    pct = counts.div(denom.replace(0, np.nan), axis=0) * 100.0
+    pct = pct.reindex(index=RATING_ORDER, columns=RATING_ORDER, fill_value=0).fillna(0.0).round(2)
+    pct_ext = pct.copy()
+    pct_ext.insert(0, "Starting", starting)                          # keep counts for reference
+    pct_ext["Paid Off"] = (paid_off / denom.replace(0, 1) * 100.0).round(2)
+    pct_ext["New Securities"] = ""                                   # not a T1 transition
+    pct_ext["Ending"] = ending                                       # counts for reference
+    return pct_ext
+
+def _save_raw_workbook(counts_ext, pct_ext, out_path):
+    with pd.ExcelWriter(out_path, engine="xlsxwriter") as xw:
+        counts_ext.to_excel(xw, sheet_name="counts", merge_cells=False)
+        pct_ext.to_excel(xw, sheet_name="percent", merge_cells=False)
+        # Bold diagonal in percent sheet (transition area only)
+        wb = xw.book
+        ws = xw.sheets["percent"]
+        n = len(RATING_ORDER)
+        # transition area starts at col index 1 (col 0 = Starting)
+        bold = wb.add_format({"bold": True})
+        for i in range(n):
+            ws.write(i+1+1, i+1+1, pct_ext.iloc[i, i+1], bold)  # +2 accounts for header row/col
+
+def _shade_transition_grid(ws, wb, start_row, start_col, n):
+    fmt_grey  = wb.add_format({"bg_color": CLR_GREY})
+    fmt_red   = wb.add_format({"bg_color": CLR_RED})
+    fmt_green = wb.add_format({"bg_color": CLR_GREEN})
+    for i in range(n):
+        for j in range(n):
+            r = start_row + i
+            c = start_col + j
+            if j == i:
+                fmt = fmt_grey
+            elif j > i:             # to the right -> worse rating number (downgrade)
+                fmt = fmt_red
+            else:                   # to the left  -> better rating number (upgrade)
+                fmt = fmt_green
+            ws.conditional_format(r, c, r, c, {"type": "no_blanks", "format": fmt})
+            ws.conditional_format(r, c, r, c, {"type": "blanks",   "format": fmt})
+
+def _save_styled_workbook(counts_ext, pct_ext, out_path):
+    with pd.ExcelWriter(out_path, engine="xlsxwriter") as xw:
+        counts_ext.to_excel(xw, sheet_name="counts", merge_cells=False)
+        pct_ext.to_excel(xw, sheet_name="percent", merge_cells=False)
+
+        wb = xw.book
+        ws_c = xw.sheets["counts"]
+        ws_p = xw.sheets["percent"]
+
+        n = len(RATING_ORDER)
+        # In both sheets: pandas writes index in col A, "Starting" in col B -> transition grid starts at col C (idx 2)
+        trans_start_row = 1 + 1   # header row (1) + start at first data row (+1)
+        trans_start_col = 2
+
+        _shade_transition_grid(ws_c, wb, trans_start_row, trans_start_col, n)
+        _shade_transition_grid(ws_p, wb, trans_start_row, trans_start_col, n)
+
+        # Column widths for readability
+        for ws in (ws_c, ws_p):
+            ws.set_column(0, 0, 9)                  # index
+            ws.set_column(1, 1, 10)                 # Starting
+            ws.set_column(2, 2 + n - 1, 6.5)        # transition grid
+            ws.set_column(2 + n, 2 + n + 2, 14)     # Paid Off, New Securities, Ending
+
+# ========= MAIN =========
+def run(file_t1: str, file_t2: str, out_prefix: str = None):
+    t1 = _read_ratings(file_t1, SHEET_T1, COL_DATE, COL_SEC, COL_RATE)
+    t2 = _read_ratings(file_t2, SHEET_T2, COL_DATE, COL_SEC, COL_RATE)
+
+    counts = _counts_matrix(t1, t2)
+    paid_off = _paid_off(t1, t2)        # present in T1, missing in T2
+    new_secs = _new_secs(t1, t2)        # present in T2, missing in T1
+    starting = _starting(t1)
+    ending   = _ending(t2)
+
+    counts_ext = _build_counts_ext(counts, starting, paid_off, new_secs, ending)
+    pct_ext    = _build_percent_ext(counts, paid_off, starting, ending)
+
+    base = out_prefix or (Path(file_t1).stem + "_to_" + Path(file_t2).stem)
+
+    # CSV
+    counts_ext.to_csv(f"{base}_counts.csv")
+
+    # Raw workbook (no colors, diagonal bold in percent)
+    _save_raw_workbook(counts_ext, pct_ext, f"{base}.xlsx")
+
+    # Styled workbook (colored transition grid)
+    _save_styled_workbook(counts_ext, pct_ext, f"{base}_styled.xlsx")
+
+    print("Saved:")
+    print(f" - {base}_counts.csv")
+    print(f" - {base}.xlsx")
+    print(f" - {base}_styled.xlsx")
+    print("\nDefinitions:")
+    print(" - NEW SECURITIES: in T2, not in T1")
+    print(" - Paid Off: in T1, not in T2")
+
+if __name__ == "__main__":
+    run(FILE_T1, FILE_T2)
