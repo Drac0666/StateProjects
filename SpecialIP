@@ -1,13 +1,13 @@
-from playwright.sync_api import sync_playwright
+import asyncio
+from playwright.async_api import async_playwright
 
-def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)  # headless=False, żeby zobaczyć okno przeglądarki
-        page = browser.new_page()
-        page.goto("https://example.com")
-        print("Strona otwarta. Naciśnij ENTER, aby zamknąć.")
-        input()
-        browser.close()
+async def open_page():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        page = await browser.new_page()
+        await page.goto("https://example.com")
+        print("Strona otwarta.")
+        # czekaj aż zamkniesz okno przeglądarki
+        await browser.contexts[0].close()  
 
-if __name__ == "__main__":
-    main()
+asyncio.run(open_page())
