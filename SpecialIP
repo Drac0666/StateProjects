@@ -1,23 +1,69 @@
 import pandas as pd
-from zoneinfo import ZoneInfo  # wbudowane w Pythonie 3.9+
+from datetime import datetime
+from zoneinfo import ZoneInfo  # Python 3.9+
 
-# Przykład: zakładamy, że df już istnieje i ma kolumny "Order Date" i "Order Time"
+def add_cet_and_lookfor(df, date_col="Order Date", time_col="Order Time"):
+    # 1. Połącz data + czas w jedno datetime (na razie bez strefy)
+    df["OrderDateTime"] = pd.to_datetime(
+        df[date_col].astype(str) + " " + df[time_col].astype(str),
+        errors="coerce"
+    )
+
+    # 2. Ustaw strefę czasową America/New_York (EST/EDT)
+    ny_tz = ZoneInfo("America/New_York")
+    cet_tz = ZoneInfo("Europe/Berlin")  # CET/CEST – taki sam jak PL
+
+    df["OrderDateTime_EST"] = df["OrderDateTime"].dt.tz_localize(ny_tz)
+
+    # 3. Konwersja na CET/CEST
+    df["OrderDateTime_CET"] = df["OrderDateTime_EST"].dt.tz_convert(cet_tz)
+
+    # 4. Definicja snapshotów (lokalne godziny + strefy)
+    snapshots = [
+        ("London 12:00",   "Europe/London",   12,  0),
+        ("London 15:00",   "Europe/London",   15,  0),
+        ("London 16:15",   "Europe/London",   16, 15),
+        ("New York 15:00", "America/New_York", 15, 0),
+        ("New York 16:00", "America/New_York", 16, 0),
+        ("Shanghai 17:00", "Asia/Shanghai",   17,  0),
+        ("Tokyo 15:00",    "Asia/Tokyo",      15,  0),
+        ("Tokyo 16:00",    "Asia/Tokyo",      16,  0),
+        ("Tokyo 17:00",    "Asia/Tokyo",      17,  0),
+    ]
+
+    def nearest_snapshot(dt_cet):
+        """Zwraca label snapshotu, którego czas (przeliczony na CET) jest najbliżej dt_cet."""
+        if pd.isna(dt_cet):
+            return pd.NA
+
+        best_label = None
+        best_diff = None
+
+        for label, tz_name, h, m in snapshots:
+            # Snapshot w lokalnej strefie danego miasta, tego samego dnia co dt_cet
+            local_dt = datetime(
+                dt_cet.year, dt_cet.month, dt_cet.day,
+                h, m, tzinfo=ZoneInfo(tz_name)
+            )
+            # Przeliczenie snapshotu na CET
+            local_dt_cet = local_dt.astimezone(cet_tz)
+
+            # Różnica w sekundach względem dt_cet
+            diff = abs((dt_cet - local_dt_cet).total_seconds())
+
+            if (best_diff is None) or (diff < best_diff):
+                best_diff = diff
+                best_label = label
+
+        return best_label
+
+    # 5. Oblicz najbliższy snapshot dla każdego zamówienia
+    df["LookFor"] = df["OrderDateTime_CET"].apply(nearest_snapshot)
+
+    return df
+
+
+# Przykład użycia:
 # df = pd.read_csv("twoj_plik.csv")
-
-# 1. Połącz datę i czas w jedno pole datetime (na razie "naive" – bez strefy czasowej)
-df["OrderDateTime"] = pd.to_datetime(
-    df["Order Date"].astype(str) + " " + df["Order Time"].astype(str),
-    errors="coerce"
-)
-
-# 2. Ustaw strefę czasową America/New_York (EST/EDT) – Python sam ogarnia DST w USA
-df["OrderDateTime_EST"] = df["OrderDateTime"].dt.tz_localize(ZoneInfo("America/New_York"))
-
-# 3. Konwersja do CET/CEST – Europa (Berlin ma taki sam czas jak Polska, łącznie z DST)
-df["OrderDateTime_CET"] = df["OrderDateTime_EST"].dt.tz_convert(ZoneInfo("Europe/Berlin"))
-
-# 4. Kolumna CET tylko jako godzina (HH:MM:SS) – jeśli tak chcesz
-df["CET"] = df["OrderDateTime_CET"].dt.strftime("%H:%M:%S")
-
-# Jeśli wolisz pełny datetime w CET zamiast samej godziny, możesz korzystać z:
-# df["OrderDateTime_CET"]
+# df = add_cet_and_lookfor(df)
+# print(df[["Order Date", "Order Time", "OrderDateTime_CET", "LookFor"]].head())
