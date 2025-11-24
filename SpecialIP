@@ -1,29 +1,7 @@
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
-def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
-        page = context.new_page()
-
-        # 1. Otwórz stronę logowania
-        page.goto("https://twoja-strona-z-logowaniem.com/login")
-
-        print("Zaloguj się ręcznie w oknie przeglądarki.")
-        input("Kiedy skończysz logowanie, wciśnij ENTER w terminalu... ")
-
-        # 2. Tutaj skrypt zakłada, że jesteś już zalogowany
-        # i wykonuje kolejne zadania
-        page.goto("https://twoja-strona-z-logowaniem.com/dashboard")
-        print("Jestem na stronie po zalogowaniu:", page.url)
-
-        # przykład: kliknięcie, pobranie tekstu itp.
-        # page.click("text=Jakis przycisk")
-        # text = page.text_content("css=selector")
-        # print(text)
-
-        input("ENTER żeby zamknąć przeglądarkę...")
-        browser.close()
-
-if __name__ == "__main__":
-    main()
+async with async_playwright() as p:
+    browser = await p.chromium.launch(headless=False)
+    page = await browser.new_page()
+    await page.goto("https://example.com")
+    print(await page.title())
