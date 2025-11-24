@@ -1,32 +1,29 @@
-%load_ext autoreload
-%autoreload 2
-mport asyncio
-from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
 
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        page = context.new_page()
 
+        # 1. Otwórz stronę logowania
+        page.goto("https://twoja-strona-z-logowaniem.com/login")
 
-async def test_in_gr_website():
-    async with async_playwright() as pp:
-        # Launch the browser
-        browser = await pp.chromium.launch(headless=False)
-        page = await browser.new_page()
+        print("Zaloguj się ręcznie w oknie przeglądarki.")
+        input("Kiedy skończysz logowanie, wciśnij ENTER w terminalu... ")
 
-        # Navigate to the website
-        await page.goto("https://www.in.gr/")
+        # 2. Tutaj skrypt zakłada, że jesteś już zalogowany
+        # i wykonuje kolejne zadania
+        page.goto("https://twoja-strona-z-logowaniem.com/dashboard")
+        print("Jestem na stronie po zalogowaniu:", page.url)
 
-        # Get the content of the body tag
-        body_content = await page.inner_text("body")
+        # przykład: kliknięcie, pobranie tekstu itp.
+        # page.click("text=Jakis przycisk")
+        # text = page.text_content("css=selector")
+        # print(text)
 
-        # Assert that the body is not empty
-        assert body_content, "The body of the webpage is empty."
+        input("ENTER żeby zamknąć przeglądarkę...")
+        browser.close()
 
-        # Close the browser
-        await browser.close()
-
-
-
-playwright = await async_playwright().start()
-browser = await playwright.chromium.launch(headless=False)
-page = await browser.new_page()
-await page.goto("https://www.in.gr/")
-
+if __name__ == "__main__":
+    main()
