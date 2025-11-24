@@ -1,7 +1,13 @@
-# zakładam że Order Date jest już w formacie datetime
-# jeśli nie — dodaj konwersję:
-# df["Order Date"] = pd.to_datetime(df["Order Date"])
+from playwright.sync_api import sync_playwright
 
-# Tworzymy nową kolumnę w formacie DD/MM/YYYY - DD/MM/YYYY
-df["DateRange"] = df["Order Date"].dt.strftime("%d/%m/%Y")
-df["DateRange"] = df["DateRange"] + " - " + df["DateRange"]
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # headless=False, żeby zobaczyć okno przeglądarki
+        page = browser.new_page()
+        page.goto("https://example.com")
+        print("Strona otwarta. Naciśnij ENTER, aby zamknąć.")
+        input()
+        browser.close()
+
+if __name__ == "__main__":
+    main()
