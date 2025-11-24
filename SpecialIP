@@ -1,6 +1,23 @@
-# Set A column (index column) width = 20
-        ws.set_column(start_col, start_col, 20, body_format)
+import pandas as pd
+from zoneinfo import ZoneInfo  # wbudowane w Pythonie 3.9+
 
-        # Set remaining columns width = 12
-        if len(headers) > 1:
-            ws.set_column(start_col + 1, start_col + len(headers) - 1, 12, body_format)
+# Przykład: zakładamy, że df już istnieje i ma kolumny "Order Date" i "Order Time"
+# df = pd.read_csv("twoj_plik.csv")
+
+# 1. Połącz datę i czas w jedno pole datetime (na razie "naive" – bez strefy czasowej)
+df["OrderDateTime"] = pd.to_datetime(
+    df["Order Date"].astype(str) + " " + df["Order Time"].astype(str),
+    errors="coerce"
+)
+
+# 2. Ustaw strefę czasową America/New_York (EST/EDT) – Python sam ogarnia DST w USA
+df["OrderDateTime_EST"] = df["OrderDateTime"].dt.tz_localize(ZoneInfo("America/New_York"))
+
+# 3. Konwersja do CET/CEST – Europa (Berlin ma taki sam czas jak Polska, łącznie z DST)
+df["OrderDateTime_CET"] = df["OrderDateTime_EST"].dt.tz_convert(ZoneInfo("Europe/Berlin"))
+
+# 4. Kolumna CET tylko jako godzina (HH:MM:SS) – jeśli tak chcesz
+df["CET"] = df["OrderDateTime_CET"].dt.strftime("%H:%M:%S")
+
+# Jeśli wolisz pełny datetime w CET zamiast samej godziny, możesz korzystać z:
+# df["OrderDateTime_CET"]
