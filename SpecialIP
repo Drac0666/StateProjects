@@ -1,14 +1,461 @@
-snapshots = [
-    ("London 12PM",    "Europe/London",      12,  0),
-    ("London 3PM",     "Europe/London",      15,  0),
-    ("London 4:15PM",  "Europe/London",      16, 15),
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
+import re
+from pathlib import Path
+from typing import List, Dict, Tuple, Optional, Any
 
-    ("New York 3PM",   "America/New_York",   15,  0),
-    ("New York 4PM",   "America/New_York",   16,  0),
+FILE_T0 = r"C:\path\to\ratings_05-30.xlsx"
+FILE_T1 = r"C:\path\to\ratings_08-29.xlsx"
+SHEET_NAME = "Holdings"
+ID_COL = "Identifier"
+RATING_COL = "Lowest Rating"
+RATING_ORDER: List[str] = ["AAA", "AA", "A", "BBB", "BB", "B", "CCC", "CC", "C"]
+CLR_GREY = "#D9D9D9"
+CLR_RED = "#F8CBAD"
+CLR_GREEN = "#C6EFCE"
 
-    ("Shanghai 5PM",   "Asia/Shanghai",      17,  0),
+def to_str_or_none(x: Any) -> Optional[str]:
+    if x is None:
+        return None
+    s = str(x)
+    if s.strip() == "":
+        return None
+    return s
 
-    ("Tokyo 3PM",      "Asia/Tokyo",         15,  0),
-    ("Tokyo 4PM",      "Asia/Tokyo",         16,  0),
-    ("Tokyo 5PM",      "Asia/Tokyo",         17,  0),
-]
+def sanitize_rating_text(s: Optional[str]) -> Optional[str]:
+    if s is None:
+        return None
+    y = s.upper()
+    y = y.replace(" ", "")
+    y = y.replace("+", "")
+    y = y.replace("-", "")
+    return y
+
+def is_not_rated_token(s: Optional[str]) -> bool:
+    if s is None:
+        return True
+    tokens = {"NR", "N/R", "NOTRATED", "NA"}
+    return s in tokens
+
+def direct_bucket_if_any(s: Optional[str], buckets: List[str]) -> Optional[str]:
+    if s is None:
+        return None
+    if s in buckets:
+        return s
+    return None
+
+def try_map_moodys(s: Optional[str]) -> Optional[str]:
+    if s is None:
+        return None
+    patterns = [
+        (r"AAA", "AAA"),
+        (r"AA[123]?", "AA"),
+        (r"A[123]?", "A"),
+        (r"BAA[123]?", "BBB"),
+        (r"BA[123]?", "BB"),
+        (r"B[123]?", "B"),
+        (r"CAA[123]?", "CCC"),
+        (r"CA", "CC"),
+        (r"CCC", "CCC"),
+        (r"CC", "CC"),
+        (r"C", "C"),
+    ]
+    for pat, out in patterns:
+        if re.fullmatch(pat, s):
+            return out
+    return None
+
+def try_map_default(s: Optional[str], allow_d: bool) -> Optional[str]:
+    if s is None:
+        return None
+    if allow_d and re.fullmatch(r"(D|DEF(AULT)?)", s):
+        return "D"
+    return None
+
+def make_order_map(buckets: List[str]) -> Dict[str, int]:
+    m = {}
+    for i, r in enumerate(buckets):
+        m[r] = i
+    return m
+
+def normalize_one_rating(x: Any, buckets: List[str]) -> Optional[str]:
+    t = to_str_or_none(x)
+    t = sanitize_rating_text(t) if t is not None else None
+    if t is None:
+        return None
+    if is_not_rated_token(t):
+        return None
+    d = direct_bucket_if_any(t, buckets)
+    if d is not None:
+        return d
+    mm = try_map_moodys(t)
+    if mm is not None and mm in buckets:
+        return mm
+    dd = try_map_default(t, "D" in buckets)
+    if dd is not None:
+        return dd
+    return None
+
+def ensure_required_columns(df: pd.DataFrame, id_col: str, rating_col: str) -> pd.DataFrame:
+    cols = list(df.columns)
+    if id_col not in cols or rating_col not in cols:
+        raise ValueError("Input does not contain required columns")
+    return df
+
+def read_input_excel(path: str, sheet_name: str, id_col: str, rating_col: str) -> pd.DataFrame:
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(str(p))
+    df = pd.read_excel(str(p), sheet_name=sheet_name, dtype=str)
+    df = ensure_required_columns(df, id_col, rating_col)
+    df[id_col] = df[id_col].astype(str)
+    df[rating_col] = df[rating_col].astype(str)
+    return df[[id_col, rating_col]].copy()
+
+def add_bucket_column(df: pd.DataFrame, rating_col: str, buckets: List[str]) -> pd.DataFrame:
+    z = []
+    vals = list(df[rating_col].values)
+    for v in vals:
+        z.append(normalize_one_rating(v, buckets))
+    out = df.copy()
+    out["bucket"] = z
+    out = out.dropna(subset=["bucket"])
+    return out[[ID_COL, "bucket"]]
+
+def keep_worst_per_identifier(df: pd.DataFrame, id_col: str, buckets: List[str]) -> pd.DataFrame:
+    order_map = make_order_map(buckets)
+    x = df.copy()
+    x["__order__"] = x["bucket"].map(lambda r: order_map.get(r, -1))
+    x = x.sort_values(by=["__order__"])
+    seen = set()
+    rows = []
+    for _, r in x.iterrows():
+        k = r[id_col]
+        if k in seen:
+            continue
+        seen.add(k)
+        rows.append((r[id_col], r["bucket"]))
+    y = pd.DataFrame(rows, columns=[id_col, "bucket"])
+    return y
+
+def load_clean_holdings(path: str, sheet_name: str, id_col: str, rating_col: str, buckets: List[str]) -> pd.DataFrame:
+    raw = read_input_excel(path, sheet_name, id_col, rating_col)
+    clean = add_bucket_column(raw, rating_col, buckets)
+    cleaned = keep_worst_per_identifier(clean, id_col, buckets)
+    return cleaned
+
+def cross_counts(t0: pd.DataFrame, t1: pd.DataFrame, id_col: str, buckets: List[str]) -> pd.DataFrame:
+    a = t0.rename(columns={"bucket": "bucket_t0"})
+    b = t1.rename(columns={"bucket": "bucket_t1"})
+    m = a.merge(b, on=id_col, how="inner")
+    pairs = []
+    for _, r in m.iterrows():
+        pairs.append((r["bucket_t0"], r["bucket_t1"]))
+    base = pd.DataFrame(pairs, columns=["bucket_t0", "bucket_t1"])
+    ct = pd.crosstab(base["bucket_t0"], base["bucket_t1"])
+    ct = ct.reindex(index=buckets, columns=buckets, fill_value=0)
+    return ct
+
+def compute_paid_off(t0: pd.DataFrame, t1: pd.DataFrame, id_col: str, buckets: List[str]) -> pd.Series:
+    ids1 = set(t1[id_col].tolist())
+    z = t0[~t0[id_col].isin(ids1)]
+    g = z.groupby("bucket")[id_col].nunique()
+    g = g.reindex(buckets).fillna(0).astype(int)
+    return g
+
+def compute_newcomers(t0: pd.DataFrame, t1: pd.DataFrame, id_col: str, buckets: List[str]) -> pd.Series:
+    ids0 = set(t0[id_col].tolist())
+    z = t1[~t1[id_col].isin(ids0)]
+    g = z.groupby("bucket")[id_col].nunique()
+    g = g.reindex(buckets).fillna(0).astype(int)
+    return g
+
+def compute_ending(df: pd.DataFrame, id_col: str, buckets: List[str]) -> pd.Series:
+    g = df.groupby("bucket")[id_col].nunique()
+    g = g.reindex(buckets).fillna(0).astype(int)
+    return g
+
+def compute_starting(df: pd.DataFrame, id_col: str, buckets: List[str]) -> pd.Series:
+    g = df.groupby("bucket")[id_col].nunique()
+    g = g.reindex(buckets).fillna(0).astype(int)
+    return g
+
+def build_extended_counts(counts: pd.DataFrame, starting: pd.Series, paid_off: pd.Series, newcomers: pd.Series, ending: pd.Series, buckets: List[str]) -> pd.DataFrame:
+    core = counts.reindex(index=buckets, columns=buckets, fill_value=0)
+    z = core.copy()
+    z.insert(0, "Starting", starting)
+    z["Paid Off"] = paid_off
+    z["New Securities"] = newcomers
+    z["Ending"] = ending
+    totals = z.sum(axis=0, numeric_only=True)
+    z.loc["Total"] = totals
+    return z
+
+def build_percent_table(counts: pd.DataFrame, paid_off: pd.Series, starting: pd.Series, ending: pd.Series, buckets: List[str]) -> pd.DataFrame:
+    trans = counts.reindex(index=buckets, columns=buckets, fill_value=0)
+    denom = trans.sum(axis=1).add(paid_off, fill_value=0)
+    pct = trans.div(denom.replace(0, np.nan), axis=0) * 100.0
+    pct = pct.fillna(0.0).round(2)
+    out = pct.copy()
+    out.insert(0, "Starting", starting)
+    out["Paid Off"] = (paid_off / denom.replace(0, 1) * 100.0).round(2)
+    out["New Securities"] = ""
+    out["Ending"] = ending
+    return out
+
+def save_dataframe_csv(df: pd.DataFrame, path: str) -> None:
+    p = Path(path)
+    df.to_csv(str(p), index=True)
+
+def save_raw_workbook(counts_ext: pd.DataFrame, pct_ext: pd.DataFrame, path: str, rating_order: List[str]) -> None:
+    p = Path(path)
+    with pd.ExcelWriter(str(p), engine="xlsxwriter") as xw:
+        counts_ext.to_excel(xw, sheet_name="counts", merge_cells=False)
+        pct_ext.to_excel(xw, sheet_name="percent", merge_cells=False)
+        wb = xw.book
+        ws = xw.sheets["percent"]
+        n = len(rating_order)
+        for i in range(n):
+            ws.write(i + 1, i + 2, pct_ext.iloc[i, i + 1], wb.add_format({"bold": True}))
+
+def shade_grid(ws, start_row: int, start_col: int, n: int, wb):
+    fmt_grey = wb.add_format({"bg_color": CLR_GREY})
+    fmt_red = wb.add_format({"bg_color": CLR_RED})
+    fmt_green = wb.add_format({"bg_color": CLR_GREEN})
+    for i in range(n):
+        for j in range(n):
+            r = start_row + i
+            c = start_col + j
+            if j == i:
+                ws.conditional_format(r, c, r, c, {"type": "no_blanks", "format": fmt_grey})
+                ws.conditional_format(r, c, r, c, {"type": "blanks", "format": fmt_grey})
+            elif j > i:
+                ws.conditional_format(r, c, r, c, {"type": "no_blanks", "format": fmt_red})
+                ws.conditional_format(r, c, r, c, {"type": "blanks", "format": fmt_red})
+            else:
+                ws.conditional_format(r, c, r, c, {"type": "no_blanks", "format": fmt_green})
+                ws.conditional_format(r, c, r, c, {"type": "blanks", "format": fmt_green})
+
+def save_styled_workbook(counts_ext: pd.DataFrame, pct_ext: pd.DataFrame, path: str, rating_order: List[str]) -> None:
+    p = Path(path)
+    with pd.ExcelWriter(str(p), engine="xlsxwriter") as xw:
+        counts_ext.to_excel(xw, sheet_name="counts", merge_cells=False)
+        pct_ext.to_excel(xw, sheet_name="percent", merge_cells=False)
+        wb = xw.book
+        ws_counts = xw.sheets["counts"]
+        ws_pct = xw.sheets["percent"]
+        n = len(rating_order)
+        start_row = 1
+        start_col = 2
+        shade_grid(ws_counts, start_row, start_col, n, wb)
+        shade_grid(ws_pct, start_row, start_col, n, wb)
+        ws_counts.set_column(0, 0, 10)
+        ws_counts.set_column(1, 1, 11)
+        ws_counts.set_column(2, 2 + n - 1, 10)
+        ws_counts.set_column(2 + n, 2 + n + 2, 15)
+        ws_pct.set_column(0, 0, 10)
+        ws_pct.set_column(1, 1, 11)
+        ws_pct.set_column(2, 2 + n - 1, 10)
+        ws_pct.set_column(2 + n, 2 + n + 2, 15)
+
+def ensure_numpy_array(df: pd.DataFrame) -> np.ndarray:
+    return df.values
+
+def build_direction_sign_matrix(index_labels: List[str], column_labels: List[str], order: List[str]) -> np.ndarray:
+    idx_map = {}
+    for i, v in enumerate(order):
+        idx_map[v] = i
+    m = np.zeros((len(index_labels), len(column_labels)), dtype=float)
+    for i, r in enumerate(index_labels):
+        for j, c in enumerate(column_labels):
+            a = idx_map.get(r, 0)
+            b = idx_map.get(c, 0)
+            m[i, j] = np.sign(b - a)
+    return m
+
+def figure_directional_heatmap(pct: pd.DataFrame, title: str, order: List[str]) -> go.Figure:
+    arr = ensure_numpy_array(pct)
+    sign = build_direction_sign_matrix(list(pct.index), list(pct.columns), order)
+    z = sign * arr
+    n = arr.shape[0]
+    txt = []
+    for i in range(n):
+        row = []
+        for j in range(n):
+            row.append(f"{pct.iat[i,j]:.1f}%")
+        txt.append(row)
+    hm = go.Heatmap(
+        z=z,
+        x=list(pct.columns),
+        y=list(pct.index),
+        colorscale="RdYlGn_r",
+        zmid=0,
+        colorbar=dict(title="Direction-weighted %", tickformat=".0f"),
+        hovertemplate="From: %{y}<br>To: %{x}<br>%{text}<extra></extra>",
+        text=txt,
+        showscale=True,
+    )
+    mask = np.eye(n, dtype=bool)
+    diag_z = np.where(mask, 1, np.nan)
+    diag = go.Heatmap(
+        z=diag_z,
+        x=list(pct.columns),
+        y=list(pct.index),
+        colorscale=[[0, "#D9D9D9"], [1, "#D9D9D9"]],
+        showscale=False,
+        hoverinfo="skip",
+        zauto=False,
+        zmin=0,
+        zmax=1,
+        opacity=1.0,
+    )
+    fig = go.Figure(data=[hm, diag])
+    fig.update_layout(
+        title=title,
+        xaxis_title="To bucket",
+        yaxis_title="From bucket",
+        yaxis=dict(autorange="reversed"),
+        margin=dict(l=70, r=20, t=70, b=60),
+        template="plotly_white",
+    )
+    return fig
+
+def figure_counts_heatmap(counts: pd.DataFrame, title: str) -> go.Figure:
+    z = ensure_numpy_array(counts)
+    fig = go.Figure(data=go.Heatmap(
+        z=z,
+        x=list(counts.columns),
+        y=list(counts.index),
+        colorscale="Blues",
+        hovertemplate="From: %{y}<br>To: %{x}<br>Count: %{z}<extra></extra>",
+        showscale=True,
+    ))
+    for i, r in enumerate(counts.index):
+        for j, c in enumerate(counts.columns):
+            fig.add_annotation(x=c, y=r, text=str(int(counts.iat[i, j])), showarrow=False, font=dict(size=11))
+    fig.update_layout(
+        title=title,
+        xaxis_title="To bucket",
+        yaxis_title="From bucket",
+        yaxis=dict(autorange="reversed"),
+        margin=dict(l=70, r=20, t=70, b=60),
+        template="plotly_white",
+    )
+    return fig
+
+def figure_sankey(counts: pd.DataFrame, title: str) -> go.Figure:
+    buckets = list(counts.index)
+    n = len(buckets)
+    labels = [f"{b} (From)" for b in buckets] + [f"{b} (To)" for b in buckets]
+    src = []
+    tgt = []
+    val = []
+    col = []
+    lab = []
+    for i, fr in enumerate(buckets):
+        for j, to in enumerate(buckets):
+            v = int(counts.iat[i, j])
+            if v == 0:
+                continue
+            src.append(i)
+            tgt.append(n + j)
+            val.append(v)
+            if j == i:
+                c = "rgba(150,150,150,0.7)"
+            elif j > i:
+                c = "rgba(203,65,84,0.7)"
+            else:
+                c = "rgba(0,150,100,0.7)"
+            col.append(c)
+            lab.append(f"{fr} → {to}: {v}")
+    node_colors = ["#CCCCCC"] * n + ["#EAEAEA"] * n
+    fig = go.Figure(data=[go.Sankey(
+        arrangement="snap",
+        node=dict(pad=15, thickness=18, label=labels, color=node_colors),
+        link=dict(source=src, target=tgt, value=val, color=col, label=lab, hovertemplate="%{label}<extra></extra>")
+    )])
+    fig.update_layout(
+        title=title,
+        font=dict(size=12),
+        margin=dict(l=20, r=20, t=60, b=20),
+        template="plotly_white",
+    )
+    return fig
+
+def write_figure_files(fig: go.Figure, base: Path, suffix: str) -> Tuple[Path, Optional[Path]]:
+    html_path = base.with_name(base.name + f"_{suffix}.html")
+    pio.write_html(fig, file=str(html_path), include_plotlyjs="cdn", full_html=True)
+    png_path = None
+    try:
+        png_path = base.with_name(base.name + f"_{suffix}.png")
+        pio.write_image(fig, str(png_path), scale=2, width=1200, height=800)
+    except Exception:
+        png_path = None
+    return html_path, png_path
+
+def save_dashboard_index(base: Path, parts: List[str]) -> Path:
+    index_html = base.with_name(base.name + "_dashboard.html")
+    links = []
+    for p in parts:
+        links.append(f'<li><a href="{p}">{p}</a></li>')
+    html_links = "\n".join(links)
+    content = f"""<!doctype html>
+<html><head><meta charset="utf-8"><title>{base.name} Dashboard</title></head>
+<body style="font-family:Arial,Helvetica,sans-serif">
+<h2>{base.name} — Rating Migration Dashboard</h2>
+<ol>
+{html_links}
+</ol>
+<p>Use the camera icon inside each chart to export PNG if no static images were created.</p>
+</body></html>"""
+    with open(index_html, "w", encoding="utf-8") as f:
+        f.write(content)
+    return index_html
+
+def build_outputs_for_visuals(counts: pd.DataFrame, paid_off: pd.Series, starting: pd.Series, order: List[str], out_prefix: str) -> List[str]:
+    denom = counts.sum(axis=1).replace(0, np.nan)
+    pct = (counts.div(denom, axis=0) * 100.0).fillna(0.0).round(2)
+    pct = pct.reindex(index=order, columns=order, fill_value=0)
+    base = Path(out_prefix).with_suffix("")
+    fig1 = figure_directional_heatmap(pct, "Rating Migration (Row-normalized %) — Upgrades/Weakenings Highlighted", order)
+    h1, _ = write_figure_files(fig1, base, "heatmap_percent_directional")
+    fig2 = figure_counts_heatmap(counts.reindex(index=order, columns=order, fill_value=0), "Rating Migration Counts (From → To)")
+    h2, _ = write_figure_files(fig2, base, "heatmap_counts")
+    fig3 = figure_sankey(counts.reindex(index=order, columns=order, fill_value=0), "Flows From → To (Counts)")
+    h3, _ = write_figure_files(fig3, base, "sankey_flows")
+    names = [h1.name, h2.name, h3.name]
+    return names
+
+def run_pipeline(file_t0: str, file_t1: str, sheet_name: str, id_col: str, rating_col: str, order: List[str], output_prefix: Optional[str] = None) -> None:
+    t0 = load_clean_holdings(file_t0, sheet_name, id_col, rating_col, order)
+    t1 = load_clean_holdings(file_t1, sheet_name, id_col, rating_col, order)
+    counts = cross_counts(t0, t1, id_col, order)
+    paid_off = compute_paid_off(t0, t1, id_col, order)
+    newcomers = compute_newcomers(t0, t1, id_col, order)
+    starting = compute_starting(t0, id_col, order)
+    ending = compute_ending(t1, id_col, order)
+    if output_prefix is None:
+        base_name = Path(file_t0).stem + "_to_" + Path(file_t1).stem
+    else:
+        base_name = output_prefix
+    counts_ext = build_extended_counts(counts, starting, paid_off, newcomers, ending, order)
+    pct_ext = build_percent_table(counts, paid_off, starting, ending, order)
+    save_dataframe_csv(counts_ext, base_name + "_counts.csv")
+    with pd.ExcelWriter(base_name + ".xlsx", engine="xlsxwriter") as xw:
+        counts_ext.to_excel(xw, sheet_name="counts", merge_cells=False)
+        pct_ext.to_excel(xw, sheet_name="percent", merge_cells=False)
+    save_styled_workbook(counts_ext, pct_ext, base_name + "_styled.xlsx", order)
+    parts = build_outputs_for_visuals(counts, paid_off, starting, order, base_name)
+    index_path = save_dashboard_index(Path(base_name).with_suffix(""), parts)
+    print("Saved:")
+    print(" - " + base_name + "_counts.csv")
+    print(" - " + base_name + ".xlsx")
+    print(" - " + base_name + "_styled.xlsx")
+    for p in parts:
+        print(" - " + p)
+    print(" - " + index_path.name)
+
+if __name__ == "__main__":
+    run_pipeline(FILE_T0, FILE_T1, SHEET_NAME, ID_COL, RATING_COL, RATING_ORDER, None)
