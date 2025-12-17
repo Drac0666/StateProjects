@@ -1,60 +1,48 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-# --------------------------------------------------
-# Example function (replace with your real function)
-# Must return a pandas Series with 3 values
-# --------------------------------------------------
-def my_func(W, A):
+# --- your function: must return 3 values as a Series (=> 3 columns) ---
+def f(row, W, A):
+    # replace this with your real logic
     return pd.Series({
-        "col1": W + A,
-        "col2": W * A,
-        "col3": W - A
+        "out1": row["x"] * W + A,
+        "out2": row["y"] * A + W,
+        "out3": row["x"] - row["y"] + (W - A),
     })
 
-# --------------------------------------------------
-# Base values
-# --------------------------------------------------
+# --- example input df (remove if you already have df) ---
+# df = pd.DataFrame({"x":[1,2,3], "y":[10,20,30]})
+
 W0 = 1.00
 A0 = 1.00
-
 stress_steps = np.array([0.01, 0.02, 0.03, 0.04, 0.05])
 
-# --------------------------------------------------
-# Stress scenarios
-# --------------------------------------------------
-results = []
+def run_apply_stress(df, func, W0, A0, steps):
+    results = []
 
-# A down only
-for s in stress_steps:
-    r = my_func(W=W0, A=A0 - s).to_frame().T
-    r["StressType"] = "A_down"
-    r["Stress"] = s
-    r["W"] = W0
-    r["A"] = A0 - s
-    results.append(r)
+    scenarios = [
+        ("A_down",         lambda s: (W0,      A0 - s)),
+        ("W_up",           lambda s: (W0 + s,  A0)),
+        ("A_down_W_up",    lambda s: (W0 + s,  A0 - s)),
+    ]
 
-# W up only
-for s in stress_steps:
-    r = my_func(W=W0 + s, A=A0).to_frame().T
-    r["StressType"] = "W_up"
-    r["Stress"] = s
-    r["W"] = W0 + s
-    r["A"] = A0
-    results.append(r)
+    for stress_type, param_fn in scenarios:
+        for s in steps:
+            W, A = param_fn(s)
 
-# Combined: A down & W up
-for s in stress_steps:
-    r = my_func(W=W0 + s, A=A0 - s).to_frame().T
-    r["StressType"] = "A_down_W_up"
-    r["Stress"] = s
-    r["W"] = W0 + s
-    r["A"] = A0 - s
-    results.append(r)
+            out = df.apply(func, axis=1, W=W, A=A)  # expects Series per row (3 outputs)
+            out = out.rename(columns=lambda c: f"{c}") if isinstance(out, pd.DataFrame) else out.to_frame()
 
-# --------------------------------------------------
-# Final dataframe
-# --------------------------------------------------
-final_df = pd.concat(results, ignore_index=True)
+            out = out.reset_index(drop=True)
+            out.insert(0, "StressType", stress_type)
+            out.insert(1, "Stress", float(s))
+            out.insert(2, "W", float(W))
+            out.insert(3, "A", float(A))
 
-print(final_df)
+            results.append(out)
+
+    return pd.concat(results, ignore_index=True)
+
+# usage:
+# final_df = run_apply_stress(df, f, W0, A0, stress_steps)
+# print(final_df.head())
