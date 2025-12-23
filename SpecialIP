@@ -1,34 +1,47 @@
+# ================================
+# Collateral Loss Comparison Config
+# ================================
+
+# Scenario filter
+scenario_name: downside
+
+# Input files
+q1_file: "Q1.csv"
+q2_file: "Q2.csv"
+
+# Output location
+output_folder: "./out"
+
+# Thresholds
+absolute_difference_threshold: 1000000   # default: 1,000,000
+
+# Flags / checks
+coverage_ratio_flag: true   # true = check Q2 < Q1, false = ignore
+
+# Column names (only change if your files differ)
+columns:
+  scenario: "scenario"
+  cusip: "CUSIP"
+  collateral_loss: "collat loss"
+  coverage_ratio: "Coverage Ratio"
+  asset_class: "Asset Class"
+
+# Output format: csv or xlsx
+output_format: "csv"
+
+
+
 #!/usr/bin/env python3
-"""
-Compare Q1 vs Q2 collateral loss for scenario == 'downside' and produce three outputs:
-
-1) All matched CUSIPs with Q1/Q2 Collateral Loss + Difference,
-   plus Coverage Ratio and Asset Class (Q1 & Q2).
-
-2) Only rows where Q2 Collateral Loss is >= 20% greater than Q1:
-      Q2 >= 1.2 * Q1   (with a special-case handling for Q1==0)
-
-3) From file #2 subset, only rows where:
-   - Q2 Coverage Ratio < Q1 Coverage Ratio, AND
-   - ABS(Q2 Collateral Loss - Q1 Collateral Loss) > abs-diff-threshold
-     (default threshold = 1,000,000)
-
-Usage (CSV inputs/outputs):
-  python compare_collat_loss.py --q1 Q1.csv --q2 Q2.csv --outdir ./out
-
-Optional:
-  --abs-diff-threshold 2000000
-  --format xlsx
-"""
-
-import argparse
 import os
+import yaml
+import pandas as pd
 from typing import Optional
 
-import pandas as pd
 
-
-def _read_file(path: str, sheet: Optional[str] = None) -> pd.DataFrame:
+# -----------------------------
+# Helpers
+# -----------------------------
+def read_file(path: str, sheet: Optional[str] = None) -> pd.DataFrame:
     ext = os.path.splitext(path.lower())[1]
     if ext in [".xlsx", ".xls"]:
         return pd.read_excel(path, sheet_name=sheet)
@@ -36,184 +49,130 @@ def _read_file(path: str, sheet: Optional[str] = None) -> pd.DataFrame:
         return pd.read_csv(path)
     if ext == ".parquet":
         return pd.read_parquet(path)
-    raise ValueError(f"Unsupported file type: {ext}. Use .csv, .xlsx/.xls, or .parquet")
+    raise ValueError(f"Unsupported file type: {ext}")
 
 
-def _norm_cols(df: pd.DataFrame) -> pd.DataFrame:
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df.columns = [c.strip() if isinstance(c, str) else c for c in df.columns]
+    df.columns = [c.strip() for c in df.columns]
     return df
 
 
-def _to_numeric_maybe_percent(s: pd.Series) -> pd.Series:
-    """
-    Converts values like:
-      0.123 -> 0.123
-      "0.123" -> 0.123
-      "12.3%" -> 0.123
-      "12,3%" -> 0.123
-      "1,234.56" -> 1234.56 (best effort)
-    """
-    s2 = s.astype(str).str.strip()
-    is_percent = s2.str.endswith("%")
+def to_numeric_maybe_percent(s: pd.Series) -> pd.Series:
+    s = s.astype(str).str.strip()
+    is_pct = s.str.endswith("%")
 
-    s2 = s2.str.replace("\u00A0", "", regex=False)  # NBSP
-    s2 = s2.str.replace(" ", "", regex=False)
+    s = s.str.replace("%", "", regex=False)
+    s = s.str.replace(",", "", regex=False)
 
-    s_no_pct = s2.str.replace("%", "", regex=False)
-
-    # both comma and dot -> comma thousands sep
-    both = s_no_pct.str.contains(",") & s_no_pct.str.contains(r"\.")
-    s_no_pct = s_no_pct.where(~both, s_no_pct.str.replace(",", "", regex=False))
-
-    # only comma -> decimal comma
-    only_comma = s_no_pct.str.contains(",") & ~s_no_pct.str.contains(r"\.")
-    s_no_pct = s_no_pct.where(~only_comma, s_no_pct.str.replace(",", ".", regex=False))
-
-    num = pd.to_numeric(s_no_pct, errors="coerce")
-    num = num.where(~is_percent, num / 100.0)
-    return num
+    num = pd.to_numeric(s, errors="coerce")
+    return num.where(~is_pct, num / 100.0)
 
 
-def _filter_downside(df: pd.DataFrame, scenario_col: str) -> pd.DataFrame:
-    if scenario_col not in df.columns:
-        raise KeyError(f"Scenario column '{scenario_col}' not found. Available: {list(df.columns)}")
-    s = df[scenario_col].astype(str).str.strip().str.lower()
-    return df.loc[s.eq("downside")].copy()
+# -----------------------------
+# Main logic
+# -----------------------------
+def main(config_path: str = "config.yaml"):
+    with open(config_path, "r") as f:
+        cfg = yaml.safe_load(f)
 
+    cols = cfg["columns"]
 
-def _prep_side(
-    df: pd.DataFrame,
-    side: str,
-    cusip_col: str,
-    loss_col: str,
-    cov_col: str,
-    asset_col: str,
-) -> pd.DataFrame:
-    missing = [c for c in [cusip_col, loss_col, cov_col, asset_col] if c not in df.columns]
-    if missing:
-        raise KeyError(f"Q{side}: Missing columns {missing}. Available: {list(df.columns)}")
+    # Read inputs
+    q1 = normalize_columns(read_file(cfg["q1_file"]))
+    q2 = normalize_columns(read_file(cfg["q2_file"]))
 
-    out = df[[cusip_col, loss_col, cov_col, asset_col]].copy()
-    out.rename(
-        columns={
-            cusip_col: "CUSIP",
-            loss_col: f"Q{side}_Collateral_Loss",
-            cov_col: f"Q{side}_Coverage_Ratio",
-            asset_col: f"Q{side}_Asset_Class",
-        },
-        inplace=True,
-    )
-    out["CUSIP"] = out["CUSIP"].astype(str).str.strip()
-    out[f"Q{side}_Collateral_Loss"] = _to_numeric_maybe_percent(out[f"Q{side}_Collateral_Loss"])
-    out[f"Q{side}_Coverage_Ratio"] = _to_numeric_maybe_percent(out[f"Q{side}_Coverage_Ratio"])
-    return out
+    # Filter scenario
+    scenario = cfg["scenario_name"].lower()
+    q1 = q1[q1[cols["scenario"]].str.lower() == scenario]
+    q2 = q2[q2[cols["scenario"]].str.lower() == scenario]
 
+    # Prepare datasets
+    def prep(df: pd.DataFrame, tag: str) -> pd.DataFrame:
+        out = df[
+            [
+                cols["cusip"],
+                cols["collateral_loss"],
+                cols["coverage_ratio"],
+                cols["asset_class"],
+            ]
+        ].copy()
 
-def _write(df: pd.DataFrame, path: str, fmt: str) -> None:
-    if fmt == "csv":
-        df.to_csv(path, index=False)
-    else:
-        df.to_excel(path, index=False)
+        out.rename(
+            columns={
+                cols["cusip"]: "CUSIP",
+                cols["collateral_loss"]: f"{tag}_Collateral_Loss",
+                cols["coverage_ratio"]: f"{tag}_Coverage_Ratio",
+                cols["asset_class"]: f"{tag}_Asset_Class",
+            },
+            inplace=True,
+        )
 
+        out[f"{tag}_Collateral_Loss"] = to_numeric_maybe_percent(
+            out[f"{tag}_Collateral_Loss"]
+        )
+        out[f"{tag}_Coverage_Ratio"] = to_numeric_maybe_percent(
+            out[f"{tag}_Coverage_Ratio"]
+        )
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--q1", required=True, help="Path to Q1 file (.csv/.xlsx/.parquet)")
-    ap.add_argument("--q2", required=True, help="Path to Q2 file (.csv/.xlsx/.parquet)")
-    ap.add_argument("--outdir", required=True, help="Output directory")
-    ap.add_argument("--format", choices=["csv", "xlsx"], default="csv", help="Output format")
+        return out
 
-    ap.add_argument("--q1-sheet", default=None, help="Excel sheet name for Q1 (if applicable)")
-    ap.add_argument("--q2-sheet", default=None, help="Excel sheet name for Q2 (if applicable)")
-
-    ap.add_argument("--scenario-col", default="scenario", help="Scenario column name")
-    ap.add_argument("--cusip-col", default="CUSIP", help="CUSIP column name")
-    ap.add_argument("--loss-col", default="collat loss", help="Collateral loss column name")
-    ap.add_argument("--cov-col", default="Coverage Ratio", help="Coverage Ratio column name")
-    ap.add_argument("--asset-col", default="Asset Class", help="Asset Class column name")
-
-    ap.add_argument(
-        "--abs-diff-threshold",
-        type=float,
-        default=1_000_000,
-        help="Absolute difference threshold for File #3 (default 1,000,000)",
-    )
-
-    args = ap.parse_args()
-    os.makedirs(args.outdir, exist_ok=True)
-
-    q1 = _norm_cols(_read_file(args.q1, sheet=args.q1_sheet))
-    q2 = _norm_cols(_read_file(args.q2, sheet=args.q2_sheet))
-
-    q1 = _filter_downside(q1, args.scenario_col)
-    q2 = _filter_downside(q2, args.scenario_col)
-
-    q1p = _prep_side(q1, "1", args.cusip_col, args.loss_col, args.cov_col, args.asset_col)
-    q2p = _prep_side(q2, "2", args.cusip_col, args.loss_col, args.cov_col, args.asset_col)
+    q1p = prep(q1, "Q1")
+    q2p = prep(q2, "Q2")
 
     merged = q1p.merge(q2p, on="CUSIP", how="inner")
 
-    merged["Difference_Q2_minus_Q1"] = merged["Q2_Collateral_Loss"] - merged["Q1_Collateral_Loss"]
-    merged["Abs_Difference"] = merged["Difference_Q2_minus_Q1"].abs()
+    # Differences
+    merged["Difference"] = merged["Q2_Collateral_Loss"] - merged["Q1_Collateral_Loss"]
+    merged["Abs_Difference"] = merged["Difference"].abs()
 
-    # Output 1: all matched
-    out_all = merged[
-        [
-            "CUSIP",
-            "Q1_Collateral_Loss",
-            "Q2_Collateral_Loss",
-            "Difference_Q2_minus_Q1",
-            "Abs_Difference",
-            "Q1_Coverage_Ratio",
-            "Q2_Coverage_Ratio",
-            "Q1_Asset_Class",
-            "Q2_Asset_Class",
-        ]
-    ].copy()
+    # -----------------------------
+    # Output 1: All matched
+    # -----------------------------
+    out_all = merged.copy()
 
-    # Output 2: Q2 is >= 20% greater than Q1
-    q1_loss = merged["Q1_Collateral_Loss"]
-    q2_loss = merged["Q2_Collateral_Loss"]
-
+    # -----------------------------
+    # Output 2: 20% rule
+    # -----------------------------
     mask_20pct = (
-        q1_loss.notna()
-        & q2_loss.notna()
-        & (
-            ((q1_loss == 0) & (q2_loss > 0))
-            | ((q1_loss != 0) & (q2_loss >= 1.2 * q1_loss))
+        (merged["Q1_Collateral_Loss"] == 0) & (merged["Q2_Collateral_Loss"] > 0)
+    ) | (merged["Q2_Collateral_Loss"] >= 1.2 * merged["Q1_Collateral_Loss"])
+
+    out_20 = merged[mask_20pct].copy()
+
+    # -----------------------------
+    # Output 3: Extra checks
+    # -----------------------------
+    mask_extra = merged["Abs_Difference"] > cfg["absolute_difference_threshold"]
+
+    if cfg["coverage_ratio_flag"]:
+        mask_extra &= (
+            merged["Q2_Coverage_Ratio"] < merged["Q1_Coverage_Ratio"]
         )
-    )
-    out_20 = out_all.loc[mask_20pct].copy()
 
-    # Output 3: additional checks on the 20% set
-    # - Q2 Coverage Ratio < Q1 Coverage Ratio
-    # - ABS(loss diff) > threshold
-    cov_q1 = merged["Q1_Coverage_Ratio"]
-    cov_q2 = merged["Q2_Coverage_Ratio"]
+    out_3 = merged[mask_20pct & mask_extra].copy()
 
-    mask_cov_lower = cov_q2.notna() & cov_q1.notna() & (cov_q2 < cov_q1)
-    mask_absdiff = merged["Abs_Difference"].notna() & (merged["Abs_Difference"] > args.abs_diff_threshold)
-
-    mask_3 = mask_20pct & mask_cov_lower & mask_absdiff
-    out_3 = out_all.loc[mask_3].copy()
-
+    # -----------------------------
     # Write outputs
-    ext = "csv" if args.format == "csv" else "xlsx"
-    p1 = os.path.join(args.outdir, f"output_1_all_cusips.{ext}")
-    p2 = os.path.join(args.outdir, f"output_2_q2_20pct_greater.{ext}")
-    p3 = os.path.join(args.outdir, f"output_3_20pct_plus_extra_checks.{ext}")
+    # -----------------------------
+    os.makedirs(cfg["output_folder"], exist_ok=True)
+    fmt = cfg["output_format"]
 
-    _write(out_all, p1, args.format)
-    _write(out_20, p2, args.format)
-    _write(out_3, p3, args.format)
+    def write(df: pd.DataFrame, name: str):
+        path = os.path.join(cfg["output_folder"], f"{name}.{fmt}")
+        if fmt == "csv":
+            df.to_csv(path, index=False)
+        else:
+            df.to_excel(path, index=False)
 
-    print("Done.")
-    print(f"Saved: {p1}  (matched CUSIPs: {len(out_all):,})")
-    print(f"Saved: {p2}  (Q2 >= 1.2*Q1: {len(out_20):,})")
-    print(
-        f"Saved: {p3}  (20% rule + Q2 cov lower + abs diff > {args.abs_diff_threshold:,.0f}: {len(out_3):,})"
-    )
+    write(out_all, "output_1_all_cusips")
+    write(out_20, "output_2_q2_20pct_greater")
+    write(out_3, "output_3_20pct_plus_extra_checks")
+
+    print("✅ Completed")
+    print(f"Scenario checked: {cfg['scenario_name']}")
+    print(f"Coverage Ratio flag: {cfg['coverage_ratio_flag']}")
+    print(f"Absolute threshold: {cfg['absolute_difference_threshold']:,}")
 
 
 if __name__ == "__main__":
