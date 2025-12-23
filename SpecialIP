@@ -1,48 +1,198 @@
-import numpy as np
+#!/usr/bin/env python3
+"""
+Compare Q1 vs Q2 collateral loss for scenario == 'downside' and produce two outputs:
+1) All matched CUSIPs with Q1/Q2 Collateral Loss + Difference, plus Coverage Ratio and Asset Class
+2) Only rows where Q2 Collateral Loss is >= 20% greater than Q1 (Q2 >= 1.2 * Q1)
+
+Usage (CSV outputs):
+  python compare_collat_loss.py --q1 Q1.csv --q2 Q2.csv --outdir ./out
+
+Usage (Excel outputs):
+  python compare_collat_loss.py --q1 Q1.xlsx --q2 Q2.xlsx --outdir ./out --format xlsx
+
+Optional:
+  --q1-sheet "Sheet1" --q2-sheet "Sheet1"
+  --scenario-col Scenario
+  --cusip-col CUSIP
+  --loss-col "collat loss"
+  --cov-col "Coverage Ratio"
+  --asset-col "Asset Class"
+"""
+
+import argparse
+import os
+from typing import Optional, Tuple
+
 import pandas as pd
 
-# --- your function: must return 3 values as a Series (=> 3 columns) ---
-def f(row, W, A):
-    # replace this with your real logic
-    return pd.Series({
-        "out1": row["x"] * W + A,
-        "out2": row["y"] * A + W,
-        "out3": row["x"] - row["y"] + (W - A),
-    })
 
-# --- example input df (remove if you already have df) ---
-# df = pd.DataFrame({"x":[1,2,3], "y":[10,20,30]})
+def _read_file(path: str, sheet: Optional[str] = None) -> pd.DataFrame:
+    ext = os.path.splitext(path.lower())[1]
+    if ext in [".xlsx", ".xls"]:
+        return pd.read_excel(path, sheet_name=sheet)
+    if ext in [".csv"]:
+        return pd.read_csv(path)
+    if ext in [".parquet"]:
+        return pd.read_parquet(path)
+    raise ValueError(f"Unsupported file type: {ext}. Use .csv, .xlsx/.xls, or .parquet")
 
-W0 = 1.00
-A0 = 1.00
-stress_steps = np.array([0.01, 0.02, 0.03, 0.04, 0.05])
 
-def run_apply_stress(df, func, W0, A0, steps):
-    results = []
+def _norm_cols(df: pd.DataFrame) -> pd.DataFrame:
+    # Keep original column names, but make it easier to match by trimming whitespace.
+    df = df.copy()
+    df.columns = [c.strip() if isinstance(c, str) else c for c in df.columns]
+    return df
 
-    scenarios = [
-        ("A_down",         lambda s: (W0,      A0 - s)),
-        ("W_up",           lambda s: (W0 + s,  A0)),
-        ("A_down_W_up",    lambda s: (W0 + s,  A0 - s)),
-    ]
 
-    for stress_type, param_fn in scenarios:
-        for s in steps:
-            W, A = param_fn(s)
+def _to_numeric_maybe_percent(s: pd.Series) -> pd.Series:
+    """
+    Converts values like:
+      0.123 -> 0.123
+      "0.123" -> 0.123
+      "12.3%" -> 0.123
+      "12,3%" -> 0.123
+      "1,234.56" -> 1234.56 (best effort)
+    """
+    s2 = s.astype(str).str.strip()
+    is_percent = s2.str.endswith("%")
 
-            out = df.apply(func, axis=1, W=W, A=A)  # expects Series per row (3 outputs)
-            out = out.rename(columns=lambda c: f"{c}") if isinstance(out, pd.DataFrame) else out.to_frame()
+    # normalize commas:
+    # - if it looks like "12,3%" treat comma as decimal
+    # - if it looks like "1,234.56" remove commas as thousands
+    s2 = s2.str.replace("\u00A0", "", regex=False)  # non-breaking space
+    s2 = s2.str.replace(" ", "", regex=False)
 
-            out = out.reset_index(drop=True)
-            out.insert(0, "StressType", stress_type)
-            out.insert(1, "Stress", float(s))
-            out.insert(2, "W", float(W))
-            out.insert(3, "A", float(A))
+    # Remove % for parsing
+    s_no_pct = s2.str.replace("%", "", regex=False)
 
-            results.append(out)
+    # Heuristic:
+    # If there is both comma and dot -> assume comma thousands separator
+    both = s_no_pct.str.contains(",") & s_no_pct.str.contains(r"\.")
+    s_no_pct = s_no_pct.where(~both, s_no_pct.str.replace(",", "", regex=False))
 
-    return pd.concat(results, ignore_index=True)
+    # If only comma -> assume decimal comma
+    only_comma = s_no_pct.str.contains(",") & ~s_no_pct.str.contains(r"\.")
+    s_no_pct = s_no_pct.where(~only_comma, s_no_pct.str.replace(",", ".", regex=False))
 
-# usage:
-# final_df = run_apply_stress(df, f, W0, A0, stress_steps)
-# print(final_df.head())
+    num = pd.to_numeric(s_no_pct, errors="coerce")
+    num = num.where(~is_percent, num / 100.0)
+    return num
+
+
+def _filter_downside(df: pd.DataFrame, scenario_col: str) -> pd.DataFrame:
+    if scenario_col not in df.columns:
+        raise KeyError(f"Scenario column '{scenario_col}' not found. Available: {list(df.columns)}")
+    s = df[scenario_col].astype(str).str.strip().str.lower()
+    return df.loc[s.eq("downside")].copy()
+
+
+def _prep_side(
+    df: pd.DataFrame,
+    side: str,
+    cusip_col: str,
+    loss_col: str,
+    cov_col: str,
+    asset_col: str,
+) -> pd.DataFrame:
+    missing = [c for c in [cusip_col, loss_col, cov_col, asset_col] if c not in df.columns]
+    if missing:
+        raise KeyError(f"{side}: Missing columns {missing}. Available: {list(df.columns)}")
+
+    out = df[[cusip_col, loss_col, cov_col, asset_col]].copy()
+    out.rename(
+        columns={
+            cusip_col: "CUSIP",
+            loss_col: f"Q{side}_Collateral_Loss",
+            cov_col: f"Q{side}_Coverage_Ratio",
+            asset_col: f"Q{side}_Asset_Class",
+        },
+        inplace=True,
+    )
+    out["CUSIP"] = out["CUSIP"].astype(str).str.strip()
+    out[f"Q{side}_Collateral_Loss"] = _to_numeric_maybe_percent(out[f"Q{side}_Collateral_Loss"])
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--q1", required=True, help="Path to Q1 file (.csv/.xlsx/.parquet)")
+    ap.add_argument("--q2", required=True, help="Path to Q2 file (.csv/.xlsx/.parquet)")
+    ap.add_argument("--outdir", required=True, help="Output directory")
+    ap.add_argument("--format", choices=["csv", "xlsx"], default="csv", help="Output format")
+
+    ap.add_argument("--q1-sheet", default=None, help="Excel sheet name for Q1 (if applicable)")
+    ap.add_argument("--q2-sheet", default=None, help="Excel sheet name for Q2 (if applicable)")
+
+    ap.add_argument("--scenario-col", default="scenario", help="Scenario column name")
+    ap.add_argument("--cusip-col", default="CUSIP", help="CUSIP column name")
+    ap.add_argument("--loss-col", default="collat loss", help="Collateral loss column name")
+    ap.add_argument("--cov-col", default="Coverage Ratio", help="Coverage Ratio column name")
+    ap.add_argument("--asset-col", default="Asset Class", help="Asset Class column name")
+
+    args = ap.parse_args()
+
+    os.makedirs(args.outdir, exist_ok=True)
+
+    q1 = _norm_cols(_read_file(args.q1, sheet=args.q1_sheet))
+    q2 = _norm_cols(_read_file(args.q2, sheet=args.q2_sheet))
+
+    q1 = _filter_downside(q1, args.scenario_col)
+    q2 = _filter_downside(q2, args.scenario_col)
+
+    q1p = _prep_side(q1, "1", args.cusip_col, args.loss_col, args.cov_col, args.asset_col)
+    q2p = _prep_side(q2, "2", args.cusip_col, args.loss_col, args.cov_col, args.asset_col)
+
+    merged = q1p.merge(q2p, on="CUSIP", how="inner")
+
+    # Difference = Q2 - Q1
+    merged["Difference_Q2_minus_Q1"] = merged["Q2_Collateral_Loss"] - merged["Q1_Collateral_Loss"]
+
+    # Output 1: all matched
+    out_all = merged[
+        [
+            "CUSIP",
+            "Q1_Collateral_Loss",
+            "Q2_Collateral_Loss",
+            "Difference_Q2_minus_Q1",
+            "Q1_Coverage_Ratio",
+            "Q2_Coverage_Ratio",
+            "Q1_Asset_Class",
+            "Q2_Asset_Class",
+        ]
+    ].copy()
+
+    # Output 2: Q2 is >= 20% greater than Q1
+    q1_loss = merged["Q1_Collateral_Loss"]
+    q2_loss = merged["Q2_Collateral_Loss"]
+
+    mask_20pct = (
+        q1_loss.notna()
+        & q2_loss.notna()
+        & (
+            ((q1_loss == 0) & (q2_loss > 0))
+            | ((q1_loss != 0) & (q2_loss >= 1.2 * q1_loss))
+        )
+    )
+
+    out_flag = out_all.loc[mask_20pct].copy()
+
+    if args.format == "csv":
+        all_path = os.path.join(args.outdir, "output_1_all_cusips.csv")
+        flag_path = os.path.join(args.outdir, "output_2_q2_20pct_greater.csv")
+        out_all.to_csv(all_path, index=False)
+        out_flag.to_csv(flag_path, index=False)
+    else:
+        all_path = os.path.join(args.outdir, "output_1_all_cusips.xlsx")
+        flag_path = os.path.join(args.outdir, "output_2_q2_20pct_greater.xlsx")
+        out_all.to_excel(all_path, index=False)
+        out_flag.to_excel(flag_path, index=False)
+
+    print("Done.")
+    print(f"Saved: {all_path}")
+    print(f"Saved: {flag_path}")
+    print(f"Matched CUSIPs: {len(out_all):,}")
+    print(f"Flagged (Q2 >= 1.2*Q1): {len(out_flag):,}")
+
+
+if __name__ == "__main__":
+    main()
