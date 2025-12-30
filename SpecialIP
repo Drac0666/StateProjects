@@ -170,4 +170,40 @@ def main():
     # Asset class frames = non-error & non-stale only
     base_for_asset_sheets = df[(df[ASSET_CLASS_COL].astype(str) != ERROR_CLASS_VALUE) & (~df["_is_stale"])].copy()
 
-    present_asset_classes = base_for_asset_sheets_
+    present_asset_classes = base_for_asset_sheets[ASSET_CLASS_COL].dropna().astype(str).unique().tolist()
+    export_asset_classes = ordered_asset_classes(present_asset_classes)
+
+    with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
+        # Asset class tabs (user-defined order)
+        for ac in export_asset_classes:
+            sub = base_for_asset_sheets[base_for_asset_sheets[ASSET_CLASS_COL].astype(str) == ac].copy()
+
+            keep_cols_from_mapping = column_mapping.get(ac, [])
+            if keep_cols_from_mapping:
+                keep_existing = [c for c in keep_cols_from_mapping if c in sub.columns]
+                if keep_existing:
+                    sub = sub.loc[:, keep_existing]
+
+            drop_internal_cols_for_output(sub).to_excel(
+                writer, sheet_name=sanitize_sheet_name(ac), index=False
+            )
+
+        # StaleData (second last)
+        drop_internal_cols_for_output(stale_df).to_excel(
+            writer, sheet_name=sanitize_sheet_name(STALE_SHEET_NAME), index=False
+        )
+
+        # Errors (last)
+        drop_internal_cols_for_output(errors_df).to_excel(
+            writer, sheet_name=sanitize_sheet_name(ERROR_SHEET_NAME), index=False
+        )
+
+    print(
+        f"Done. Asset sheets: {len(export_asset_classes)} | "
+        f"Plus {STALE_SHEET_NAME} and {ERROR_SHEET_NAME} (always last). "
+        f"Output: {OUTPUT_PATH}"
+    )
+
+
+if __name__ == "__main__":
+    main()
