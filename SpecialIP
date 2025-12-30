@@ -1,178 +1,143 @@
-# ================================
-# Collateral Loss Comparison Config
-# ================================
+# Python 3.9
+# ------------------------------------------------------------
+# What this script does:
+# 1) Reads MainData into df
+# 2) Reads AssetClassMapping (columns: "Deal Type", "SSFA_AssetClass")
+# 3) Assigns SSFA_AssetClass to df based on df["Deal Type"]
+# 4) Reads ColumnMapping.xlsx (columns named like asset classes, e.g. "CMBS")
+# 5) Splits df into separate DataFrames per SSFA_AssetClass
+#    - If SSFA_AssetClass == "Error": NO column filtering (export as-is)
+#    - Else: filter columns based on the matching asset-class column in ColumnMapping
+# 6) Exports all DataFrames to one Excel file with separate tabs named by asset class
+# ------------------------------------------------------------
 
-# Scenario filter
-scenario_name: downside
-
-# Input files
-q1_file: "Q1.csv"
-q2_file: "Q2.csv"
-
-# Output location
-output_folder: "./out"
-
-# Thresholds
-absolute_difference_threshold: 1000000   # default: 1,000,000
-
-# Flags / checks
-coverage_ratio_flag: true   # true = check Q2 < Q1, false = ignore
-
-# Column names (only change if your files differ)
-columns:
-  scenario: "scenario"
-  cusip: "CUSIP"
-  collateral_loss: "collat loss"
-  coverage_ratio: "Coverage Ratio"
-  asset_class: "Asset Class"
-
-# Output format: csv or xlsx
-output_format: "csv"
-
-
-
-#!/usr/bin/env python3
-import os
-import yaml
+import re
 import pandas as pd
-from typing import Optional
 
 
-# -----------------------------
-# Helpers
-# -----------------------------
-def read_file(path: str, sheet: Optional[str] = None) -> pd.DataFrame:
-    ext = os.path.splitext(path.lower())[1]
-    if ext in [".xlsx", ".xls"]:
-        return pd.read_excel(path, sheet_name=sheet)
-    if ext == ".csv":
+# ============== CONFIG ==============
+MAIN_DATA_PATH = r"MainData.xlsx"               # or .csv
+ASSET_CLASS_MAPPING_PATH = r"AssetClassMapping.xlsx"  # must contain: Deal Type, SSFA_AssetClass
+COLUMN_MAPPING_PATH = r"ColumnMapping.xlsx"     # columns named by AssetClass, cells list column names to keep
+OUTPUT_PATH = r"Output_By_AssetClass.xlsx"
+
+MAIN_DATA_SHEET = 0            # sheet index or name if Excel
+ASSET_CLASS_MAPPING_SHEET = 0  # sheet index or name
+COLUMN_MAPPING_SHEET = 0       # sheet index or name
+
+DEAL_TYPE_COL = "Deal Type"
+ASSET_CLASS_COL = "SSFA_AssetClass"
+
+ERROR_CLASS_VALUE = "Error"
+# ====================================
+
+
+def read_main_data(path: str) -> pd.DataFrame:
+    """Reads main data into a DataFrame (supports .xlsx/.xlsm/.xls and .csv)."""
+    if path.lower().endswith((".xlsx", ".xlsm", ".xls")):
+        return pd.read_excel(path, sheet_name=MAIN_DATA_SHEET)
+    if path.lower().endswith(".csv"):
         return pd.read_csv(path)
-    if ext == ".parquet":
-        return pd.read_parquet(path)
-    raise ValueError(f"Unsupported file type: {ext}")
+    raise ValueError(f"Unsupported main data file type: {path}")
 
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    df.columns = [c.strip() for c in df.columns]
-    return df
+def sanitize_sheet_name(name: str) -> str:
+    """Excel sheet name rules: max 31 chars, cannot contain : \ / ? * [ ]"""
+    if name is None:
+        name = "Unknown"
+    name = str(name).strip()
+    name = re.sub(r"[:\\/?*\[\]]", "_", name)
+    return (name[:31] if len(name) > 31 else name) or "Sheet"
 
 
-def to_numeric_maybe_percent(s: pd.Series) -> pd.Series:
-    s = s.astype(str).str.strip()
-    is_pct = s.str.endswith("%")
+def build_assetclass_lookup(asset_map_df: pd.DataFrame) -> dict:
+    """Build mapping: Deal Type -> SSFA_AssetClass."""
+    required = {DEAL_TYPE_COL, ASSET_CLASS_COL}
+    missing = required - set(asset_map_df.columns)
+    if missing:
+        raise KeyError(f"AssetClassMapping missing required columns: {sorted(missing)}")
 
-    s = s.str.replace("%", "", regex=False)
-    s = s.str.replace(",", "", regex=False)
+    # Keep last occurrence if duplicates exist
+    asset_map_df = asset_map_df[[DEAL_TYPE_COL, ASSET_CLASS_COL]].dropna(subset=[DEAL_TYPE_COL])
+    asset_map_df[DEAL_TYPE_COL] = asset_map_df[DEAL_TYPE_COL].astype(str).str.strip()
+    asset_map_df[ASSET_CLASS_COL] = asset_map_df[ASSET_CLASS_COL].astype(str).str.strip()
 
-    num = pd.to_numeric(s, errors="coerce")
-    return num.where(~is_pct, num / 100.0)
+    return dict(zip(asset_map_df[DEAL_TYPE_COL], asset_map_df[ASSET_CLASS_COL]))
 
 
-# -----------------------------
-# Main logic
-# -----------------------------
-def main(config_path: str = "config.yaml"):
-    with open(config_path, "r") as f:
-        cfg = yaml.safe_load(f)
+def read_column_mapping(path: str) -> dict:
+    """
+    Reads ColumnMapping.xlsx and returns:
+      { "CMBS": ["colA", "colB", ...], "RMBS": [...], ... }
+    Assumption: each asset class is a column header; the cells under it are column names to KEEP.
+    """
+    cm = pd.read_excel(path, sheet_name=COLUMN_MAPPING_SHEET)
 
-    cols = cfg["columns"]
-
-    # Read inputs
-    q1 = normalize_columns(read_file(cfg["q1_file"]))
-    q2 = normalize_columns(read_file(cfg["q2_file"]))
-
-    # Filter scenario
-    scenario = cfg["scenario_name"].lower()
-    q1 = q1[q1[cols["scenario"]].str.lower() == scenario]
-    q2 = q2[q2[cols["scenario"]].str.lower() == scenario]
-
-    # Prepare datasets
-    def prep(df: pd.DataFrame, tag: str) -> pd.DataFrame:
-        out = df[
-            [
-                cols["cusip"],
-                cols["collateral_loss"],
-                cols["coverage_ratio"],
-                cols["asset_class"],
-            ]
-        ].copy()
-
-        out.rename(
-            columns={
-                cols["cusip"]: "CUSIP",
-                cols["collateral_loss"]: f"{tag}_Collateral_Loss",
-                cols["coverage_ratio"]: f"{tag}_Coverage_Ratio",
-                cols["asset_class"]: f"{tag}_Asset_Class",
-            },
-            inplace=True,
+    mapping = {}
+    for asset_class in cm.columns:
+        # drop blanks, cast to str, strip
+        cols = (
+            cm[asset_class]
+            .dropna()
+            .astype(str)
+            .map(str.strip)
         )
+        # remove empty strings
+        cols = [c for c in cols.tolist() if c]
+        mapping[str(asset_class).strip()] = cols
 
-        out[f"{tag}_Collateral_Loss"] = to_numeric_maybe_percent(
-            out[f"{tag}_Collateral_Loss"]
-        )
-        out[f"{tag}_Coverage_Ratio"] = to_numeric_maybe_percent(
-            out[f"{tag}_Coverage_Ratio"]
-        )
+    return mapping
 
-        return out
 
-    q1p = prep(q1, "Q1")
-    q2p = prep(q2, "Q2")
+def main():
+    # 1) Read files
+    df = read_main_data(MAIN_DATA_PATH)
 
-    merged = q1p.merge(q2p, on="CUSIP", how="inner")
+    asset_map_df = pd.read_excel(ASSET_CLASS_MAPPING_PATH, sheet_name=ASSET_CLASS_MAPPING_SHEET)
+    deal_to_asset = build_assetclass_lookup(asset_map_df)
 
-    # Differences
-    merged["Difference"] = merged["Q2_Collateral_Loss"] - merged["Q1_Collateral_Loss"]
-    merged["Abs_Difference"] = merged["Difference"].abs()
+    column_mapping = read_column_mapping(COLUMN_MAPPING_PATH)
 
-    # -----------------------------
-    # Output 1: All matched
-    # -----------------------------
-    out_all = merged.copy()
+    # 2) Assign SSFA_AssetClass based on Deal Type
+    if DEAL_TYPE_COL not in df.columns:
+        raise KeyError(f"Main data is missing required column: '{DEAL_TYPE_COL}'")
 
-    # -----------------------------
-    # Output 2: 20% rule
-    # -----------------------------
-    mask_20pct = (
-        (merged["Q1_Collateral_Loss"] == 0) & (merged["Q2_Collateral_Loss"] > 0)
-    ) | (merged["Q2_Collateral_Loss"] >= 1.2 * merged["Q1_Collateral_Loss"])
+    df[DEAL_TYPE_COL] = df[DEAL_TYPE_COL].astype(str).str.strip()
 
-    out_20 = merged[mask_20pct].copy()
+    # map deal type -> asset class; anything not mapped becomes "Error"
+    df[ASSET_CLASS_COL] = df[DEAL_TYPE_COL].map(deal_to_asset).fillna(ERROR_CLASS_VALUE)
 
-    # -----------------------------
-    # Output 3: Extra checks
-    # -----------------------------
-    mask_extra = merged["Abs_Difference"] > cfg["absolute_difference_threshold"]
+    # 3) Split and filter
+    mandatory_cols = [c for c in [DEAL_TYPE_COL, ASSET_CLASS_COL] if c in df.columns]
 
-    if cfg["coverage_ratio_flag"]:
-        mask_extra &= (
-            merged["Q2_Coverage_Ratio"] < merged["Q1_Coverage_Ratio"]
-        )
+    # We'll export one sheet per distinct asset class in df
+    asset_classes = sorted(df[ASSET_CLASS_COL].dropna().astype(str).unique().tolist())
 
-    out_3 = merged[mask_20pct & mask_extra].copy()
+    with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
+        for ac in asset_classes:
+            ac_str = str(ac)
 
-    # -----------------------------
-    # Write outputs
-    # -----------------------------
-    os.makedirs(cfg["output_folder"], exist_ok=True)
-    fmt = cfg["output_format"]
+            sub = df[df[ASSET_CLASS_COL].astype(str) == ac_str].copy()
 
-    def write(df: pd.DataFrame, name: str):
-        path = os.path.join(cfg["output_folder"], f"{name}.{fmt}")
-        if fmt == "csv":
-            df.to_csv(path, index=False)
-        else:
-            df.to_excel(path, index=False)
+            # If Error => do not filter columns
+            if ac_str != ERROR_CLASS_VALUE:
+                keep_cols_from_mapping = column_mapping.get(ac_str, [])
 
-    write(out_all, "output_1_all_cusips")
-    write(out_20, "output_2_q2_20pct_greater")
-    write(out_3, "output_3_20pct_plus_extra_checks")
+                # If mapping column doesn't exist or is empty, keep everything (safe fallback),
+                # but you can change this behavior if you prefer "keep only mandatory".
+                if keep_cols_from_mapping:
+                    # Keep only columns that actually exist in sub + ensure mandatory columns stay
+                    keep = []
+                    for c in mandatory_cols + keep_cols_from_mapping:
+                        if c in sub.columns and c not in keep:
+                            keep.append(c)
+                    sub = sub.loc[:, keep]
+                # else: keep as-is
 
-    print("✅ Completed")
-    print(f"Scenario checked: {cfg['scenario_name']}")
-    print(f"Coverage Ratio flag: {cfg['coverage_ratio_flag']}")
-    print(f"Absolute threshold: {cfg['absolute_difference_threshold']:,}")
+            sheet_name = sanitize_sheet_name(ac_str)
+            sub.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    print(f"Done. Exported {len(asset_classes)} sheet(s) to: {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
