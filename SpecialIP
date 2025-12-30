@@ -1,14 +1,12 @@
 # Python 3.9
 # ------------------------------------------------------------
-# What this script does:
-# 1) Reads MainData into df
-# 2) Reads AssetClassMapping (columns: "Deal Type", "SSFA_AssetClass")
-# 3) Assigns SSFA_AssetClass to df based on df["Deal Type"]
-# 4) Reads ColumnMapping.xlsx (columns named like asset classes, e.g. "CMBS")
-# 5) Splits df into separate DataFrames per SSFA_AssetClass
-#    - If SSFA_AssetClass == "Error": NO column filtering (export as-is)
-#    - Else: filter columns based on the matching asset-class column in ColumnMapping
-# 6) Exports all DataFrames to one Excel file with separate tabs named by asset class
+# Updates vs your last request:
+# - "Deal Type" and "SSFA_AssetClass" columns are NOT included in final outputs
+# - Adds StaleData based on config AS_OF_DATE vs "Latest Update" column:
+#     days_diff = (AS_OF_DATE - Latest Update) in whole days
+#     stale if days_diff > 91  OR Latest Update is blank/unparseable
+# - AssetClass sheets are created from FRESH + NON-ERROR rows only (no duplicates)
+# - "StaleData" and "Errors" sheets are written LAST (StaleData second-last, Errors last)
 # ------------------------------------------------------------
 
 import re
@@ -16,19 +14,25 @@ import pandas as pd
 
 
 # ============== CONFIG ==============
-MAIN_DATA_PATH = r"MainData.xlsx"               # or .csv
+MAIN_DATA_PATH = r"MainData.xlsx"                 # or .csv
 ASSET_CLASS_MAPPING_PATH = r"AssetClassMapping.xlsx"  # must contain: Deal Type, SSFA_AssetClass
-COLUMN_MAPPING_PATH = r"ColumnMapping.xlsx"     # columns named by AssetClass, cells list column names to keep
+COLUMN_MAPPING_PATH = r"ColumnMapping.xlsx"       # columns named by AssetClass, cells list column names to keep
 OUTPUT_PATH = r"Output_By_AssetClass.xlsx"
 
-MAIN_DATA_SHEET = 0            # sheet index or name if Excel
-ASSET_CLASS_MAPPING_SHEET = 0  # sheet index or name
-COLUMN_MAPPING_SHEET = 0       # sheet index or name
+MAIN_DATA_SHEET = 0
+ASSET_CLASS_MAPPING_SHEET = 0
+COLUMN_MAPPING_SHEET = 0
 
 DEAL_TYPE_COL = "Deal Type"
 ASSET_CLASS_COL = "SSFA_AssetClass"
 
+LATEST_UPDATE_COL = "Latest Update"   # in main data
+AS_OF_DATE = "2025-12-30"             # <-- set from your config input "Date"
+STALE_THRESHOLD_DAYS = 91
+
 ERROR_CLASS_VALUE = "Error"
+ERROR_SHEET_NAME = "Errors"
+STALE_SHEET_NAME = "StaleData"
 # ====================================
 
 
@@ -42,12 +46,13 @@ def read_main_data(path: str) -> pd.DataFrame:
 
 
 def sanitize_sheet_name(name: str) -> str:
-    """Excel sheet name rules: max 31 chars, cannot contain : \ / ? * [ ]"""
+    """Excel sheet name rules: max 31 chars, cannot contain : \\ / ? * [ ]"""
     if name is None:
         name = "Unknown"
     name = str(name).strip()
     name = re.sub(r"[:\\/?*\[\]]", "_", name)
-    return (name[:31] if len(name) > 31 else name) or "Sheet"
+    name = (name[:31] if len(name) > 31 else name) or "Sheet"
+    return name
 
 
 def build_assetclass_lookup(asset_map_df: pd.DataFrame) -> dict:
@@ -57,7 +62,6 @@ def build_assetclass_lookup(asset_map_df: pd.DataFrame) -> dict:
     if missing:
         raise KeyError(f"AssetClassMapping missing required columns: {sorted(missing)}")
 
-    # Keep last occurrence if duplicates exist
     asset_map_df = asset_map_df[[DEAL_TYPE_COL, ASSET_CLASS_COL]].dropna(subset=[DEAL_TYPE_COL])
     asset_map_df[DEAL_TYPE_COL] = asset_map_df[DEAL_TYPE_COL].astype(str).str.strip()
     asset_map_df[ASSET_CLASS_COL] = asset_map_df[ASSET_CLASS_COL].astype(str).str.strip()
@@ -75,18 +79,59 @@ def read_column_mapping(path: str) -> dict:
 
     mapping = {}
     for asset_class in cm.columns:
-        # drop blanks, cast to str, strip
         cols = (
             cm[asset_class]
             .dropna()
             .astype(str)
             .map(str.strip)
         )
-        # remove empty strings
         cols = [c for c in cols.tolist() if c]
         mapping[str(asset_class).strip()] = cols
 
     return mapping
+
+
+def compute_stale_flags(df: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
+    """
+    Adds:
+      - _as_of_dt
+      - _latest_update_dt
+      - DaysSinceLatestUpdate (int; NaN if no as-of)
+      - _is_stale (bool)
+    stale if DaysSinceLatestUpdate > STALE_THRESHOLD_DAYS OR Latest Update missing/unparseable
+    """
+    if LATEST_UPDATE_COL not in df.columns:
+        raise KeyError(f"Main data is missing required column: '{LATEST_UPDATE_COL}'")
+
+    as_of_dt = pd.to_datetime(as_of_date, errors="coerce")
+    if pd.isna(as_of_dt):
+        raise ValueError(f"AS_OF_DATE could not be parsed: {as_of_date!r} (recommend YYYY-MM-DD)")
+
+    df["_as_of_dt"] = as_of_dt
+    df["_latest_update_dt"] = pd.to_datetime(df[LATEST_UPDATE_COL], errors="coerce")
+
+    # whole-day difference; negative values (future latest updates) treated as 0
+    days = (df["_as_of_dt"] - df["_latest_update_dt"]).dt.days
+    days = days.where(days >= 0, 0)
+
+    df["DaysSinceLatestUpdate"] = days
+
+    # stale if missing Latest Update OR days > threshold
+    df["_is_stale"] = df["_latest_update_dt"].isna() | (df["DaysSinceLatestUpdate"] > STALE_THRESHOLD_DAYS)
+    return df
+
+
+def drop_internal_cols_for_output(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove helper & routing columns from final outputs."""
+    cols_to_drop = {
+        DEAL_TYPE_COL,
+        ASSET_CLASS_COL,
+        "_as_of_dt",
+        "_latest_update_dt",
+        "_is_stale",
+    }
+    keep = [c for c in df.columns if c not in cols_to_drop]
+    return df.loc[:, keep].copy()
 
 
 def main():
@@ -103,41 +148,47 @@ def main():
         raise KeyError(f"Main data is missing required column: '{DEAL_TYPE_COL}'")
 
     df[DEAL_TYPE_COL] = df[DEAL_TYPE_COL].astype(str).str.strip()
-
-    # map deal type -> asset class; anything not mapped becomes "Error"
     df[ASSET_CLASS_COL] = df[DEAL_TYPE_COL].map(deal_to_asset).fillna(ERROR_CLASS_VALUE)
 
-    # 3) Split and filter
-    mandatory_cols = [c for c in [DEAL_TYPE_COL, ASSET_CLASS_COL] if c in df.columns]
+    # 3) Compute stale flags
+    df = compute_stale_flags(df, AS_OF_DATE)
 
-    # We'll export one sheet per distinct asset class in df
-    asset_classes = sorted(df[ASSET_CLASS_COL].dropna().astype(str).unique().tolist())
+    # 4) Create special DataFrames
+    errors_df = df[df[ASSET_CLASS_COL].astype(str) == ERROR_CLASS_VALUE].copy()
+    # StaleData excludes Error rows to avoid overlap with Errors sheet
+    stale_df = df[(df["_is_stale"]) & (df[ASSET_CLASS_COL].astype(str) != ERROR_CLASS_VALUE)].copy()
 
+    # 5) AssetClass sheets from: NON-ERROR and NON-STALE only
+    base_for_asset_sheets = df[(df[ASSET_CLASS_COL].astype(str) != ERROR_CLASS_VALUE) & (~df["_is_stale"])].copy()
+
+    asset_classes = sorted(base_for_asset_sheets[ASSET_CLASS_COL].dropna().astype(str).unique().tolist())
+
+    # 6) Export (asset classes first, then StaleData, then Errors)
     with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
+        # Asset class tabs
         for ac in asset_classes:
-            ac_str = str(ac)
+            sub = base_for_asset_sheets[base_for_asset_sheets[ASSET_CLASS_COL].astype(str) == ac].copy()
 
-            sub = df[df[ASSET_CLASS_COL].astype(str) == ac_str].copy()
+            keep_cols_from_mapping = column_mapping.get(ac, [])
 
-            # If Error => do not filter columns
-            if ac_str != ERROR_CLASS_VALUE:
-                keep_cols_from_mapping = column_mapping.get(ac_str, [])
+            if keep_cols_from_mapping:
+                # Ensure we only keep columns that actually exist
+                keep_existing = [c for c in keep_cols_from_mapping if c in sub.columns]
+                sub = sub.loc[:, keep_existing] if keep_existing else sub
 
-                # If mapping column doesn't exist or is empty, keep everything (safe fallback),
-                # but you can change this behavior if you prefer "keep only mandatory".
-                if keep_cols_from_mapping:
-                    # Keep only columns that actually exist in sub + ensure mandatory columns stay
-                    keep = []
-                    for c in mandatory_cols + keep_cols_from_mapping:
-                        if c in sub.columns and c not in keep:
-                            keep.append(c)
-                    sub = sub.loc[:, keep]
-                # else: keep as-is
+            sub_out = drop_internal_cols_for_output(sub)
+            sheet_name = sanitize_sheet_name(ac)
+            sub_out.to_excel(writer, sheet_name=sheet_name, index=False)
 
-            sheet_name = sanitize_sheet_name(ac_str)
-            sub.to_excel(writer, sheet_name=sheet_name, index=False)
+        # StaleData (second last)
+        stale_out = drop_internal_cols_for_output(stale_df)
+        stale_out.to_excel(writer, sheet_name=sanitize_sheet_name(STALE_SHEET_NAME), index=False)
 
-    print(f"Done. Exported {len(asset_classes)} sheet(s) to: {OUTPUT_PATH}")
+        # Errors (last)
+        errors_out = drop_internal_cols_for_output(errors_df)
+        errors_out.to_excel(writer, sheet_name=sanitize_sheet_name(ERROR_SHEET_NAME), index=False)
+
+    print(f"Done. Exported {len(asset_classes)} asset class sheet(s) + {STALE_SHEET_NAME} + {ERROR_SHEET_NAME} to: {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
