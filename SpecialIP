@@ -1,12 +1,20 @@
 # Python 3.9
 # ------------------------------------------------------------
-# Updates vs your last request:
-# - "Deal Type" and "SSFA_AssetClass" columns are NOT included in final outputs
-# - Adds StaleData based on config AS_OF_DATE vs "Latest Update" column:
-#     days_diff = (AS_OF_DATE - Latest Update) in whole days
-#     stale if days_diff > 91  OR Latest Update is blank/unparseable
-# - AssetClass sheets are created from FRESH + NON-ERROR rows only (no duplicates)
-# - "StaleData" and "Errors" sheets are written LAST (StaleData second-last, Errors last)
+# Adds: Exception list override for asset class mapping based on DealTrancheID
+#
+# How it works:
+# - Read exceptions file with columns:
+#       DealTrancheID, SSFA_AssetClass
+# - For rows where df["DealTrancheID"] matches exceptions:
+#       df["SSFA_AssetClass"] is overridden by exception value
+#   (so we DO NOT use Deal Type mapping for those rows)
+#
+# Everything else stays the same:
+# - map Deal Type -> SSFA_AssetClass for non-exception rows
+# - Error rows go to "Errors" (no column filtering)
+# - Stale rows (DaysSinceLatestUpdate > 91 OR missing/unparseable Latest Update) go to "StaleData"
+# - Asset class tabs include only NON-ERROR and NON-STALE rows
+# - Output tabs order: asset classes first, then StaleData, then Errors
 # ------------------------------------------------------------
 
 import re
@@ -14,20 +22,24 @@ import pandas as pd
 
 
 # ============== CONFIG ==============
-MAIN_DATA_PATH = r"MainData.xlsx"                 # or .csv
-ASSET_CLASS_MAPPING_PATH = r"AssetClassMapping.xlsx"  # must contain: Deal Type, SSFA_AssetClass
-COLUMN_MAPPING_PATH = r"ColumnMapping.xlsx"       # columns named by AssetClass, cells list column names to keep
+MAIN_DATA_PATH = r"MainData.xlsx"                      # or .csv
+ASSET_CLASS_MAPPING_PATH = r"AssetClassMapping.xlsx"   # must contain: Deal Type, SSFA_AssetClass
+COLUMN_MAPPING_PATH = r"ColumnMapping.xlsx"            # columns named by AssetClass, cells list column names to keep
+EXCEPTIONS_PATH = r"AssetClassExceptions.xlsx"         # <-- NEW (can be .xlsx/.csv). If file missing, set to None.
 OUTPUT_PATH = r"Output_By_AssetClass.xlsx"
 
 MAIN_DATA_SHEET = 0
 ASSET_CLASS_MAPPING_SHEET = 0
 COLUMN_MAPPING_SHEET = 0
+EXCEPTIONS_SHEET = 0
 
 DEAL_TYPE_COL = "Deal Type"
 ASSET_CLASS_COL = "SSFA_AssetClass"
 
-LATEST_UPDATE_COL = "Latest Update"   # in main data
-AS_OF_DATE = "2025-12-30"             # <-- set from your config input "Date"
+DEAL_TRANCHE_ID_COL = "DealTrancheID"                  # <-- NEW key column for exceptions
+
+LATEST_UPDATE_COL = "Latest Update"
+AS_OF_DATE = "2025-12-30"                              # set from your config input "Date"
 STALE_THRESHOLD_DAYS = 91
 
 ERROR_CLASS_VALUE = "Error"
@@ -36,13 +48,20 @@ STALE_SHEET_NAME = "StaleData"
 # ====================================
 
 
-def read_main_data(path: str) -> pd.DataFrame:
-    """Reads main data into a DataFrame (supports .xlsx/.xlsm/.xls and .csv)."""
-    if path.lower().endswith((".xlsx", ".xlsm", ".xls")):
-        return pd.read_excel(path, sheet_name=MAIN_DATA_SHEET)
-    if path.lower().endswith(".csv"):
+def read_table(path: str, sheet=0) -> pd.DataFrame:
+    """Reads .xlsx/.xlsm/.xls or .csv into a DataFrame."""
+    if path is None:
+        return None
+    p = path.lower()
+    if p.endswith((".xlsx", ".xlsm", ".xls")):
+        return pd.read_excel(path, sheet_name=sheet)
+    if p.endswith(".csv"):
         return pd.read_csv(path)
-    raise ValueError(f"Unsupported main data file type: {path}")
+    raise ValueError(f"Unsupported file type: {path}")
+
+
+def read_main_data(path: str) -> pd.DataFrame:
+    return read_table(path, sheet=MAIN_DATA_SHEET)
 
 
 def sanitize_sheet_name(name: str) -> str:
@@ -51,12 +70,10 @@ def sanitize_sheet_name(name: str) -> str:
         name = "Unknown"
     name = str(name).strip()
     name = re.sub(r"[:\\/?*\[\]]", "_", name)
-    name = (name[:31] if len(name) > 31 else name) or "Sheet"
-    return name
+    return (name[:31] if len(name) > 31 else name) or "Sheet"
 
 
 def build_assetclass_lookup(asset_map_df: pd.DataFrame) -> dict:
-    """Build mapping: Deal Type -> SSFA_AssetClass."""
     required = {DEAL_TYPE_COL, ASSET_CLASS_COL}
     missing = required - set(asset_map_df.columns)
     if missing:
@@ -70,36 +87,37 @@ def build_assetclass_lookup(asset_map_df: pd.DataFrame) -> dict:
 
 
 def read_column_mapping(path: str) -> dict:
-    """
-    Reads ColumnMapping.xlsx and returns:
-      { "CMBS": ["colA", "colB", ...], "RMBS": [...], ... }
-    Assumption: each asset class is a column header; the cells under it are column names to KEEP.
-    """
     cm = pd.read_excel(path, sheet_name=COLUMN_MAPPING_SHEET)
 
     mapping = {}
     for asset_class in cm.columns:
-        cols = (
-            cm[asset_class]
-            .dropna()
-            .astype(str)
-            .map(str.strip)
-        )
+        cols = cm[asset_class].dropna().astype(str).map(str.strip)
         cols = [c for c in cols.tolist() if c]
         mapping[str(asset_class).strip()] = cols
-
     return mapping
 
 
+def build_exception_lookup(ex_df: pd.DataFrame) -> dict:
+    """
+    Exceptions file must contain:
+      - DealTrancheID
+      - SSFA_AssetClass
+    Returns dict: DealTrancheID(str) -> SSFA_AssetClass(str)
+    """
+    required = {DEAL_TRANCHE_ID_COL, ASSET_CLASS_COL}
+    missing = required - set(ex_df.columns)
+    if missing:
+        raise KeyError(f"Exceptions file missing required columns: {sorted(missing)}")
+
+    ex_df = ex_df[[DEAL_TRANCHE_ID_COL, ASSET_CLASS_COL]].dropna(subset=[DEAL_TRANCHE_ID_COL])
+    ex_df[DEAL_TRANCHE_ID_COL] = ex_df[DEAL_TRANCHE_ID_COL].astype(str).str.strip()
+    ex_df[ASSET_CLASS_COL] = ex_df[ASSET_CLASS_COL].astype(str).str.strip()
+
+    # Keep last occurrence if duplicates exist
+    return dict(zip(ex_df[DEAL_TRANCHE_ID_COL], ex_df[ASSET_CLASS_COL]))
+
+
 def compute_stale_flags(df: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
-    """
-    Adds:
-      - _as_of_dt
-      - _latest_update_dt
-      - DaysSinceLatestUpdate (int; NaN if no as-of)
-      - _is_stale (bool)
-    stale if DaysSinceLatestUpdate > STALE_THRESHOLD_DAYS OR Latest Update missing/unparseable
-    """
     if LATEST_UPDATE_COL not in df.columns:
         raise KeyError(f"Main data is missing required column: '{LATEST_UPDATE_COL}'")
 
@@ -110,19 +128,15 @@ def compute_stale_flags(df: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
     df["_as_of_dt"] = as_of_dt
     df["_latest_update_dt"] = pd.to_datetime(df[LATEST_UPDATE_COL], errors="coerce")
 
-    # whole-day difference; negative values (future latest updates) treated as 0
     days = (df["_as_of_dt"] - df["_latest_update_dt"]).dt.days
-    days = days.where(days >= 0, 0)
-
+    days = days.where(days >= 0, 0)  # if latest update is in the future
     df["DaysSinceLatestUpdate"] = days
 
-    # stale if missing Latest Update OR days > threshold
     df["_is_stale"] = df["_latest_update_dt"].isna() | (df["DaysSinceLatestUpdate"] > STALE_THRESHOLD_DAYS)
     return df
 
 
 def drop_internal_cols_for_output(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove helper & routing columns from final outputs."""
     cols_to_drop = {
         DEAL_TYPE_COL,
         ASSET_CLASS_COL,
@@ -138,57 +152,74 @@ def main():
     # 1) Read files
     df = read_main_data(MAIN_DATA_PATH)
 
-    asset_map_df = pd.read_excel(ASSET_CLASS_MAPPING_PATH, sheet_name=ASSET_CLASS_MAPPING_SHEET)
+    asset_map_df = read_table(ASSET_CLASS_MAPPING_PATH, sheet=ASSET_CLASS_MAPPING_SHEET)
     deal_to_asset = build_assetclass_lookup(asset_map_df)
 
     column_mapping = read_column_mapping(COLUMN_MAPPING_PATH)
 
-    # 2) Assign SSFA_AssetClass based on Deal Type
+    # 2) Build exceptions lookup (optional)
+    exception_lookup = {}
+    if EXCEPTIONS_PATH:
+        ex_df = read_table(EXCEPTIONS_PATH, sheet=EXCEPTIONS_SHEET)
+        exception_lookup = build_exception_lookup(ex_df)
+
+    # 3) Assign SSFA_AssetClass with exception overrides
     if DEAL_TYPE_COL not in df.columns:
         raise KeyError(f"Main data is missing required column: '{DEAL_TYPE_COL}'")
+    if DEAL_TRANCHE_ID_COL not in df.columns:
+        raise KeyError(f"Main data is missing required column: '{DEAL_TRANCHE_ID_COL}'")
 
     df[DEAL_TYPE_COL] = df[DEAL_TYPE_COL].astype(str).str.strip()
+    df[DEAL_TRANCHE_ID_COL] = df[DEAL_TRANCHE_ID_COL].astype(str).str.strip()
+
+    # Default mapping from Deal Type
     df[ASSET_CLASS_COL] = df[DEAL_TYPE_COL].map(deal_to_asset).fillna(ERROR_CLASS_VALUE)
 
-    # 3) Compute stale flags
+    # Override for exceptions where DealTrancheID is listed
+    # (these rows "do not check mapping" - we force exception value)
+    override = df[DEAL_TRANCHE_ID_COL].map(exception_lookup)
+    df.loc[override.notna(), ASSET_CLASS_COL] = override[override.notna()].astype(str)
+
+    # 4) Compute stale flags
     df = compute_stale_flags(df, AS_OF_DATE)
 
-    # 4) Create special DataFrames
+    # 5) Special DataFrames (no duplicates by design)
     errors_df = df[df[ASSET_CLASS_COL].astype(str) == ERROR_CLASS_VALUE].copy()
-    # StaleData excludes Error rows to avoid overlap with Errors sheet
     stale_df = df[(df["_is_stale"]) & (df[ASSET_CLASS_COL].astype(str) != ERROR_CLASS_VALUE)].copy()
 
-    # 5) AssetClass sheets from: NON-ERROR and NON-STALE only
+    # 6) AssetClass sheets from: NON-ERROR and NON-STALE only
     base_for_asset_sheets = df[(df[ASSET_CLASS_COL].astype(str) != ERROR_CLASS_VALUE) & (~df["_is_stale"])].copy()
-
     asset_classes = sorted(base_for_asset_sheets[ASSET_CLASS_COL].dropna().astype(str).unique().tolist())
 
-    # 6) Export (asset classes first, then StaleData, then Errors)
+    # 7) Export: asset classes first, then StaleData, then Errors
     with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
         # Asset class tabs
         for ac in asset_classes:
             sub = base_for_asset_sheets[base_for_asset_sheets[ASSET_CLASS_COL].astype(str) == ac].copy()
 
             keep_cols_from_mapping = column_mapping.get(ac, [])
-
             if keep_cols_from_mapping:
-                # Ensure we only keep columns that actually exist
                 keep_existing = [c for c in keep_cols_from_mapping if c in sub.columns]
-                sub = sub.loc[:, keep_existing] if keep_existing else sub
+                if keep_existing:
+                    sub = sub.loc[:, keep_existing]
 
             sub_out = drop_internal_cols_for_output(sub)
-            sheet_name = sanitize_sheet_name(ac)
-            sub_out.to_excel(writer, sheet_name=sheet_name, index=False)
+            sub_out.to_excel(writer, sheet_name=sanitize_sheet_name(ac), index=False)
 
         # StaleData (second last)
-        stale_out = drop_internal_cols_for_output(stale_df)
-        stale_out.to_excel(writer, sheet_name=sanitize_sheet_name(STALE_SHEET_NAME), index=False)
+        drop_internal_cols_for_output(stale_df).to_excel(
+            writer, sheet_name=sanitize_sheet_name(STALE_SHEET_NAME), index=False
+        )
 
         # Errors (last)
-        errors_out = drop_internal_cols_for_output(errors_df)
-        errors_out.to_excel(writer, sheet_name=sanitize_sheet_name(ERROR_SHEET_NAME), index=False)
+        drop_internal_cols_for_output(errors_df).to_excel(
+            writer, sheet_name=sanitize_sheet_name(ERROR_SHEET_NAME), index=False
+        )
 
-    print(f"Done. Exported {len(asset_classes)} asset class sheet(s) + {STALE_SHEET_NAME} + {ERROR_SHEET_NAME} to: {OUTPUT_PATH}")
+    print(
+        f"Done. Exported {len(asset_classes)} asset class sheet(s) + "
+        f"{STALE_SHEET_NAME} + {ERROR_SHEET_NAME} to: {OUTPUT_PATH}"
+    )
 
 
 if __name__ == "__main__":
