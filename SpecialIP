@@ -1,6 +1,275 @@
-sub = base_for_asset_sheets[
-    base_for_asset_sheets[ASSET_CLASS_COL].astype(str) == ac
-].copy()
+import pandas as pd
+import numpy as np
 
-# NEW: oldest first
-sub = sub.sort_values("_latest_update_dt", ascending=True)
+# ==========================
+# KONFIGURACJA – DO EDYCJI
+# ==========================
+
+# Ścieżki do plików wejściowych
+INPUT_Q3_PATH = r"sciezka/do/pliku_Q3.csv"
+INPUT_Q4_PATH = r"sciezka/do/pliku_Q4.csv"
+
+# Typ pliku: "csv" lub "excel"
+INPUT_FILE_TYPE = "csv"   # albo "excel"
+
+# Nazwy kolumn w plikach wejściowych
+COL_CUSIP      = "cusip"
+COL_EAD        = "ead"
+COL_RWA        = "rwa"
+COL_KG         = "kg"
+COL_ATTACH     = "attachment"
+COL_DETACH     = "detachment"
+COL_W          = "w"
+COL_P          = "p"
+
+# Kolejność faktorów do dekompozycji (ścieżka sekwencyjna)
+FACTOR_ORDER = [COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P]
+
+
+# ======================================
+# FUNKCJA: RISK WEIGHT z SSFA z faktorów
+# ======================================
+
+def compute_rw_from_factors(kg, attachment, detachment, w, p):
+    """
+    TODO: WSTAW TU REALNĄ FORMUŁĘ SSFA DLA RW !!!
+    Poniżej jest tylko 'placeholder', żeby skrypt się wykonywał.
+    """
+
+    # ----- PRZYKŁADOWY DUMMY: ZAMIEN NA SWÓJ WZÓR -----
+    # Ten dummy zwraca po prostu kg * 1250% przycięte do 1250%
+    # (to NIE jest pełna, poprawna implementacja SSFA!)
+    rw = min(kg * 12.5, 12.5)   # 12.5 = 1250% jako 12.5
+    return rw
+
+
+# ==========================
+# FUNKCJE POMOCNICZE
+# ==========================
+
+def read_input(path: str):
+    if INPUT_FILE_TYPE.lower() == "csv":
+        return pd.read_csv(path)
+    elif INPUT_FILE_TYPE.lower() == "excel":
+        return pd.read_excel(path)
+    else:
+        raise ValueError("INPUT_FILE_TYPE musi być 'csv' albo 'excel'.")
+
+
+def aggregate_by_cusip(df: pd.DataFrame, period_label: str) -> pd.DataFrame:
+    """
+    Agregacja po CUSIP:
+    - sumujemy EAD i RWA,
+    - liczymy EAD-ważone średnie faktorów (kg, attachment, detachment, w, p).
+    """
+    # Upewnij się, że mamy tylko potrzebne kolumny
+    cols_needed = [
+        COL_CUSIP, COL_EAD, COL_RWA,
+        COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P
+    ]
+    missing = [c for c in cols_needed if c not in df.columns]
+    if missing:
+        raise KeyError(f"W pliku brakuje kolumn: {missing}")
+
+    # Najpierw licznik: EAD * faktor
+    df = df.copy()
+    for col in [COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P]:
+        df[f"{col}_num"] = df[col] * df[COL_EAD]
+
+    grouped = df.groupby(COL_CUSIP, as_index=False).agg(
+        **{
+            f"{COL_EAD}_{period_label}": (COL_EAD, "sum"),
+            f"{COL_RWA}_{period_label}": (COL_RWA, "sum"),
+        }
+    )
+
+    # Dołącz wagowane sumy do grupy, żeby policzyć średnie
+    num_cols = [f"{COL_KG}_num", f"{COL_ATTACH}_num", f"{COL_DETACH}_num",
+                f"{COL_W}_num", f"{COL_P}_num"]
+    df_num = df.groupby(COL_CUSIP, as_index=False)[num_cols].sum()
+
+    grouped = grouped.merge(df_num, on=COL_CUSIP, how="left")
+
+    # EAD-ważone średnie faktorów
+    ead_col = f"{COL_EAD}_{period_label}"
+
+    for col, num_col in zip(
+            [COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P],
+            num_cols
+    ):
+        grouped[f"{col}_{period_label}"] = grouped[num_col] / grouped[ead_col]
+        grouped[f"{col}_{period_label}"] = grouped[f"{col}_{period_label}"].replace(
+            [np.inf, -np.inf], np.nan
+        )
+
+    # Usuń pomocnicze numery
+    grouped.drop(columns=num_cols, inplace=True)
+
+    return grouped
+
+
+def factor_path_effects_row(row) -> pd.Series:
+    """
+    Dekompozycja efektu faktorów na poziomie pojedynczego CUSIP:
+    sekwencyjnie zmieniamy kg, attachment, detachment, w, p z wartości Q3 na Q4
+    i patrzymy jaki to ma wpływ na RWA.
+
+    Wynik: seria z kolumnami "<factor>_effect".
+    """
+    ead4 = row[f"{COL_EAD}_Q4"]
+
+    # Jeśli w Q4 EAD = 0, nie ma sensu liczyć efektu faktorów (zero RWA)
+    if ead4 == 0 or pd.isna(ead4):
+        return pd.Series({f"{f}_effect": 0.0 for f in FACTOR_ORDER})
+
+    # Zbuduj dict faktorów Q3 i Q4
+    factors_q3 = {
+        COL_KG:      row[f"{COL_KG}_Q3"],
+        COL_ATTACH:  row[f"{COL_ATTACH}_Q3"],
+        COL_DETACH:  row[f"{COL_DETACH}_Q3"],
+        COL_W:       row[f"{COL_W}_Q3"],
+        COL_P:       row[f"{COL_P}_Q3"],
+    }
+    factors_q4 = {
+        COL_KG:      row[f"{COL_KG}_Q4"],
+        COL_ATTACH:  row[f"{COL_ATTACH}_Q4"],
+        COL_DETACH:  row[f"{COL_DETACH}_Q4"],
+        COL_W:       row[f"{COL_W}_Q4"],
+        COL_P:       row[f"{COL_P}_Q4"],
+    }
+
+    # Start: RW dla Q3 (wszystkie faktory Q3)
+    rw_curr = compute_rw_from_factors(
+        kg=factors_q3[COL_KG],
+        attachment=factors_q3[COL_ATTACH],
+        detachment=factors_q3[COL_DETACH],
+        w=factors_q3[COL_W],
+        p=factors_q3[COL_P],
+    )
+
+    effects = {}
+    curr_factors = factors_q3.copy()
+
+    for f in FACTOR_ORDER:
+        # podmień jeden faktor na wersję Q4
+        curr_factors[f] = factors_q4[f]
+
+        rw_new = compute_rw_from_factors(
+            kg=curr_factors[COL_KG],
+            attachment=curr_factors[COL_ATTACH],
+            detachment=curr_factors[COL_DETACH],
+            w=curr_factors[COL_W],
+            p=curr_factors[COL_P],
+        )
+
+        rwa_diff = (rw_new - rw_curr) * ead4
+        effects[f"{f}_effect"] = rwa_diff
+
+        rw_curr = rw_new
+
+    return pd.Series(effects)
+
+
+# ==========================
+# GŁÓWNA LOGIKA
+# ==========================
+
+def main():
+    # 1. Wczytanie danych
+    df_q3_raw = read_input(INPUT_Q3_PATH)
+    df_q4_raw = read_input(INPUT_Q4_PATH)
+
+    # 2. Agregacja po CUSIP
+    df_q3 = aggregate_by_cusip(df_q3_raw, "Q3")
+    df_q4 = aggregate_by_cusip(df_q4_raw, "Q4")
+
+    # 3. Połączenie Q3 i Q4 po CUSIP
+    df = df_q3.merge(df_q4, on=COL_CUSIP, how="outer", indicator=True)
+
+    # 4. Podstawowe sumy / total RWA
+    total_rwa_q3 = df[f"{COL_RWA}_Q3"].sum(skipna=True)
+    total_rwa_q4 = df[f"{COL_RWA}_Q4"].sum(skipna=True)
+    delta_rwa_total = total_rwa_q4 - total_rwa_q3
+
+    # 5. Maski: nowe, znikniete, wspólne
+    mask_new     = df["_merge"] == "right_only"   # tylko w Q4
+    mask_gone    = df["_merge"] == "left_only"    # tylko w Q3
+    mask_common  = df["_merge"] == "both"         # wspólne
+
+    # 6. Efekt nowych papierów (RWA nowych CUSIPów)
+    new_papers_effect = df.loc[mask_new, f"{COL_RWA}_Q4"].sum(skipna=True)
+
+    # 7. Efekt zniknięcia papierów (sprzedaż / full paydown)
+    #    liczony jako ujemny wkład do zmiany RWA
+    gone_papers_effect = - df.loc[mask_gone, f"{COL_RWA}_Q3"].sum(skipna=True)
+
+    # 8. Analiza wspólnych CUSIPów (zmiana EAD i faktorów)
+    common = df.loc[mask_common].copy()
+
+    # RW_Q3 i RW_Q4 wyliczone z RWA / EAD jako sanity check / fallback
+    common["RW_Q3_from_data"] = common[f"{COL_RWA}_Q3"] / common[f"{COL_EAD}_Q3"]
+    common["RW_Q4_from_data"] = common[f"{COL_RWA}_Q4"] / common[f"{COL_EAD}_Q4"]
+    common["RW_Q3_from_data"] = common["RW_Q3_from_data"].replace(
+        [np.inf, -np.inf], 0
+    ).fillna(0)
+    common["RW_Q4_from_data"] = common["RW_Q4_from_data"].replace(
+        [np.inf, -np.inf], 0
+    ).fillna(0)
+
+    # 8a. Efekt zmiany ekspozycji na wspólnych papierach:
+    #      Exposure effect = RW_Q3 * (EAD_Q4 - EAD_Q3)
+    common["exposure_effect"] = common["RW_Q3_from_data"] * (
+        common[f"{COL_EAD}_Q4"] - common[f"{COL_EAD}_Q3"]
+    )
+    exposure_effect_existing = common["exposure_effect"].sum(skipna=True)
+
+    # 8b. Efekt faktorów (pojedynczo: kg, attachment, detachment, w, p)
+    factor_effects_df = common.apply(factor_path_effects_row, axis=1)
+    for col in factor_effects_df.columns:
+        common[col] = factor_effects_df[col]
+
+    # Suma efektów faktorów (per faktor i łączna)
+    factor_effect_sums = {
+        col: common[col].sum(skipna=True) for col in factor_effects_df.columns
+    }
+    total_factor_effect = sum(factor_effect_sums.values())
+
+    # 9. Złożenie dekompozycji
+    total_explained = (
+        new_papers_effect
+        + gone_papers_effect
+        + exposure_effect_existing
+        + total_factor_effect
+    )
+
+    unexplained = delta_rwa_total - total_explained
+
+    # ==========================
+    # OUTPUT – PODSUMOWANIE
+    # ==========================
+
+    print("===== PODSUMOWANIE RWA ATTRIBUTION (SSFA) =====")
+    print(f"Total RWA Q3: {total_rwa_q3:,.2f}")
+    print(f"Total RWA Q4: {total_rwa_q4:,.2f}")
+    print(f"ΔRWA (Q4 - Q3): {delta_rwa_total:,.2f}")
+    print()
+
+    print("Kontrybucje (signed):")
+    print(f"  + Nowe papiery (tylko Q4):        {new_papers_effect:,.2f}")
+    print(f"  + Zniknięte papiery (sell/payoff):{gone_papers_effect:,.2f}")
+    print(f"  + Zmiana EAD na wspólnych:        {exposure_effect_existing:,.2f}")
+    print(f"  + Efekt faktorów ogółem:          {total_factor_effect:,.2f}")
+    print()
+
+    print("Rozbicie efektu faktorów:")
+    for k, v in factor_effect_sums.items():
+        factor_name = k.replace("_effect", "")
+        print(f"    - {factor_name}: {v:,.2f}")
+
+    print()
+    print(f"Suma wyjaśniona (powinna ≈ ΔRWA): {total_explained:,.2f}")
+    print(f"Niewyjaśnione (rounding / model): {unexplained:,.2f}")
+
+
+if __name__ == "__main__":
+    main()
