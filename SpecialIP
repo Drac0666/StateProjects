@@ -23,7 +23,7 @@ COL_DETACH     = "detachment"
 COL_W          = "w"
 COL_P          = "p"
 
-# Lista faktorów do Shapley (kolejność nie ma znaczenia dla wyniku Shapley)
+# Lista faktorów (wygodnie w jednym miejscu)
 FACTOR_LIST = [COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P]
 
 
@@ -89,7 +89,7 @@ def aggregate_by_cusip(df: pd.DataFrame, period_label: str) -> pd.DataFrame:
     )
 
     num_cols = [f"{COL_KG}_num", f"{COL_ATTACH}_num", f"{COL_DETACH}_num",
-                f"{COL_W}_num", f"{COL_P}_num]
+                f"{COL_W}_num", f"{COL_P}_num"]
     df_num = df.groupby(COL_CUSIP, as_index=False)[num_cols].sum()
 
     grouped = grouped.merge(df_num, on=COL_CUSIP, how="left")
@@ -120,22 +120,16 @@ def factor_shapley_effects_row(row) -> pd.Series:
     Shapley values dla efektu poszczególnych faktorów na ΔRWA
     dla pojedynczego CUSIPa.
 
-    Założenie:
-      - start: wszystkie faktory w poziomie Q3
-      - koniec: wszystkie faktory w poziomie Q4
-      - EAD = EAD_Q4 (liczymy efekt na docelowej ekspozycji)
+    Start: wszystkie faktory w poziomie Q3
+    Koniec: wszystkie faktory w poziomie Q4
+    EAD = EAD_Q4 (efekt na docelowej ekspozycji)
 
-    Dla każdej permutacji faktorów bierzemy marginalny wkład danego faktora
-    (zmiana RW przy przejściu Q3->Q4 dla tego faktora) i potem uśredniamy
-    po wszystkich permutacjach.
-
-    Wynik: Series z kolumnami "<factor>_effect" w jednostkach RWA.
+    Wynik: Series z kolumnami "<factor>_shapley_effect" w jednostkach RWA.
     """
     ead4 = row[f"{COL_EAD}_Q4"]
 
-    # Jeśli EAD w Q4 = 0 lub NaN, nie ma efektu faktorów (RWA=0)
     if pd.isna(ead4) or ead4 == 0:
-        return pd.Series({f"{f}_effect": 0.0 for f in FACTOR_LIST})
+        return pd.Series({f"{f}_shapley_effect": 0.0 for f in FACTOR_LIST})
 
     # Faktor Q3 i Q4 w słownikach
     factors_q3 = {
@@ -153,22 +147,18 @@ def factor_shapley_effects_row(row) -> pd.Series:
         COL_P:       row.get(f"{COL_P}_Q4"),
     }
 
-    # Jeśli czegoś brakuje (NaN), traktujemy jako 0 – możesz to dostosować
+    # NaN → 0 (ew. możesz zmienić na inny default)
     for f in FACTOR_LIST:
         if pd.isna(factors_q3[f]):
             factors_q3[f] = 0.0
         if pd.isna(factors_q4[f]):
             factors_q4[f] = 0.0
 
-    # Inicjalizacja sum shapley'owskich
     shapley_sums = {f: 0.0 for f in FACTOR_LIST}
-
-    # Wszystkie permutacje faktorów
     perms = list(permutations(FACTOR_LIST))
     n_perm = len(perms)
 
     for perm in perms:
-        # Start: wszystkie faktory w poziomie Q3
         curr_factors = factors_q3.copy()
 
         rw_prev = compute_rw_from_factors(
@@ -192,17 +182,84 @@ def factor_shapley_effects_row(row) -> pd.Series:
             )
 
             delta_rw = rw_new - rw_prev
-
-            # marginalny wkład tego faktora w tej permutacji
             shapley_sums[f] += delta_rw
 
             rw_prev = rw_new
 
-    # Uśrednienie po wszystkich permutacjach i przeskalowanie przez EAD_Q4
     effects = {
-        f"{f}_effect": (shapley_sums[f] / n_perm) * ead4
+        f"{f}_shapley_effect": (shapley_sums[f] / n_perm) * ead4
         for f in FACTOR_LIST
     }
+
+    return pd.Series(effects)
+
+
+# ======================================
+# PURE (counterfactual) efekt faktorów
+# ======================================
+
+def factor_pure_effects_row(row) -> pd.Series:
+    """
+    PURE / counterfactual:
+    Zakładamy:
+      - start: wszystkie faktory = Q3
+      - zmieniamy JEDEN faktor na Q4, reszta zostaje na Q3
+      - EAD = EAD_Q4
+
+    ΔRWA_f_pure = [ RW(Q3 z f=Q4) − RW(Q3) ] * EAD_Q4
+    """
+    ead4 = row[f"{COL_EAD}_Q4"]
+
+    if pd.isna(ead4) or ead4 == 0:
+        return pd.Series({f"{f}_pure_effect": 0.0 for f in FACTOR_LIST})
+
+    factors_q3 = {
+        COL_KG:      row.get(f"{COL_KG}_Q3"),
+        COL_ATTACH:  row.get(f"{COL_ATTACH}_Q3"),
+        COL_DETACH:  row.get(f"{COL_DETACH}_Q3"),
+        COL_W:       row.get(f"{COL_W}_Q3"),
+        COL_P:       row.get(f"{COL_P}_Q3"),
+    }
+    factors_q4 = {
+        COL_KG:      row.get(f"{COL_KG}_Q4"),
+        COL_ATTACH:  row.get(f"{COL_ATTACH}_Q4"),
+        COL_DETACH:  row.get(f"{COL_DETACH}_Q4"),
+        COL_W:       row.get(f"{COL_W}_Q4"),
+        COL_P:       row.get(f"{COL_P}_Q4"),
+    }
+
+    for f in FACTOR_LIST:
+        if pd.isna(factors_q3[f]):
+            factors_q3[f] = 0.0
+        if pd.isna(factors_q4[f]):
+            factors_q4[f] = 0.0
+
+    # RW przy wszystkich faktorach z Q3
+    rw_q3 = compute_rw_from_factors(
+        kg=factors_q3[COL_KG],
+        attachment=factors_q3[COL_ATTACH],
+        detachment=factors_q3[COL_DETACH],
+        w=factors_q3[COL_W],
+        p=factors_q3[COL_P],
+    )
+
+    effects = {}
+
+    for f in FACTOR_LIST:
+        # kopia Q3, ale dany faktor = Q4
+        curr = factors_q3.copy()
+        curr[f] = factors_q4[f]
+
+        rw_cf = compute_rw_from_factors(
+            kg=curr[COL_KG],
+            attachment=curr[COL_ATTACH],
+            detachment=curr[COL_DETACH],
+            w=curr[COL_W],
+            p=curr[COL_P],
+        )
+
+        delta_rw = rw_cf - rw_q3
+        effects[f"{f}_pure_effect"] = delta_rw * ead4
 
     return pd.Series(effects)
 
@@ -223,7 +280,7 @@ def main():
     # 3. Połączenie Q3 i Q4 po CUSIP
     df = df_q3.merge(df_q4, on=COL_CUSIP, how="outer", indicator=True)
 
-    # 4. Podstawowe sumy / total RWA
+    # 4. Total RWA
     total_rwa_q3 = df[f"{COL_RWA}_Q3"].sum(skipna=True)
     total_rwa_q4 = df[f"{COL_RWA}_Q4"].sum(skipna=True)
     delta_rwa_total = total_rwa_q4 - total_rwa_q3
@@ -233,16 +290,16 @@ def main():
     mask_gone    = df["_merge"] == "left_only"    # tylko w Q3
     mask_common  = df["_merge"] == "both"         # wspólne
 
-    # 6. Efekt nowych papierów (RWA nowych CUSIPów)
+    # 6. Efekt nowych papierów
     new_papers_effect = df.loc[mask_new, f"{COL_RWA}_Q4"].sum(skipna=True)
 
-    # 7. Efekt zniknięcia papierów (sprzedaż / full paydown)
+    # 7. Efekt zniknięcia papierów
     gone_papers_effect = - df.loc[mask_gone, f"{COL_RWA}_Q3"].sum(skipna=True)
 
-    # 8. Analiza wspólnych CUSIPów (zmiana EAD i faktorów)
+    # 8. Wspólne CUSIPy
     common = df.loc[mask_common].copy()
 
-    # RW z danych (fallback / sanity check)
+    # RW z danych – używane do exposure effect
     common["RW_Q3_from_data"] = common[f"{COL_RWA}_Q3"] / common[f"{COL_EAD}_Q3"]
     common["RW_Q4_from_data"] = common[f"{COL_RWA}_Q4"] / common[f"{COL_EAD}_Q4"]
     common["RW_Q3_from_data"] = common["RW_Q3_from_data"].replace(
@@ -252,29 +309,38 @@ def main():
         [np.inf, -np.inf], 0
     ).fillna(0)
 
-    # 8a. Efekt zmiany ekspozycji na wspólnych papierach:
-    #      Exposure effect = RW_Q3 * (EAD_Q4 - EAD_Q3)
+    # 8a. Efekt ekspozycji (na wspólnych)
     common["exposure_effect"] = common["RW_Q3_from_data"] * (
         common[f"{COL_EAD}_Q4"] - common[f"{COL_EAD}_Q3"]
     )
     exposure_effect_existing = common["exposure_effect"].sum(skipna=True)
 
-    # 8b. Efekt faktorów: Shapley per faktor
-    factor_effects_df = common.apply(factor_shapley_effects_row, axis=1)
-    for col in factor_effects_df.columns:
-        common[col] = factor_effects_df[col]
+    # 8b. Efekt faktorów – Shapley
+    shapley_df = common.apply(factor_shapley_effects_row, axis=1)
+    for col in shapley_df.columns:
+        common[col] = shapley_df[col]
 
-    factor_effect_sums = {
-        col: common[col].sum(skipna=True) for col in factor_effects_df.columns
+    shapley_sums = {
+        col: common[col].sum(skipna=True) for col in shapley_df.columns
     }
-    total_factor_effect = sum(factor_effect_sums.values())
+    total_shapley_effect = sum(shapley_sums.values())
 
-    # 9. Złożenie dekompozycji
+    # 8c. Efekt faktorów – PURE (counterfactual)
+    pure_df = common.apply(factor_pure_effects_row, axis=1)
+    for col in pure_df.columns:
+        common[col] = pure_df[col]
+
+    pure_sums = {
+        col: common[col].sum(skipna=True) for col in pure_df.columns
+    }
+    total_pure_effect = sum(pure_sums.values())  # to NIE musi = total_shapley_effect
+
+    # 9. Złożenie dekompozycji (używamy Shapley dla "oficjalnego" factor effect)
     total_explained = (
         new_papers_effect
         + gone_papers_effect
         + exposure_effect_existing
-        + total_factor_effect
+        + total_shapley_effect
     )
 
     unexplained = delta_rwa_total - total_explained
@@ -283,27 +349,32 @@ def main():
     # OUTPUT – PODSUMOWANIE
     # ==========================
 
-    print("===== PODSUMOWANIE RWA ATTRIBUTION (SSFA, Shapley) =====")
+    print("===== RWA ATTRIBUTION (SSFA) =====")
     print(f"Total RWA Q3: {total_rwa_q3:,.2f}")
     print(f"Total RWA Q4: {total_rwa_q4:,.2f}")
     print(f"ΔRWA (Q4 - Q3): {delta_rwa_total:,.2f}")
     print()
 
-    print("Kontrybucje (signed):")
+    print("Kontrybucje (signed, oficjalnie używamy Shapley dla faktorów):")
     print(f"  + Nowe papiery (tylko Q4):         {new_papers_effect:,.2f}")
     print(f"  + Zniknięte papiery (sell/payoff): {gone_papers_effect:,.2f}")
     print(f"  + Zmiana EAD na wspólnych:         {exposure_effect_existing:,.2f}")
-    print(f"  + Efekt faktorów ogółem (Shapley): {total_factor_effect:,.2f}")
+    print(f"  + Efekt faktorów ogółem (Shapley): {total_shapley_effect:,.2f}")
+    print()
+    print(f"Suma wyjaśniona (powinna ≈ ΔRWA):   {total_explained:,.2f}")
+    print(f"Niewyjaśnione (rounding / model):   {unexplained:,.2f}")
     print()
 
-    print("Rozbicie efektu faktorów (Shapley):")
-    for k, v in factor_effect_sums.items():
-        factor_name = k.replace("_effect", "")
-        print(f"    - {factor_name}: {v:,.2f}")
+    print("Rozbicie efektu faktorów – Shapley:")
+    for f in FACTOR_LIST:
+        key = f"{f}_shapley_effect"
+        print(f"    {f:12s}: {shapley_sums.get(key, 0.0):,.2f}")
 
     print()
-    print(f"Suma wyjaśniona (powinna ≈ ΔRWA): {total_explained:,.2f}")
-    print(f"Niewyjaśnione (rounding / model): {unexplained:,.2f}")
+    print("Rozbicie efektu faktorów – PURE (co-if: tylko ten faktor się zmienia):")
+    for f in FACTOR_LIST:
+        key = f"{f}_pure_effect"
+        print(f"    {f:12s}: {pure_sums.get(key, 0.0):,.2f}")
 
 
 if __name__ == "__main__":
