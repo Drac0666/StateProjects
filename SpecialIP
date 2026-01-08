@@ -22,9 +22,9 @@ COL_ATTACH       = "attachment"
 COL_DETACH       = "detachment"
 COL_W            = "w"
 COL_P            = "p"
-COL_ASSET_CLASS  = "asset_class"   # NOWE: asset_class
+COL_ASSET_CLASS  = "asset_class"   # asset class
 
-# Lista faktorów (wygodnie w jednym miejscu)
+# Lista faktorów
 FACTOR_LIST = [COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P]
 
 
@@ -35,17 +35,9 @@ FACTOR_LIST = [COL_KG, COL_ATTACH, COL_DETACH, COL_W, COL_P]
 def compute_rw_from_factors(kg, attachment, detachment, w, p):
     """
     TODO: WSTAW TU REALNĄ FORMUŁĘ SSFA DLA RW !!!
-    Poniżej jest tylko 'placeholder', żeby skrypt się wykonywał.
-
-    Upewnij się, że jednostki RW są spójne z tym, jak liczysz RWA:
-        RWA = RW * EAD
-    np. RW jako liczba typu 0.15 (15%) albo 1.25 (125%).
+    Poniżej placeholder, żeby skrypt się wykonywał.
     """
-
-    # ----- PRZYKŁADOWY DUMMY: ZAMIEN NA SWÓJ WZÓR -----
-    # Ten dummy zwraca po prostu kg * 12.5 przycięte do 12.5
-    # (to NIE jest pełna, poprawna implementacja SSFA!)
-    rw = min(kg * 12.5, 12.5)
+    rw = min(kg * 12.5, 12.5)  # DUMMY
     return rw
 
 
@@ -94,7 +86,6 @@ def aggregate_by_cusip(df: pd.DataFrame, period_label: str) -> pd.DataFrame:
 
     grouped = df.groupby(COL_CUSIP, as_index=False).agg(agg_dict)
 
-    # Zmieniamy nazwy bazowych kolumn na <col>_<period_label>
     grouped.rename(columns={
         COL_EAD:         f"{COL_EAD}_{period_label}",
         COL_RWA:         f"{COL_RWA}_{period_label}",
@@ -111,7 +102,6 @@ def aggregate_by_cusip(df: pd.DataFrame, period_label: str) -> pd.DataFrame:
             [np.inf, -np.inf], np.nan
         )
 
-    # Usuwamy *_num
     num_cols = [f"{col}_num" for col in FACTOR_LIST]
     grouped.drop(columns=num_cols, inplace=True)
 
@@ -123,16 +113,6 @@ def aggregate_by_cusip(df: pd.DataFrame, period_label: str) -> pd.DataFrame:
 # ======================================
 
 def factor_shapley_effects_row(row) -> pd.Series:
-    """
-    Shapley values dla efektu poszczególnych faktorów na ΔRWA
-    dla pojedynczego CUSIPa.
-
-    Start: wszystkie faktory w poziomie Q3
-    Koniec: wszystkie faktory w poziomie Q4
-    EAD = EAD_Q4 (efekt na docelowej ekspozycji)
-
-    Wynik: Series z kolumnami "<factor>_shapley_effect" w jednostkach RWA.
-    """
     ead4 = row[f"{COL_EAD}_Q4"]
 
     if pd.isna(ead4) or ead4 == 0:
@@ -203,15 +183,6 @@ def factor_shapley_effects_row(row) -> pd.Series:
 # ======================================
 
 def factor_pure_effects_row(row) -> pd.Series:
-    """
-    PURE / counterfactual:
-    Zakładamy:
-      - start: wszystkie faktory = Q3
-      - zmieniamy JEDEN faktor na Q4, reszta zostaje na Q3
-      - EAD = EAD_Q4
-
-    ΔRWA_f_pure = [ RW(Q3 z f=Q4) − RW(Q3) ] * EAD_Q4
-    """
     ead4 = row[f"{COL_EAD}_Q4"]
 
     if pd.isna(ead4) or ead4 == 0:
@@ -275,54 +246,59 @@ def main():
     df_q3_raw = read_input(INPUT_Q3_PATH)
     df_q4_raw = read_input(INPUT_Q4_PATH)
 
-    # 2. Agregacja po CUSIP (z asset_class)
+    # 2. Agregacja po CUSIP
     df_q3 = aggregate_by_cusip(df_q3_raw, "Q3")
     df_q4 = aggregate_by_cusip(df_q4_raw, "Q4")
 
     # 3. Połączenie Q3 i Q4 po CUSIP
     df = df_q3.merge(df_q4, on=COL_CUSIP, how="outer", indicator=True)
 
-    # 3a. Jedna kolumna asset_class (A – stałe per CUSIP)
+    # asset_class (stałe per CUSIP)
     df[COL_ASSET_CLASS] = df[f"{COL_ASSET_CLASS}_Q3"].combine_first(
         df[f"{COL_ASSET_CLASS}_Q4"]
     )
+
+    # Status: new / gone / common
+    df["status"] = df["_merge"].map({
+        "left_only":  "gone",
+        "right_only": "new",
+        "both":       "common"
+    })
 
     # 4. Total RWA
     total_rwa_q3 = df[f"{COL_RWA}_Q3"].sum(skipna=True)
     total_rwa_q4 = df[f"{COL_RWA}_Q4"].sum(skipna=True)
     delta_rwa_total = total_rwa_q4 - total_rwa_q3
 
-    # 5. Maski: nowe, znikniete, wspólne
-    mask_new     = df["_merge"] == "right_only"   # tylko w Q4
-    mask_gone    = df["_merge"] == "left_only"    # tylko w Q3
-    mask_common  = df["_merge"] == "both"         # wspólne
+    # 5. Maski
+    mask_new     = df["_merge"] == "right_only"
+    mask_gone    = df["_merge"] == "left_only"
+    mask_common  = df["_merge"] == "both"
 
-    # 6. Efekt nowych papierów
+    # RW z danych (dla wszystkich – new/gone będą mieć NaN/0)
+    df["RW_Q3_from_data"] = df[f"{COL_RWA}_Q3"] / df[f"{COL_EAD}_Q3"]
+    df["RW_Q4_from_data"] = df[f"{COL_RWA}_Q4"] / df[f"{COL_EAD}_Q4"]
+    df["RW_Q3_from_data"] = df["RW_Q3_from_data"].replace(
+        [np.inf, -np.inf], 0
+    ).fillna(0)
+    df["RW_Q4_from_data"] = df["RW_Q4_from_data"].replace(
+        [np.inf, -np.inf], 0
+    ).fillna(0)
+
+    # 6. Efekt nowych / znikniętych
     new_papers_effect = df.loc[mask_new, f"{COL_RWA}_Q4"].sum(skipna=True)
-
-    # 7. Efekt zniknięcia papierów
     gone_papers_effect = - df.loc[mask_gone, f"{COL_RWA}_Q3"].sum(skipna=True)
 
-    # 8. Wspólne CUSIPy
+    # 7. Wspólne CUSIPy
     common = df.loc[mask_common].copy()
 
-    # RW z danych – używane do exposure effect
-    common["RW_Q3_from_data"] = common[f"{COL_RWA}_Q3"] / common[f"{COL_EAD}_Q3"]
-    common["RW_Q4_from_data"] = common[f"{COL_RWA}_Q4"] / common[f"{COL_EAD}_Q4"]
-    common["RW_Q3_from_data"] = common["RW_Q3_from_data"].replace(
-        [np.inf, -np.inf], 0
-    ).fillna(0)
-    common["RW_Q4_from_data"] = common["RW_Q4_from_data"].replace(
-        [np.inf, -np.inf], 0
-    ).fillna(0)
-
-    # 8a. Efekt ekspozycji (na wspólnych)
+    # Exposure effect (tylko common)
     common["exposure_effect"] = common["RW_Q3_from_data"] * (
         common[f"{COL_EAD}_Q4"] - common[f"{COL_EAD}_Q3"]
     )
     exposure_effect_existing = common["exposure_effect"].sum(skipna=True)
 
-    # 8b. Efekt faktorów – Shapley
+    # Shapley (tylko common)
     shapley_df = common.apply(factor_shapley_effects_row, axis=1)
     for col in shapley_df.columns:
         common[col] = shapley_df[col]
@@ -332,7 +308,7 @@ def main():
     }
     total_shapley_effect = sum(shapley_sums.values())
 
-    # 8c. Efekt faktorów – PURE (counterfactual)
+    # Pure (tylko common)
     pure_df = common.apply(factor_pure_effects_row, axis=1)
     for col in pure_df.columns:
         common[col] = pure_df[col]
@@ -340,20 +316,24 @@ def main():
     pure_sums = {
         col: common[col].sum(skipna=True) for col in pure_df.columns
     }
-    total_pure_effect = sum(pure_sums.values())  # to NIE musi = total_shapley_effect
+    total_pure_effect = sum(pure_sums.values())
 
-    # 9. Złożenie dekompozycji (Shapley jako "oficjalny" factor effect)
+    # 8. ΔEAD, ΔRWA, ΔRW (na df – dla wszystkich statusów)
+    df["delta_ead"] = df[f"{COL_EAD}_Q4"] - df[f"{COL_EAD}_Q3"]
+    df["delta_rwa"] = df[f"{COL_RWA}_Q4"] - df[f"{COL_RWA}_Q3"]
+    df["delta_rw"]  = df["RW_Q4_from_data"] - df["RW_Q3_from_data"]
+
+    # 9. Złożenie dekompozycji (global)
     total_explained = (
         new_papers_effect
         + gone_papers_effect
         + exposure_effect_existing
         + total_shapley_effect
     )
-
     unexplained = delta_rwa_total - total_explained
 
     # ==========================
-    # OUTPUT – PODSUMOWANIE GLOBALNE
+    # OUTPUT – GLOBAL (print)
     # ==========================
 
     print("===== RWA ATTRIBUTION (SSFA) – CAŁY PORTFEL =====")
@@ -361,33 +341,17 @@ def main():
     print(f"Total RWA Q4: {total_rwa_q4:,.2f}")
     print(f"ΔRWA (Q4 - Q3): {delta_rwa_total:,.2f}")
     print()
-
-    print("Kontrybucje (signed, Shapley dla faktorów):")
-    print(f"  + Nowe papiery (tylko Q4):         {new_papers_effect:,.2f}")
-    print(f"  + Zniknięte papiery (sell/payoff): {gone_papers_effect:,.2f}")
-    print(f"  + Zmiana EAD na wspólnych:         {exposure_effect_existing:,.2f}")
-    print(f"  + Efekt faktorów ogółem (Shapley): {total_shapley_effect:,.2f}")
-    print()
-    print(f"Suma wyjaśniona (powinna ≈ ΔRWA):   {total_explained:,.2f}")
-    print(f"Niewyjaśnione (rounding / model):   {unexplained:,.2f}")
-    print()
-
-    print("Rozbicie efektu faktorów – Shapley (cały portfel):")
-    for f in FACTOR_LIST:
-        key = f"{f}_shapley_effect"
-        print(f"    {f:12s}: {shapley_sums.get(key, 0.0):,.2f}")
-
-    print()
-    print("Rozbicie efektu faktorów – PURE (co-if, cały portfel):")
-    for f in FACTOR_LIST:
-        key = f"{f}_pure_effect"
-        print(f"    {f:12s}: {pure_sums.get(key, 0.0):,.2f}")
+    print("Kontrybucje:")
+    print(f"  New:       {new_papers_effect:,.2f}")
+    print(f"  Gone:      {gone_papers_effect:,.2f}")
+    print(f"  Exposure:  {exposure_effect_existing:,.2f}")
+    print(f"  Factors:   {total_shapley_effect:,.2f}")
+    print(f"  Explained: {total_explained:,.2f}")
+    print(f"  Unexpl.:   {unexplained:,.2f}")
 
     # ==========================
-    # OUTPUT – PER ASSET CLASS
+    # BY ASSET CLASS (jak wcześniej)
     # ==========================
-
-    print("\n===== ATTRIBUTION BY ASSET CLASS =====")
 
     asset_classes = df[COL_ASSET_CLASS].dropna().unique()
     asset_classes = sorted(asset_classes)
@@ -395,21 +359,15 @@ def main():
     results_by_class = []
 
     for cls in asset_classes:
-        # całe RWA Q3/Q4 w tej klasie
         sub_all = df[df[COL_ASSET_CLASS] == cls]
         total_rwa_q3_cls = sub_all[f"{COL_RWA}_Q3"].sum(skipna=True)
         total_rwa_q4_cls = sub_all[f"{COL_RWA}_Q4"].sum(skipna=True)
         delta_rwa_cls = total_rwa_q4_cls - total_rwa_q3_cls
 
-        # nowe i zniknięte w tej klasie
-        new_eff_cls = df.loc[mask_new & (df[COL_ASSET_CLASS] == cls),
-                             f"{COL_RWA}_Q4"].sum(skipna=True)
-        gone_eff_cls = - df.loc[mask_gone & (df[COL_ASSET_CLASS] == cls),
-                                f"{COL_RWA}_Q3"].sum(skipna=True)
+        new_eff_cls = sub_all.loc[sub_all["status"] == "new", f"{COL_RWA}_Q4"].sum(skipna=True)
+        gone_eff_cls = - sub_all.loc[sub_all["status"] == "gone", f"{COL_RWA}_Q3"].sum(skipna=True)
 
-        # wspólne w tej klasie
         common_cls = common[common[COL_ASSET_CLASS] == cls]
-
         exposure_eff_cls = common_cls["exposure_effect"].sum(skipna=True)
 
         shapley_cls_sums = {
@@ -448,22 +406,60 @@ def main():
             **{f"{f}_pure":    pure_cls_sums[f"{f}_pure_effect"]      for f in FACTOR_LIST},
         })
 
-        # krótki print per klasa
-        print(f"\n--- asset_class = {cls} ---")
-        print(f"RWA Q3: {total_rwa_q3_cls:,.2f} | RWA Q4: {total_rwa_q4_cls:,.2f} | ΔRWA: {delta_rwa_cls:,.2f}")
-        print(f"  New:       {new_eff_cls:,.2f}")
-        print(f"  Gone:      {gone_eff_cls:,.2f}")
-        print(f"  Exposure:  {exposure_eff_cls:,.2f}")
-        print(f"  Factors (Shapley total): {shapley_cls_total:,.2f}")
-        print(f"  Explained: {explained_cls:,.2f}")
-        print(f"  Unexpl.:   {unexplained_cls:,.2f}")
-        print("  Factors Shapley by factor:")
-        for f in FACTOR_LIST:
-            print(f"    {f:12s}: {shapley_cls_sums[f'{f}_shapley_effect']:,.2f}")
-
-    # Jeśli chcesz pracować dalej w Pythonie, masz pełną tabelę:
     df_results_by_class = pd.DataFrame(results_by_class)
-    # np. df_results_by_class.to_excel("rwa_attribution_by_asset_class.xlsx", index=False)
+
+    # ==========================
+    # PER-CUSIP EXPORT
+    # ==========================
+
+    # Najpierw wstrzykujemy efekty z 'common' z powrotem do df (dla common rows)
+    effects_cols = (
+        ["exposure_effect"] +
+        [f"{f}_shapley_effect" for f in FACTOR_LIST] +
+        [f"{f}_pure_effect" for f in FACTOR_LIST]
+    )
+    common_effects = common[[COL_CUSIP] + effects_cols].copy()
+
+    df = df.merge(common_effects, on=COL_CUSIP, how="left", suffixes=("", "_from_common"))
+
+    # Kolumny do outputu per CUSIP
+    per_cusip_cols = [
+        COL_CUSIP,
+        COL_ASSET_CLASS,
+        "status",
+        f"{COL_EAD}_Q3", f"{COL_EAD}_Q4", "delta_ead",
+        f"{COL_RWA}_Q3", f"{COL_RWA}_Q4", "delta_rwa",
+        "RW_Q3_from_data", "RW_Q4_from_data", "delta_rw",
+        "exposure_effect",
+    ] + [f"{f}_shapley_effect" for f in FACTOR_LIST] \
+      + [f"{f}_pure_effect" for f in FACTOR_LIST]
+
+    # A) tylko common (status == 'common')
+    df_cusip_common = df[df["status"] == "common"][per_cusip_cols].copy()
+
+    # B) wszystkie cusipy
+    df_cusip_all = df[per_cusip_cols].copy()
+
+    # ==========================
+    # ZAPIS DO EXCELA
+    # ==========================
+
+    # 1) by asset class + global summary (opcjonalnie)
+    with pd.ExcelWriter("rwa_attr_by_asset_class.xlsx") as writer:
+        df_results_by_class.to_excel(writer, sheet_name="by_asset_class", index=False)
+
+    # 2) per-CUSIP tylko common
+    with pd.ExcelWriter("rwa_attr_per_cusip_common.xlsx") as writer:
+        df_cusip_common.to_excel(writer, sheet_name="common_only", index=False)
+
+    # 3) per-CUSIP wszystkie (new/gone/common)
+    with pd.ExcelWriter("rwa_attr_per_cusip_all.xlsx") as writer:
+        df_cusip_all.to_excel(writer, sheet_name="all_cusips", index=False)
+
+    print("\nPliki zapisane:")
+    print(" - rwa_attr_by_asset_class.xlsx")
+    print(" - rwa_attr_per_cusip_common.xlsx")
+    print(" - rwa_attr_per_cusip_all.xlsx")
 
 
 if __name__ == "__main__":
