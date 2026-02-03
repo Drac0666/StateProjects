@@ -1,9 +1,20 @@
-cols = ['S1', 'S2', 'S3']
+INT_renamed = INT.rename(
+    columns=lambda c: f"INT_{c}" if c != 'Deal' else c
+)
 
-df_missing = df[
-    df[cols]
-    .replace('', pd.NA)
-    .isna()
-    .any(axis=1)
-]
+rows_before = len(DF)
+
+DF_merged = DF.merge(
+    INT_renamed,
+    left_on='Security',
+    right_on='Deal',
+    how='left'
+)
+
+rows_after = len(DF_merged)
+
+if rows_before != rows_after:
+    print(f"⚠️ Row count changed! Before: {rows_before}, After: {rows_after}")
+else:
+    print(f"✅ Row count OK: {rows_before}")
 
