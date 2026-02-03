@@ -1,88 +1,82 @@
 import pandas as pd
 
-def apply_conditions_mapping(DF: pd.DataFrame,
-                             conditions: pd.DataFrame,
-                             ConditionColumns: list,
-                             no_mapping_value: str = "NO MAPPING",
-                             first_match_wins: bool = True) -> pd.DataFrame:
-    # ---- 1) Validate condition columns exist in both ----
+def apply_conditions_mapping_specificity(
+    DF: pd.DataFrame,
+    conditions: pd.DataFrame,
+    ConditionColumns: list,
+    no_mapping_value: str = "NO MAPPING",
+    tie_break: str = "first"  # "first" or "last"
+) -> pd.DataFrame:
+    # ---- 1) Validate ----
     missing_in_df = [c for c in ConditionColumns if c not in DF.columns]
     missing_in_cond = [c for c in ConditionColumns if c not in conditions.columns]
     if missing_in_df or missing_in_cond:
         raise SystemExit("Critical Error Condition Columns are missing")
 
-    # ---- 2) Determine mapping columns (to be assigned) ----
+    # ---- 2) Mapping columns = everything else in conditions ----
     mapping_cols = [c for c in conditions.columns if c not in ConditionColumns]
 
-    # If DF doesn't have them yet, create them
+    # Ensure DF has mapping cols
     for c in mapping_cols:
         if c not in DF.columns:
             DF[c] = pd.NA
 
-    # ---- helpers for blanks / allowed parsing ----
     def is_blank(x) -> bool:
-        if x is None or (isinstance(x, float) and pd.isna(x)) or pd.isna(x):
-            return True
-        if isinstance(x, str) and x.strip() == "":
-            return True
-        return False
+        return pd.isna(x) or (isinstance(x, str) and x.strip() == "")
 
     def parse_allowed(cell):
-        """
-        Returns:
-          - None if blank (wildcard)
-          - set of allowed string values otherwise
-        """
+        # blank -> wildcard (None)
         if is_blank(cell):
             return None
-        # split on |, strip whitespace
         parts = [p.strip() for p in str(cell).split("|")]
-        # remove empty tokens
         parts = [p for p in parts if p != ""]
         return set(parts)
 
-    # ---- 3) Precompile rules from conditions ----
+    # ---- 3) Precompile rules with a "specificity score" ----
     rules = []
-    for _, r in conditions.iterrows():
+    for idx, r in conditions.reset_index(drop=True).iterrows():
         allowed_by_col = {col: parse_allowed(r[col]) for col in ConditionColumns}
+        specificity = sum(allowed_by_col[col] is not None for col in ConditionColumns)  # count non-wildcards
         mapping_values = {col: r[col] for col in mapping_cols}
-        rules.append((allowed_by_col, mapping_values))
+        rules.append((idx, specificity, allowed_by_col, mapping_values))
 
-    # ---- 4) Row-wise matching + assignment ----
-    def match_rule(df_row, allowed_by_col) -> bool:
+    def rule_matches(df_row, allowed_by_col) -> bool:
         for col, allowed in allowed_by_col.items():
             if allowed is None:
                 continue  # wildcard
-            val = df_row[col]
-            if is_blank(val):
+            v = df_row[col]
+            if is_blank(v):
                 return False
-            # compare as string, stripped
-            sval = str(val).strip()
-            if sval not in allowed:
+            sv = str(v).strip()
+            if sv not in allowed:
                 return False
         return True
 
-    def assign_for_row(df_row):
-        for allowed_by_col, mapping_values in rules:
-            if match_rule(df_row, allowed_by_col):
-                # assign mapping columns from this rule
-                for mc, mv in mapping_values.items():
-                    df_row[mc] = mv
-                if first_match_wins:
-                    return df_row
-        # no rule matched
-        for mc in mapping_cols:
-            df_row[mc] = no_mapping_value
-        return df_row
+    # ---- 4) Apply: pick most specific matching rule ----
+    def map_one_row(row):
+        matches = []
+        for idx, spec, allowed_by_col, mapping_values in rules:
+            if rule_matches(row, allowed_by_col):
+                matches.append((spec, idx, mapping_values))
 
-    out = DF.apply(assign_for_row, axis=1)
+        if not matches:
+            for mc in mapping_cols:
+                row[mc] = no_mapping_value
+            return row
 
-    return out
-ConditionColumns = ["S1", "S2", "S3", "S4"]  # must exist in both DF and conditions
+        # highest specificity wins
+        max_spec = max(m[0] for m in matches)
+        top = [m for m in matches if m[0] == max_spec]
 
-DF_mapped = apply_conditions_mapping(
-    DF=DF,
-    conditions=conditions,
-    ConditionColumns=ConditionColumns,
-    no_mapping_value="NO MAPPING"
-)
+        # tie-break by order in conditions
+        if tie_break == "last":
+            chosen = max(top, key=lambda x: x[1])  # largest idx
+        else:
+            chosen = min(top, key=lambda x: x[1])  # smallest idx
+
+        mapping_values = chosen[2]
+        for mc, mv in mapping_values.items():
+            row[mc] = mv
+        return row
+
+    return DF.apply(map_one_row, axis=1)
