@@ -1,21 +1,9 @@
-  # ==========================
-    # STRICT RULE: IF RW_Q3 == RW_Q4 → NO FACTOR EFFECTS
-    # ==========================
-    same_rw_mask = common["RW_Q3_from_data"] == common["RW_Q4_from_data"]
+cols = ['S1', 'S2', 'S3']
 
-    for f in FACTOR_LIST:
-        common.loc[same_rw_mask, f"{f}_shapley_effect"] = 0.0
-        common.loc[same_rw_mask, f"{f}_pure_effect"] = 0.0
+df_missing = df[
+    df[cols]
+    .replace('', pd.NA)
+    .isna()
+    .any(axis=1)
+]
 
-    # recompute sums after strict-zeroing
-    shapley_sums = {
-        col: common[col].sum(skipna=True)
-        for col in shapley_df.columns
-    }
-    total_shapley_effect = sum(shapley_sums.values())
-
-    pure_sums = {
-        col: common[col].sum(skipna=True)
-        for col in pure_df.columns
-    }
-    total_pure_effect = sum(pure_sums.values())
