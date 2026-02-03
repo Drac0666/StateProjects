@@ -1,20 +1,88 @@
-INT_renamed = INT.rename(
-    columns=lambda c: f"INT_{c}" if c != 'Deal' else c
+import pandas as pd
+
+def apply_conditions_mapping(DF: pd.DataFrame,
+                             conditions: pd.DataFrame,
+                             ConditionColumns: list,
+                             no_mapping_value: str = "NO MAPPING",
+                             first_match_wins: bool = True) -> pd.DataFrame:
+    # ---- 1) Validate condition columns exist in both ----
+    missing_in_df = [c for c in ConditionColumns if c not in DF.columns]
+    missing_in_cond = [c for c in ConditionColumns if c not in conditions.columns]
+    if missing_in_df or missing_in_cond:
+        raise SystemExit("Critical Error Condition Columns are missing")
+
+    # ---- 2) Determine mapping columns (to be assigned) ----
+    mapping_cols = [c for c in conditions.columns if c not in ConditionColumns]
+
+    # If DF doesn't have them yet, create them
+    for c in mapping_cols:
+        if c not in DF.columns:
+            DF[c] = pd.NA
+
+    # ---- helpers for blanks / allowed parsing ----
+    def is_blank(x) -> bool:
+        if x is None or (isinstance(x, float) and pd.isna(x)) or pd.isna(x):
+            return True
+        if isinstance(x, str) and x.strip() == "":
+            return True
+        return False
+
+    def parse_allowed(cell):
+        """
+        Returns:
+          - None if blank (wildcard)
+          - set of allowed string values otherwise
+        """
+        if is_blank(cell):
+            return None
+        # split on |, strip whitespace
+        parts = [p.strip() for p in str(cell).split("|")]
+        # remove empty tokens
+        parts = [p for p in parts if p != ""]
+        return set(parts)
+
+    # ---- 3) Precompile rules from conditions ----
+    rules = []
+    for _, r in conditions.iterrows():
+        allowed_by_col = {col: parse_allowed(r[col]) for col in ConditionColumns}
+        mapping_values = {col: r[col] for col in mapping_cols}
+        rules.append((allowed_by_col, mapping_values))
+
+    # ---- 4) Row-wise matching + assignment ----
+    def match_rule(df_row, allowed_by_col) -> bool:
+        for col, allowed in allowed_by_col.items():
+            if allowed is None:
+                continue  # wildcard
+            val = df_row[col]
+            if is_blank(val):
+                return False
+            # compare as string, stripped
+            sval = str(val).strip()
+            if sval not in allowed:
+                return False
+        return True
+
+    def assign_for_row(df_row):
+        for allowed_by_col, mapping_values in rules:
+            if match_rule(df_row, allowed_by_col):
+                # assign mapping columns from this rule
+                for mc, mv in mapping_values.items():
+                    df_row[mc] = mv
+                if first_match_wins:
+                    return df_row
+        # no rule matched
+        for mc in mapping_cols:
+            df_row[mc] = no_mapping_value
+        return df_row
+
+    out = DF.apply(assign_for_row, axis=1)
+
+    return out
+ConditionColumns = ["S1", "S2", "S3", "S4"]  # must exist in both DF and conditions
+
+DF_mapped = apply_conditions_mapping(
+    DF=DF,
+    conditions=conditions,
+    ConditionColumns=ConditionColumns,
+    no_mapping_value="NO MAPPING"
 )
-
-rows_before = len(DF)
-
-DF_merged = DF.merge(
-    INT_renamed,
-    left_on='Security',
-    right_on='Deal',
-    how='left'
-)
-
-rows_after = len(DF_merged)
-
-if rows_before != rows_after:
-    print(f"⚠️ Row count changed! Before: {rows_before}, After: {rows_after}")
-else:
-    print(f"✅ Row count OK: {rows_before}")
-
