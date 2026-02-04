@@ -1,106 +1,12 @@
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from datetime import date, timedelta
+# Major ticks = months (labeled)
+ax.xaxis.set_major_locator(mdates.MonthLocator())
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
 
-# --------------------------------------------------
-# Helper: nth weekday of a month
-# --------------------------------------------------
-def nth_weekday_of_month(year: int, month: int, weekday: int, n: int) -> date:
-    """
-    weekday: Monday=0 ... Sunday=6
-    n: nth occurrence in month (1..5)
-    """
-    first_day = date(year, month, 1)
-    days_until_weekday = (weekday - first_day.weekday()) % 7
-    first_occurrence = first_day + timedelta(days=days_until_weekday)
-    return first_occurrence + timedelta(weeks=n - 1)
-
-# --------------------------------------------------
-# INPUT DATA (duration in DAYS, supports decimals)
-# --------------------------------------------------
-tasks = [
-    {"Task": "Discovery", "Year": 2026, "Month": 1,  "WeekOfMonth": 2, "DurationDays": 5},
-    {"Task": "Design",    "Year": 2026, "Month": 2,  "WeekOfMonth": 1, "DurationDays": 10.5},
-    {"Task": "Build",     "Year": 2026, "Month": 3,  "WeekOfMonth": 1, "DurationDays": 42},
-    {"Task": "Testing",   "Year": 2026, "Month": 6,  "WeekOfMonth": 2, "DurationDays": 21.5},
-    {"Task": "Rollout",   "Year": 2026, "Month": 8,  "WeekOfMonth": 4, "DurationDays": 3},
-    {"Task": "Hardening", "Year": 2026, "Month": 9,  "WeekOfMonth": 2, "DurationDays": 28},
-    {"Task": "Wrap-up",   "Year": 2026, "Month": 11, "WeekOfMonth": 3, "DurationDays": 7.5},
-]
-
-# --------------------------------------------------
-# Convert input → real dates
-# --------------------------------------------------
-rows = []
-for t in tasks:
-    start = nth_weekday_of_month(
-        year=t["Year"],
-        month=t["Month"],
-        weekday=0,            # Monday
-        n=t["WeekOfMonth"]
-    )
-    duration_days = float(t["DurationDays"])
-    end = start + timedelta(days=duration_days)
-
-    rows.append({
-        "Task": t["Task"],
-        "Start": pd.Timestamp(start),
-        "End": pd.Timestamp(end),
-        "DurationDays": duration_days,
-        "Year": t["Year"],
-    })
-
-df = pd.DataFrame(rows).sort_values("Start").reset_index(drop=True)
-
-# --------------------------------------------------
-# Plot function for a zoomed half-year Gantt
-# --------------------------------------------------
-def plot_gantt(df_in: pd.DataFrame, x_start: pd.Timestamp, x_end: pd.Timestamp, title: str):
-    fig, ax = plt.subplots(figsize=(14, 6))
-
-    colors = plt.cm.tab20.colors
-
-    for i, row in df_in.iterrows():
-        ax.barh(
-            y=row["Task"],
-            width=row["DurationDays"],
-            left=mdates.date2num(row["Start"]),
-            color=colors[i % len(colors)]
-        )
-
-    ax.invert_yaxis()
-    ax.set_title(title)
-    ax.set_xlabel("Date")
-
-    ax.set_xlim(mdates.date2num(x_start), mdates.date2num(x_end))
-
-    # Zoomed view: show weeks as major ticks, months as secondary clarity
-    ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=1))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
-
-    ax.xaxis.set_minor_locator(mdates.MonthLocator())
-    ax.grid(True, which="major", axis="x")
-    ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.8)
-
-    plt.tight_layout()
-    plt.show()
-
-# --------------------------------------------------
-# Create two charts: Jan–Jun and Jul–Dec
-# --------------------------------------------------
-year = int(df["Year"].mode()[0])
-
-plot_gantt(
-    df,
-    pd.Timestamp(year=year, month=1, day=1),
-    pd.Timestamp(year=year, month=6, day=30),
-    "Gantt Chart (Jan–Jun)"
+# Minor ticks = weeks (grid only → ~4 per month)
+ax.xaxis.set_minor_locator(
+    mdates.WeekdayLocator(byweekday=mdates.MO, interval=1)
 )
 
-plot_gantt(
-    df,
-    pd.Timestamp(year=year, month=7, day=1),
-    pd.Timestamp(year=year, month=12, day=31),
-    "Gantt Chart (Jul–Dec)"
-)
+# Grid: strong month lines, light weekly lines
+ax.grid(True, which="major", axis="x", linewidth=1.2)
+ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.7)
