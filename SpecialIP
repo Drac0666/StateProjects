@@ -1,12 +1,38 @@
-# Major ticks = months (labeled)
-ax.xaxis.set_major_locator(mdates.MonthLocator())
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+def plot_gantt(df_in, x_start, x_end, title, filename):
+    fig, ax = plt.subplots(figsize=(14, 6))
 
-# Minor ticks = weeks (grid only → ~4 per month)
-ax.xaxis.set_minor_locator(
-    mdates.WeekdayLocator(byweekday=mdates.MO, interval=1)
-)
+    colors = plt.cm.tab20.colors
 
-# Grid: strong month lines, light weekly lines
-ax.grid(True, which="major", axis="x", linewidth=1.2)
-ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.7)
+    for i, row in df_in.iterrows():
+        ax.barh(
+            y=row["Task"],
+            width=row["DurationDays"],
+            left=mdates.date2num(row["Start"]),
+            color=colors[i % len(colors)]
+        )
+
+    ax.invert_yaxis()
+    ax.set_title(title)
+    ax.set_xlabel("Month")
+
+    ax.set_xlim(mdates.date2num(x_start), mdates.date2num(x_end))
+
+    # Major ticks = months
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+
+    # Minor ticks = weeks (~4 per month)
+    ax.xaxis.set_minor_locator(
+        mdates.WeekdayLocator(byweekday=mdates.MO, interval=1)
+    )
+
+    ax.grid(True, which="major", axis="x", linewidth=1.2)
+    ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.7)
+
+    plt.tight_layout()
+
+    # ✅ EXPORT TO PNG
+    fig.savefig(filename, dpi=300, bbox_inches="tight")
+
+    plt.show()
+    plt.close(fig)  # good practice when saving multiple figures
