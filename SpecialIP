@@ -37,56 +37,70 @@ for t in tasks:
     start = nth_weekday_of_month(
         year=t["Year"],
         month=t["Month"],
-        weekday=0,            # Monday start
+        weekday=0,            # Monday
         n=t["WeekOfMonth"]
     )
-
-    end = start + timedelta(days=float(t["DurationDays"]))
+    duration_days = float(t["DurationDays"])
+    end = start + timedelta(days=duration_days)
 
     rows.append({
         "Task": t["Task"],
         "Start": pd.Timestamp(start),
         "End": pd.Timestamp(end),
-        "DurationDays": float(t["DurationDays"]),
+        "DurationDays": duration_days,
+        "Year": t["Year"],
     })
 
 df = pd.DataFrame(rows).sort_values("Start").reset_index(drop=True)
 
 # --------------------------------------------------
-# Plot Gantt chart
+# Plot function for a zoomed half-year Gantt
 # --------------------------------------------------
-fig, ax = plt.subplots(figsize=(14, 6))
+def plot_gantt(df_in: pd.DataFrame, x_start: pd.Timestamp, x_end: pd.Timestamp, title: str):
+    fig, ax = plt.subplots(figsize=(14, 6))
 
-colors = plt.cm.tab20.colors
+    colors = plt.cm.tab20.colors
 
-for i, row in df.iterrows():
-    ax.barh(
-        y=row["Task"],
-        width=row["DurationDays"],
-        left=mdates.date2num(row["Start"]),
-        color=colors[i % len(colors)]
-    )
+    for i, row in df_in.iterrows():
+        ax.barh(
+            y=row["Task"],
+            width=row["DurationDays"],
+            left=mdates.date2num(row["Start"]),
+            color=colors[i % len(colors)]
+        )
 
-ax.invert_yaxis()
-ax.set_title("Gantt Chart – Full Year (Duration in Days)")
-ax.set_xlabel("Month")
+    ax.invert_yaxis()
+    ax.set_title(title)
+    ax.set_xlabel("Date")
+
+    ax.set_xlim(mdates.date2num(x_start), mdates.date2num(x_end))
+
+    # Zoomed view: show weeks as major ticks, months as secondary clarity
+    ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=1))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
+
+    ax.xaxis.set_minor_locator(mdates.MonthLocator())
+    ax.grid(True, which="major", axis="x")
+    ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.8)
+
+    plt.tight_layout()
+    plt.show()
 
 # --------------------------------------------------
-# X-axis: Jan–Dec
+# Create two charts: Jan–Jun and Jul–Dec
 # --------------------------------------------------
-year = df["Start"].dt.year.mode()[0]
-xmin = pd.Timestamp(year=year, month=1, day=1)
-xmax = pd.Timestamp(year=year, month=12, day=31)
+year = int(df["Year"].mode()[0])
 
-ax.set_xlim(mdates.date2num(xmin), mdates.date2num(xmax))
+plot_gantt(
+    df,
+    pd.Timestamp(year=year, month=1, day=1),
+    pd.Timestamp(year=year, month=6, day=30),
+    "Gantt Chart (Jan–Jun)"
+)
 
-ax.xaxis.set_major_locator(mdates.MonthLocator())
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
-
-ax.xaxis.set_minor_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
-
-ax.grid(True, which="major", axis="x")
-ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.6)
-
-plt.tight_layout()
-plt.show()
+plot_gantt(
+    df,
+    pd.Timestamp(year=year, month=7, day=1),
+    pd.Timestamp(year=year, month=12, day=31),
+    "Gantt Chart (Jul–Dec)"
+)
