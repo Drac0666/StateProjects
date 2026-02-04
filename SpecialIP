@@ -1,22 +1,70 @@
 import pandas as pd
-import plotly.express as px
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import date, timedelta
 
-df = pd.DataFrame([
-    {"Task": "Design",      "Start": "2026-02-10", "Finish": "2026-02-20"},
-    {"Task": "Build",       "Start": "2026-02-18", "Finish": "2026-03-10"},
-    {"Task": "Testing",     "Start": "2026-03-05", "Finish": "2026-03-20"},
-    {"Task": "Deployment",  "Start": "2026-03-21", "Finish": "2026-03-25"},
-])
+def nth_weekday_of_month(year: int, month: int, weekday: int, n: int) -> date:
+    """
+    Return the date of the nth 'weekday' in a given month.
+    weekday: Monday=0 ... Sunday=6
+    n: 1..5 typically
+    """
+    first_day = date(year, month, 1)
+    days_until_weekday = (weekday - first_day.weekday()) % 7
+    first_occurrence = first_day + timedelta(days=days_until_weekday)
+    return first_occurrence + timedelta(weeks=n - 1)
 
-df["Start"] = pd.to_datetime(df["Start"])
-df["Finish"] = pd.to_datetime(df["Finish"])
+# ---- Example: whole-year style inputs (replace/add tasks) ----
+tasks = [
+    {"Task": "Discovery",  "Year": 2026, "Month": 1, "WeekOfMonth": 2, "DurationWeeks": 2},
+    {"Task": "Design",     "Year": 2026, "Month": 2, "WeekOfMonth": 1, "DurationWeeks": 4},
+    {"Task": "Build",      "Year": 2026, "Month": 3, "WeekOfMonth": 1, "DurationWeeks": 10},
+    {"Task": "Testing",    "Year": 2026, "Month": 6, "WeekOfMonth": 2, "DurationWeeks": 6},
+    {"Task": "Rollout",    "Year": 2026, "Month": 8, "WeekOfMonth": 4, "DurationWeeks": 2},
+    {"Task": "Hardening",  "Year": 2026, "Month": 9, "WeekOfMonth": 2, "DurationWeeks": 6},
+    {"Task": "Wrap-up",    "Year": 2026, "Month": 11, "WeekOfMonth": 3, "DurationWeeks": 3},
+]
 
-fig = px.timeline(
-    df,
-    x_start="Start",
-    x_end="Finish",
-    y="Task",
-    title="Gantt Chart (Plotly)",
+# ---- Convert to dates ----
+rows = []
+for t in tasks:
+    start = nth_weekday_of_month(t["Year"], t["Month"], weekday=0, n=t["WeekOfMonth"])  # Monday start
+    end = start + timedelta(weeks=t["DurationWeeks"])
+    rows.append({"Task": t["Task"], "Start": pd.Timestamp(start), "End": pd.Timestamp(end)})
+
+df = pd.DataFrame(rows).sort_values("Start").reset_index(drop=True)
+df["DurationDays"] = (df["End"] - df["Start"]).dt.days
+
+# ---- Plot ----
+fig, ax = plt.subplots(figsize=(12, 6))
+
+ax.barh(
+    y=df["Task"],
+    width=df["DurationDays"],
+    left=mdates.date2num(df["Start"])
 )
-fig.update_yaxes(autorange="reversed")  # first task at top
-fig.show()
+
+ax.invert_yaxis()
+ax.set_title("Gantt Chart (Monthly axis for full year)")
+ax.set_xlabel("Month")
+
+# ---- Force x-axis to show each month (Jan..Dec) ----
+year = int(df["Start"].dt.year.mode()[0])  # most common year in your data
+xmin = pd.Timestamp(year=year, month=1, day=1)
+xmax = pd.Timestamp(year=year, month=12, day=31)
+
+ax.set_xlim(mdates.date2num(xmin), mdates.date2num(xmax))
+
+# Major ticks = months
+ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))  # Jan, Feb, Mar...
+
+# Optional: minor ticks = weeks (gives helpful grid feel)
+ax.xaxis.set_minor_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=1))
+
+# Grid
+ax.grid(True, which="major", axis="x")
+ax.grid(True, which="minor", axis="x", linestyle=":", linewidth=0.7)
+
+plt.tight_layout()
+plt.show()
