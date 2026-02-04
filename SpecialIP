@@ -1,7 +1,22 @@
-DF_mapped = apply_conditions_mapping_specificity(
-    DF=DF,
-    conditions=conditions,
-    ConditionColumns=ConditionColumns,
-    no_mapping_value="NO MAPPING",
-    tie_break="first"
+import pandas as pd
+import plotly.express as px
+
+df = pd.DataFrame([
+    {"Task": "Design",      "Start": "2026-02-10", "Finish": "2026-02-20"},
+    {"Task": "Build",       "Start": "2026-02-18", "Finish": "2026-03-10"},
+    {"Task": "Testing",     "Start": "2026-03-05", "Finish": "2026-03-20"},
+    {"Task": "Deployment",  "Start": "2026-03-21", "Finish": "2026-03-25"},
+])
+
+df["Start"] = pd.to_datetime(df["Start"])
+df["Finish"] = pd.to_datetime(df["Finish"])
+
+fig = px.timeline(
+    df,
+    x_start="Start",
+    x_end="Finish",
+    y="Task",
+    title="Gantt Chart (Plotly)",
 )
+fig.update_yaxes(autorange="reversed")  # first task at top
+fig.show()
