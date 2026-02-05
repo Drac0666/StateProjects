@@ -43,4 +43,4 @@ ws.conditional_formatting.add(
         color="F8696B",   # red
         showValue=False
     )
-)
+) 
