@@ -1,8 +1,1 @@
-def update_row(row):
-    if row['Security'] in p_dict:
-        row['P1'] = p_dict[row['Security']]['P1']
-        row['P2'] = p_dict[row['Security']]['P2']
-        row['P3'] = p_dict[row['Security']]['P3']
-    return row
-
-df1 = df1.apply(update_row, axis=1)
+p_dict = df2.set_index('Security')[['P1', 'P2', 'P3']].to_dict('index')
