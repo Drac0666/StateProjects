@@ -1,1 +1,203 @@
-issuer_detail = issuer_detail[issuer_detail["ExceptionIssuerLimit"].isna()].copy()
+import pandas as pd
+import numpy as np
+from typing import Optional, Dict, Tuple
+
+def issuer_and_mt_monitor(
+    DF: pd.DataFrame,
+    IssuerLimits: pd.DataFrame,
+    MTDataframe: pd.DataFrame,
+    exclude_mm_issuers: Optional[list] = None,          # <-- EXCLUDE z monitoringu
+    exposure_col: str = "Exposure(USD)",
+    issuer_col: str = "MM_ISSUER",
+    mt_col: str = "MT_ISSUER",
+    rating_col: str = "Lowest_Bucket_Rating",
+    subasset_col: str = "Sub_Asset_Class",
+    mt_lookup_col: str = "MT_ISSUER",
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Returns:
+      1) issuer_detail: per MM_ISSUER (IssuerExposure vs IssuerLimit)
+      2) subasset_summary: Sub_Asset_Class | Count of Issuer | Max Exposure  (Issuer monitor)
+      3) mt_detail: per MT_ISSUER (MTExposure vs MasterTrustLimit)
+      4) mt_summary: Sub_Asset_Class | Count of MT | Max MT Exposure        (MT monitor)
+    """
+
+    # ---- checks ----
+    req_df = {issuer_col, mt_col, rating_col, subasset_col, exposure_col}
+    req_lim = {rating_col, "IssuerLimit", "MasterTrustLimit"}
+    req_mt = {mt_lookup_col}
+
+    missing_df = req_df - set(DF.columns)
+    missing_lim = req_lim - set(IssuerLimits.columns)
+    missing_mt = req_mt - set(MTDataframe.columns)
+
+    if missing_df:
+        raise SystemExit(f"Critical Error: DF missing columns: {sorted(missing_df)}")
+    if missing_lim:
+        raise SystemExit(f"Critical Error: IssuerLimits missing columns: {sorted(missing_lim)}")
+    if missing_mt:
+        raise SystemExit(f"Critical Error: MTDataframe missing columns: {sorted(missing_mt)}")
+
+    df = DF.copy()
+    lim = IssuerLimits.copy()
+    mt = MTDataframe.copy()
+
+    # ---- normalize strings ----
+    for c in [issuer_col, mt_col, rating_col, subasset_col]:
+        df[c] = df[c].astype("string").str.strip()
+
+    lim[rating_col] = lim[rating_col].astype("string").str.strip()
+    mt[mt_lookup_col] = mt[mt_lookup_col].astype("string").str.strip()
+
+    df[exposure_col] = pd.to_numeric(df[exposure_col], errors="coerce").fillna(0.0)
+    lim["IssuerLimit"] = pd.to_numeric(lim["IssuerLimit"], errors="coerce")
+    lim["MasterTrustLimit"] = pd.to_numeric(lim["MasterTrustLimit"], errors="coerce")
+
+    # ---- MT universe ----
+    mt_set = set(mt[mt_lookup_col].dropna().astype("string").str.strip().tolist())
+    df["_is_mt_row"] = df[mt_col].isin(mt_set)
+
+    # ---- EXCLUDE issuerów z monitoringu (2-3 linie jak chciałeś) ----
+    exclude_mm_issuers = exclude_mm_issuers or []
+    if len(exclude_mm_issuers) > 0:
+        exclude_set = set(pd.Series(exclude_mm_issuers, dtype="string").str.strip().tolist())
+        df = df[~df[issuer_col].isin(exclude_set)].copy()
+
+    # =====================================================================================
+    # 1) ISSUER MONITOR (MM_ISSUER vs IssuerLimit)
+    # =====================================================================================
+    issuer_exposure = (
+        df.groupby(issuer_col, dropna=False)[exposure_col].sum()
+          .reset_index()
+          .rename(columns={exposure_col: "IssuerExposure"})
+    )
+
+    issuer_subasset = (
+        df.groupby([issuer_col, subasset_col], dropna=False)[exposure_col].sum()
+          .reset_index()
+          .sort_values([issuer_col, exposure_col], ascending=[True, False], kind="stable")
+          .drop_duplicates(subset=[issuer_col])[[issuer_col, subasset_col]]
+    )
+
+    issuer_rating = (
+        df[[issuer_col, rating_col]]
+        .dropna(subset=[rating_col])
+        .drop_duplicates()
+        .groupby(issuer_col, dropna=False)[rating_col]
+        .agg(lambda s: s.iloc[0])
+        .reset_index()
+    )
+
+    issuer_detail = (
+        issuer_exposure
+        .merge(issuer_subasset, on=issuer_col, how="left")
+        .merge(issuer_rating, on=issuer_col, how="left")
+        .merge(lim[[rating_col, "IssuerLimit"]], on=rating_col, how="left")
+    )
+
+    issuer_detail["IssuerUtilization"] = np.where(
+        pd.to_numeric(issuer_detail["IssuerLimit"], errors="coerce").fillna(0.0) > 0,
+        issuer_detail["IssuerExposure"] / issuer_detail["IssuerLimit"],
+        np.nan
+    )
+    issuer_detail["IssuerBreach"] = np.where(issuer_detail["IssuerUtilization"] >= 1, 1, 0)
+
+    subasset_summary = (
+        issuer_detail.groupby(subasset_col, dropna=False)
+        .agg(
+            **{
+                "Count of Issuer": (issuer_col, "nunique"),
+                "Max Exposure": ("IssuerExposure", "max"),
+                # opcjonalnie:
+                "Issuer Breaches": ("IssuerBreach", "sum"),
+                "Max Issuer Utilization": ("IssuerUtilization", "max"),
+            }
+        )
+        .reset_index()
+        .rename(columns={subasset_col: "Sub_Asset_Class"})
+        .sort_values(["Max Issuer Utilization", "Max Exposure"], ascending=[False, False], kind="stable")
+    )
+
+    # =====================================================================================
+    # 2) MT MONITOR (MT_ISSUER vs MasterTrustLimit)  <-- KLUCZOWA ZMIANA
+    # =====================================================================================
+    mt_rows = df[df["_is_mt_row"]].copy()
+
+    # Jeśli chcesz “worst rating” per MT_ISSUER, potrzebujesz porządku ratingów.
+    # Najbezpieczniej: przyjąć, że IssuerLimits jest ułożone od best->worst i użyć tego jako rank.
+    lim_rank = lim[[rating_col]].drop_duplicates().reset_index(drop=True).copy()
+    lim_rank["_rating_rank"] = lim_rank.index  # większy = "gorszy" (założenie: tabela od best->worst)
+    mt_rows = mt_rows.merge(lim_rank, on=rating_col, how="left")
+
+    mt_exposure = (
+        mt_rows.groupby(mt_col, dropna=False)[exposure_col].sum()
+               .reset_index()
+               .rename(columns={exposure_col: "MTExposure"})
+    )
+
+    # rating dla MT_ISSUER: bierzemy "najgorszy" wg rank (max rank)
+    mt_rating = (
+        mt_rows.groupby(mt_col, dropna=False)["_rating_rank"].max()
+               .reset_index()
+               .merge(lim_rank, on="_rating_rank", how="left")
+               [[mt_col, rating_col]]
+    )
+
+    # Sub_Asset_Class dla MT_ISSUER: przypisz subasset z największą ekspozycją MT
+    mt_subasset = (
+        mt_rows.groupby([mt_col, subasset_col], dropna=False)[exposure_col].sum()
+               .reset_index()
+               .sort_values([mt_col, exposure_col], ascending=[True, False], kind="stable")
+               .drop_duplicates(subset=[mt_col])[[mt_col, subasset_col]]
+    )
+
+    mt_detail = (
+        mt_exposure
+        .merge(mt_rating, on=mt_col, how="left")
+        .merge(mt_subasset, on=mt_col, how="left")
+        .merge(lim[[rating_col, "MasterTrustLimit"]], on=rating_col, how="left")
+    )
+
+    mt_detail["MTUtilization"] = np.where(
+        pd.to_numeric(mt_detail["MasterTrustLimit"], errors="coerce").fillna(0.0) > 0,
+        mt_detail["MTExposure"] / mt_detail["MasterTrustLimit"],
+        np.nan
+    )
+    mt_detail["MTBreach"] = np.where(mt_detail["MTUtilization"] >= 1, 1, 0)
+
+    # mt_summary: TYLKO MT (już tylko mt_rows), więc to jest spełnione by design
+    mt_summary = (
+        mt_detail[mt_detail["MTExposure"] > 0]
+        .groupby(subasset_col, dropna=False)
+        .agg(
+            **{
+                "Count of MT": (mt_col, "nunique"),
+                "Max MT Exposure": ("MTExposure", "max"),
+                # opcjonalnie:
+                "MT Breaches": ("MTBreach", "sum"),
+                "Max MT Utilization": ("MTUtilization", "max"),
+            }
+        )
+        .reset_index()
+        .rename(columns={subasset_col: "Sub_Asset_Class"})
+        .sort_values(["Max MT Utilization", "Max MT Exposure"], ascending=[False, False], kind="stable")
+    )
+
+    return issuer_detail, subasset_summary, mt_detail, mt_summary
+
+
+exclude_list = ["ISSUER_ABC", "ISSUER_XYZ"]  # całkowicie poza testami
+
+issuer_detail, subasset_summary, mt_detail, mt_summary = issuer_and_mt_monitor(
+    DF=DF,
+    IssuerLimits=IssuerLimits,
+    MTDataframe=MTDataframe,
+    exclude_mm_issuers=exclude_list
+)
+
+# Twoje wymagane wyjście (issuer monitor):
+subasset_summary[["Sub_Asset_Class", "Count of Issuer", "Max Exposure"]]
+
+# MT summary (tylko master trusts):
+mt_summary[["Sub_Asset_Class", "Count of MT", "Max MT Exposure"]]
+
