@@ -1,15 +1,46 @@
-def scale_report_to_bn(report: pd.DataFrame) -> pd.DataFrame:
-    out = report.copy()
-    out["Exposure"] = pd.to_numeric(out["Exposure"], errors="coerce").fillna(0.0) / 1e9
-    out["LimitAmount"] = pd.to_numeric(out["LimitAmount"], errors="coerce").fillna(0.0) / 1e9
-    # %Utilization zostaje jak jest (np. 50.0)
-    return out
-report_bn = scale_report_to_bn(report)
-export_limit_onepager_excel(report_bn, "limit_utilization_onepager.xlsx", exposure_label="USD (bn)")
+# --- Multi-color progress bars (based on utilization) ---
+progress_range = f"E{body_start}:E{last_row}"
 
-ws.cell(i, 2).number_format = '0.00" bn"'
-ws.cell(i, 3).number_format = '0.00" bn"'
+# GREEN < 80%
+ws.conditional_formatting.add(
+    progress_range,
+    DataBarRule(
+        start_type="num", start_value=0,
+        end_type="num", end_value=0.80,
+        color="63BE7B",   # green
+        showValue=False
+    )
+)
 
+# YELLOW 80% - 95%
+ws.conditional_formatting.add(
+    progress_range,
+    DataBarRule(
+        start_type="num", start_value=0.80,
+        end_type="num", end_value=0.95,
+        color="FFEB84",   # yellow
+        showValue=False
+    )
+)
 
-ws.cell(i, 2).number_format = '$#,##0,,"bn"'
-ws.cell(i, 3).number_format = '$#,##0,,"bn"'
+# ORANGE 95% - 99.9%
+ws.conditional_formatting.add(
+    progress_range,
+    DataBarRule(
+        start_type="num", start_value=0.95,
+        end_type="num", end_value=0.999,
+        color="F4B084",   # orange
+        showValue=False
+    )
+)
+
+# RED >= 100%
+ws.conditional_formatting.add(
+    progress_range,
+    DataBarRule(
+        start_type="num", start_value=0.999,
+        end_type="num", end_value=1.0,
+        color="F8696B",   # red
+        showValue=False
+    )
+)
