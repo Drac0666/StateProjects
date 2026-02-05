@@ -1,1 +1,93 @@
-p_dict = df2.set_index('Security')[['P1', 'P2', 'P3']].to_dict('index')
+import pandas as pd
+import numpy as np
+
+def limits_utilization_report(DF: pd.DataFrame, limits: pd.DataFrame) -> pd.DataFrame:
+    # --- checks ---
+    df_cols = {"Parent_Asset_Class", "Asset_Class", "Sub_Asset_Class", "Exposure(USD)"}
+    lim_cols = {"LimitID", "Level", "parent_Asset_Class", "Asset_Class", "Sub_Asset_Class",
+                "LimitAmount", "LimitCurrency", "LimitName"}
+
+    missing_df = df_cols - set(DF.columns)
+    missing_lim = lim_cols - set(limits.columns)
+    if missing_df:
+        raise SystemExit(f"Critical Error: DF missing columns: {sorted(missing_df)}")
+    if missing_lim:
+        raise SystemExit(f"Critical Error: limits missing columns: {sorted(missing_lim)}")
+
+    # --- normalize join columns (VERY important for clean merges) ---
+    DF = DF.copy()
+    limits = limits.copy()
+
+    for c in ["Parent_Asset_Class", "Asset_Class", "Sub_Asset_Class"]:
+        DF[c] = DF[c].astype("string").str.strip()
+
+    limits["parent_Asset_Class"] = limits["parent_Asset_Class"].astype("string").str.strip()
+    limits["Asset_Class"] = limits["Asset_Class"].astype("string").str.strip()
+    limits["Sub_Asset_Class"] = limits["Sub_Asset_Class"].astype("string").str.strip()
+
+    # --- aggregate exposures from DF for each level ---
+    exp_parent = (DF.groupby(["Parent_Asset_Class"], dropna=False)["Exposure(USD)"]
+                    .sum().reset_index().rename(columns={"Exposure(USD)": "Exposure"}))
+
+    exp_asset = (DF.groupby(["Parent_Asset_Class", "Asset_Class"], dropna=False)["Exposure(USD)"]
+                   .sum().reset_index().rename(columns={"Exposure(USD)": "Exposure"}))
+
+    exp_sub = (DF.groupby(["Parent_Asset_Class", "Asset_Class", "Sub_Asset_Class"], dropna=False)["Exposure(USD)"]
+                 .sum().reset_index().rename(columns={"Exposure(USD)": "Exposure"}))
+
+    # --- normalize naming (limits -> DF naming) ---
+    lim = limits.copy()
+    lim["Level"] = lim["Level"].astype(str).str.upper()
+    lim = lim.rename(columns={"parent_Asset_Class": "Parent_Asset_Class"})
+
+    # --- split and merge correct exposure depending on Level ---
+    lim_parent = lim[lim["Level"].eq("PARENT")].merge(
+        exp_parent, on=["Parent_Asset_Class"], how="left"
+    )
+    lim_asset = lim[lim["Level"].eq("ASSET")].merge(
+        exp_asset, on=["Parent_Asset_Class", "Asset_Class"], how="left"
+    )
+    lim_sub = lim[lim["Level"].eq("SUB")].merge(
+        exp_sub, on=["Parent_Asset_Class", "Asset_Class", "Sub_Asset_Class"], how="left"
+    )
+
+    out = pd.concat([lim_parent, lim_asset, lim_sub], ignore_index=True)
+    out["Exposure"] = out["Exposure"].fillna(0.0)
+
+    # --- utilization ---
+    out["%Utilization"] = np.where(
+        pd.to_numeric(out["LimitAmount"], errors="coerce").fillna(0.0) != 0,
+        out["Exposure"].astype(float) / out["LimitAmount"].astype(float),
+        np.nan
+    ) * 100
+
+    # --- display name indent based on Level ---
+    prefix = {"PARENT": "", "ASSET": "--- ", "SUB": "------ "}
+    out["Limit Name"] = out["Level"].map(prefix).fillna("") + out["LimitName"].astype(str)
+
+    # --- TREE SORT (fix) ---
+    # Parent first, then for each (Parent, Asset): ASSET row then SUB rows
+    out["_parent"] = out["Parent_Asset_Class"].fillna("").astype(str)
+    out["_asset"] = out["Asset_Class"].fillna("").astype(str)
+    out["_sub"] = out["Sub_Asset_Class"].fillna("").astype(str)
+
+    # sort bucket inside an asset-group
+    # Parent must be first, then ASSET, then SUB
+    out["_bucket"] = np.select(
+        [out["Level"].eq("PARENT"), out["Level"].eq("ASSET"), out["Level"].eq("SUB")],
+        [-1, 0, 1],
+        default=9
+    ).astype(int)
+
+    # For PARENT rows: force asset/sub empty so they appear on top within parent
+    out.loc[out["Level"].eq("PARENT"), "_asset"] = ""
+    out.loc[out["Level"].eq("PARENT"), "_sub"] = ""
+
+    out = out.sort_values(
+        ["_parent", "_asset", "_bucket", "_sub", "LimitName"],
+        kind="stable"
+    )
+
+    # --- final shape ---
+    result = out[["Limit Name", "Exposure", "LimitAmount", "%Utilization"]].reset_index(drop=True)
+    return result
