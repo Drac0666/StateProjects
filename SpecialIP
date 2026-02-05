@@ -1,3 +1,8 @@
-for col in ['P1', 'P2', 'P3']:
-    mapping = dict(zip(df2['Security'], df2[col]))
-    df1[col] = df1['Security'].map(mapping)
+def update_row(row):
+    if row['Security'] in p_dict:
+        row['P1'] = p_dict[row['Security']]['P1']
+        row['P2'] = p_dict[row['Security']]['P2']
+        row['P3'] = p_dict[row['Security']]['P3']
+    return row
+
+df1 = df1.apply(update_row, axis=1)
