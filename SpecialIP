@@ -1,45 +1,79 @@
 import pandas as pd
 import numpy as np
+from typing import Optional, Dict, Tuple
 
-def issuer_limit_monitor(
+def issuer_limit_monitor_with_mt_addon(
     DF: pd.DataFrame,
     IssuerLimits: pd.DataFrame,
-    exception_limits: dict | None = None,
+    MTDataframe: pd.DataFrame,
+    exception_limits_mm: Optional[Dict[str, float]] = None,  # override IssuerLimit per MM_ISSUER
     exposure_col: str = "Exposure(USD)",
     issuer_col: str = "MM_ISSUER",
+    mt_col: str = "MT_ISSUER",
     rating_col: str = "Lowest_Bucket_Rating",
     subasset_col: str = "Sub_Asset_Class",
-):
+    mt_lookup_col: str = "MT_ISSUER",
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
+    Always checks: Total exposure per MM_ISSUER vs IssuerLimit (rating-based; can be overridden by exception_limits_mm).
+    Additional check: MT-only exposure (rows where MT_ISSUER is listed in MTDataframe) vs MasterTrustLimit.
+
     Returns:
-      - issuer_detail: one row per issuer with exposure, rating, base limit, exception limit, effective limit, utilization, breach flag
-      - subasset_summary: Sub_Asset_Class | Count of Issuer | Max Exposure (+ optional fields)
+      issuer_detail: per MM_ISSUER
+      subasset_summary: Sub_Asset_Class | Count of Issuer | Max Exposure (+ extras)
+      mt_summary: Sub_Asset_Class | Count of Issuer | Max MT Exposure (+ extras)  (MT-only view)
     """
 
     # ---- checks ----
-    req_df = {issuer_col, rating_col, subasset_col, exposure_col}
+    req_df = {issuer_col, mt_col, rating_col, subasset_col, exposure_col}
     req_lim = {rating_col, "IssuerLimit", "MasterTrustLimit"}
+    req_mt = {mt_lookup_col}
+
     missing_df = req_df - set(DF.columns)
     missing_lim = req_lim - set(IssuerLimits.columns)
+    missing_mt = req_mt - set(MTDataframe.columns)
+
     if missing_df:
         raise SystemExit(f"Critical Error: DF missing columns: {sorted(missing_df)}")
     if missing_lim:
         raise SystemExit(f"Critical Error: IssuerLimits missing columns: {sorted(missing_lim)}")
+    if missing_mt:
+        raise SystemExit(f"Critical Error: MTDataframe missing columns: {sorted(missing_mt)}")
 
     df = DF.copy()
     lim = IssuerLimits.copy()
+    mt = MTDataframe.copy()
 
-    # normalize strings to avoid merge mismatches
-    for c in [issuer_col, rating_col, subasset_col]:
+    # ---- normalize strings ----
+    for c in [issuer_col, mt_col, rating_col, subasset_col]:
         df[c] = df[c].astype("string").str.strip()
+
     lim[rating_col] = lim[rating_col].astype("string").str.strip()
+    mt[mt_lookup_col] = mt[mt_lookup_col].astype("string").str.strip()
 
     df[exposure_col] = pd.to_numeric(df[exposure_col], errors="coerce").fillna(0.0)
     lim["IssuerLimit"] = pd.to_numeric(lim["IssuerLimit"], errors="coerce")
     lim["MasterTrustLimit"] = pd.to_numeric(lim["MasterTrustLimit"], errors="coerce")
 
-    # ---- issuer-level aggregation ----
-    # If issuer appears in multiple Sub_Asset_Class, we assign the one with max exposure (so summary is stable)
+    mt_set = set(mt[mt_lookup_col].dropna().astype("string").str.strip().tolist())
+    df["_is_mt_row"] = df[mt_col].isin(mt_set)
+
+    # ---- issuer total exposure ----
+    issuer_exposure = (
+        df.groupby(issuer_col, dropna=False)[exposure_col].sum()
+          .reset_index()
+          .rename(columns={exposure_col: "IssuerExposure"})
+    )
+
+    # ---- MT-only exposure per issuer (only rows that are “MT bonds”) ----
+    issuer_mt_exposure = (
+        df[df["_is_mt_row"]]
+        .groupby(issuer_col, dropna=False)[exposure_col].sum()
+        .reset_index()
+        .rename(columns={exposure_col: "MasterTrustExposure"})
+    )
+
+    # ---- Sub_Asset_Class per issuer: pick the one with max total exposure (stable grouping) ----
     issuer_subasset = (
         df.groupby([issuer_col, subasset_col], dropna=False)[exposure_col].sum()
           .reset_index()
@@ -48,50 +82,16 @@ def issuer_limit_monitor(
           [[issuer_col, subasset_col]]
     )
 
-    issuer_exposure = (
-        df.groupby(issuer_col, dropna=False)[exposure_col].sum()
-          .reset_index()
-          .rename(columns={exposure_col: "IssuerExposure"})
-    )
-
-    # Rating per issuer: take the first non-null rating seen (and warn later if inconsistent)
+    # ---- rating per issuer (first non-null); also flag inconsistencies ----
     issuer_rating = (
         df[[issuer_col, rating_col]]
         .dropna(subset=[rating_col])
         .drop_duplicates()
         .groupby(issuer_col, dropna=False)[rating_col]
-        .agg(lambda s: s.iloc[0])   # first
+        .agg(lambda s: s.iloc[0])
         .reset_index()
     )
 
-    issuer_detail = (
-        issuer_exposure
-        .merge(issuer_subasset, on=issuer_col, how="left")
-        .merge(issuer_rating, on=issuer_col, how="left")
-        .merge(lim[[rating_col, "IssuerLimit", "MasterTrustLimit"]], on=rating_col, how="left")
-    )
-
-    # ---- exceptions ----
-    exception_limits = exception_limits or {}
-    exc = pd.Series(exception_limits, name="ExceptionLimit")
-    exc.index.name = issuer_col
-    exc = exc.reset_index()
-    exc["ExceptionLimit"] = pd.to_numeric(exc["ExceptionLimit"], errors="coerce")
-
-    issuer_detail = issuer_detail.merge(exc, on=issuer_col, how="left")
-
-    # effective limit: ExceptionLimit if provided else IssuerLimit
-    issuer_detail["EffectiveIssuerLimit"] = issuer_detail["ExceptionLimit"].combine_first(issuer_detail["IssuerLimit"])
-
-    issuer_detail["Utilization"] = np.where(
-        pd.to_numeric(issuer_detail["EffectiveIssuerLimit"], errors="coerce").fillna(0.0) > 0,
-        issuer_detail["IssuerExposure"] / issuer_detail["EffectiveIssuerLimit"],
-        np.nan
-    )
-
-    issuer_detail["Breach"] = np.where(issuer_detail["Utilization"] >= 1, 1, 0)
-
-    # ---- optional data quality check: issuer has multiple ratings in DF ----
     rating_counts = (
         df[[issuer_col, rating_col]]
         .dropna(subset=[rating_col])
@@ -99,8 +99,46 @@ def issuer_limit_monitor(
         .groupby(issuer_col)[rating_col].nunique()
         .reset_index(name="DistinctRatings")
     )
-    issuer_detail = issuer_detail.merge(rating_counts, on=issuer_col, how="left")
+
+    # ---- build issuer_detail ----
+    issuer_detail = (
+        issuer_exposure
+        .merge(issuer_mt_exposure, on=issuer_col, how="left")
+        .merge(issuer_subasset, on=issuer_col, how="left")
+        .merge(issuer_rating, on=issuer_col, how="left")
+        .merge(lim[[rating_col, "IssuerLimit", "MasterTrustLimit"]], on=rating_col, how="left")
+        .merge(rating_counts, on=issuer_col, how="left")
+    )
+
+    issuer_detail["MasterTrustExposure"] = issuer_detail["MasterTrustExposure"].fillna(0.0)
     issuer_detail["DistinctRatings"] = issuer_detail["DistinctRatings"].fillna(0).astype(int)
+
+    # ---- exception limits for IssuerLimit (highest priority for issuer check) ----
+    exception_limits_mm = exception_limits_mm or {}
+    exc = pd.Series(exception_limits_mm, name="ExceptionIssuerLimit")
+    exc.index.name = issuer_col
+    exc = exc.reset_index()
+    exc["ExceptionIssuerLimit"] = pd.to_numeric(exc["ExceptionIssuerLimit"], errors="coerce")
+
+    issuer_detail = issuer_detail.merge(exc, on=issuer_col, how="left")
+
+    issuer_detail["EffectiveIssuerLimit"] = issuer_detail["ExceptionIssuerLimit"].combine_first(issuer_detail["IssuerLimit"])
+
+    # ---- utilization (Issuer) ----
+    issuer_detail["IssuerUtilization"] = np.where(
+        pd.to_numeric(issuer_detail["EffectiveIssuerLimit"], errors="coerce").fillna(0.0) > 0,
+        issuer_detail["IssuerExposure"] / issuer_detail["EffectiveIssuerLimit"],
+        np.nan
+    )
+    issuer_detail["IssuerBreach"] = np.where(issuer_detail["IssuerUtilization"] >= 1, 1, 0)
+
+    # ---- utilization (MasterTrust add-on) ----
+    issuer_detail["MasterTrustUtilization"] = np.where(
+        pd.to_numeric(issuer_detail["MasterTrustLimit"], errors="coerce").fillna(0.0) > 0,
+        issuer_detail["MasterTrustExposure"] / issuer_detail["MasterTrustLimit"],
+        np.nan
+    )
+    issuer_detail["MasterTrustBreach"] = np.where(issuer_detail["MasterTrustUtilization"] >= 1, 1, 0)
 
     # ---- summary by Sub_Asset_Class (as requested) ----
     subasset_summary = (
@@ -109,25 +147,50 @@ def issuer_limit_monitor(
             **{
                 "Count of Issuer": (issuer_col, "nunique"),
                 "Max Exposure": ("IssuerExposure", "max"),
-                # optional extras (keep if you want)
-                "Breaches": ("Breach", "sum"),
-                "Max Utilization": ("Utilization", "max"),
+                # optional extras you may keep/drop
+                "Issuer Breaches": ("IssuerBreach", "sum"),
+                "Max Issuer Utilization": ("IssuerUtilization", "max"),
             }
         )
         .reset_index()
         .rename(columns={subasset_col: "Sub_Asset_Class"})
-        .sort_values(["Max Utilization", "Max Exposure"], ascending=[False, False], kind="stable")
+        .sort_values(["Max Issuer Utilization", "Max Exposure"], ascending=[False, False], kind="stable")
     )
 
-    return issuer_detail, subasset_summary
+    # ---- optional MT-only summary (sometimes very useful) ----
+    mt_summary = (
+        issuer_detail.groupby(subasset_col, dropna=False)
+        .agg(
+            **{
+                "Count of Issuer": (issuer_col, "nunique"),
+                "Max MT Exposure": ("MasterTrustExposure", "max"),
+                "MT Breaches": ("MasterTrustBreach", "sum"),
+                "Max MT Utilization": ("MasterTrustUtilization", "max"),
+            }
+        )
+        .reset_index()
+        .rename(columns={subasset_col: "Sub_Asset_Class"})
+        .sort_values(["Max MT Utilization", "Max MT Exposure"], ascending=[False, False], kind="stable")
+    )
 
-issuer_detail, subasset_summary = issuer_limit_monitor(DF, IssuerLimits)
+    return issuer_detail, subasset_summary, mt_summary
+
+
+
+
+
+
 
 exception_limits = {
-    "Issuer A": 250_000_000,  # override IssuerLimit for this issuer
-    "Issuer B": 100_000_000,
+    "ISSUER_ABC": 250_000_000,  # override IssuerLimit only (issuer check)
 }
 
-issuer_detail, subasset_summary = issuer_limit_monitor(
-    DF, IssuerLimits, exception_limits=exception_limits
+issuer_detail, subasset_summary, mt_summary = issuer_limit_monitor_with_mt_addon(
+    DF=DF,
+    IssuerLimits=IssuerLimits,
+    MTDataframe=MTDataframe,
+    exception_limits_mm=exception_limits
 )
+
+# Twoje wymagane wyjście:
+print(subasset_summary[["Sub_Asset_Class", "Count of Issuer", "Max Exposure"]])
