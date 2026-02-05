@@ -285,3 +285,12 @@ def export_limit_onepager_excel(
     ws.print_area = f"A1:E{final_last_row}"
 
     wb.save(output_path)
+
+export_limit_onepager_excel(
+    report=limits_report_df,          # Twoja tabela limitów Parent/Asset/Sub
+    subasset_summary=subasset_summary, # z monitora issuer
+    mt_summary=mt_summary,            # z monitora MT
+    output_path="limit_onepager.xlsx",
+    as_of=date(2026, 2, 5),
+    exposure_label="USD"
+)
