@@ -1,296 +1,111 @@
-import pandas as pd
-import numpy as np
-from datetime import date
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.formatting.rule import DataBarRule, IconSetRule
-from openpyxl.worksheet.page import PageMargins
+Add this helper above write_section_table:
 
-
-def export_limit_onepager_excel(
-    report: pd.DataFrame,
-    output_path: str,
-    as_of: date = None,
-    exposure_label: str = "USD",
-    green_threshold: float = 70.0,   # %
-    yellow_threshold: float = 85.0,  # %
-    subasset_summary: pd.DataFrame = None,
-    mt_summary: pd.DataFrame = None,
-):
+def resolve_number_format(fmt: str, col_name: str) -> str:
     """
-    Exports a manager-friendly Excel report with:
-      - Title + as-of line
-      - KPI strip
-      - Full hierarchy table (Parent/Asset/Sub)
-      - Progress bars + status icons
-      - OPTIONAL: SubAsset Summary table below
-      - OPTIONAL: MT Summary table below
-
-    Expected report columns:
-      - 'Limit Name' (string; hierarchy optionally indicated with '---' and '------')
-      - 'Exposure' (number)
-      - 'LimitAmount' (number)
-      - '%Utilization' (number in percent, e.g. 50.0 for 50%)
-
-    Summary tables: any dataframe; will be printed as-is with a header row.
+    Returns Excel number format string based on requested format mode.
     """
-    if as_of is None:
-        as_of = date.today()
+    fmt = (fmt or "").lower()
+    col = str(col_name).lower()
 
-    required = {"Limit Name", "Exposure", "LimitAmount", "%Utilization"}
-    missing = required - set(report.columns)
-    if missing:
-        raise ValueError(f"report missing columns: {sorted(missing)}")
+    # Percent columns always percent
+    if "util" in col or "%" in col:
+        return "0.0%"
 
-    # Copy & ensure types
-    df = report.copy()
-    df["Exposure"] = pd.to_numeric(df["Exposure"], errors="coerce").fillna(0.0)
-    df["LimitAmount"] = pd.to_numeric(df["LimitAmount"], errors="coerce").fillna(0.0)
-    df["%Utilization"] = pd.to_numeric(df["%Utilization"], errors="coerce")
+    if fmt == "bn":
+        return '0.00" bn"'
+    if fmt == "mn":
+        return '0.00" mn"'
+    if fmt == "accounting":
+        return '#,##0'
+    if fmt == "auto":
+        # fallback to your previous behavior
+        if "exposure" in col or "limit" in col:
+            return '$#,##0,,"bn"'
+        return '#,##0'
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Report"
+    # default safe fallback
+    return '#,##0'
 
-    # ---- Page setup ----
-    ws.sheet_view.showGridLines = False
-    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
-    ws.page_setup.fitToWidth = 1
-    ws.page_setup.fitToHeight = 1
-    ws.page_margins = PageMargins(left=0.35, right=0.35, top=0.5, bottom=0.5)
+def write_section_table(
+    title: str,
+    table_df: pd.DataFrame,
+    start_at_row: int,
+    number_format: str = "auto",   # "bn" | "mn" | "accounting" | "auto"
+) -> int:
 
-    # ---- Column widths (main table) ----
-    ws.column_dimensions["A"].width = 42  # Limit Name
-    ws.column_dimensions["B"].width = 16  # Exposure
-    ws.column_dimensions["C"].width = 16  # LimitAmount
-    ws.column_dimensions["D"].width = 14  # %Utilization (with icons)
-    ws.column_dimensions["E"].width = 24  # Progress
-    ws.column_dimensions["F"].width = 12  # KPI strip extra cell
+def write_section_table(
+    title: str,
+    table_df: pd.DataFrame,
+    start_at_row: int,
+    number_format: str = "auto",   # "bn" | "mn" | "accounting" | "auto"
+) -> int:
+    if table_df is None or len(table_df) == 0:
+        return start_at_row - 1
 
-    # ---- Styles ----
-    title_font = Font(size=18, bold=True)
-    subtitle_font = Font(size=10, color="666666")
-    header_font = Font(size=11, bold=True, color="FFFFFF")
-    body_font = Font(size=11)
-    section_font = Font(size=12, bold=True, color="111827")  # near-black
-    small_grey = Font(size=9, color="6B7280")
+    tdf = table_df.copy()
 
-    thin = Side(style="thin", color="D9D9D9")
-    border_bottom = Border(bottom=thin)
+    # Section title
+    ws.merge_cells(start_row=start_at_row, start_column=1, end_row=start_at_row, end_column=5)
+    tcell = ws.cell(start_at_row, 1, title)
+    tcell.font = section_font
+    tcell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[start_at_row].height = 18
 
-    fill_header = PatternFill("solid", fgColor="1F2937")  # dark slate
-    fill_kpi = PatternFill("solid", fgColor="F3F4F6")     # light gray
-    fill_white = PatternFill("solid", fgColor="FFFFFF")
-    breach_fill = PatternFill("solid", fgColor="FEE2E2")  # light red
+    # Header row
+    hdr_row = start_at_row + 1
+    cols = list(tdf.columns)
 
-    # ---- Title area ----
-    ws["A1"] = "Limit Utilization Report"
-    ws["A1"].font = title_font
-    ws["A2"] = f"As of: {as_of.isoformat()}   |   Exposure: {exposure_label}"
-    ws["A2"].font = subtitle_font
-
-    # ---- KPI strip ----
-    total_limits = int(len(df))
-    high = int((df["%Utilization"] >= yellow_threshold).sum())
-    breaches = int((df["%Utilization"] >= 100).sum())
-
-    ws["A4"] = "Total limits"
-    ws["B4"] = total_limits
-    ws["C4"] = f"High utilization (≥{yellow_threshold:.0f}%)"
-    ws["D4"] = high
-    ws["E4"] = "Breaches (≥100%)"
-    ws["F4"] = breaches
-
-    for cell in ["A4", "B4", "C4", "D4", "E4", "F4"]:
-        ws[cell].fill = fill_kpi
-        ws[cell].alignment = Alignment(vertical="center")
-        ws[cell].font = Font(size=10, bold=True) if cell in ["A4", "C4", "E4"] else Font(size=10)
-
-    # ---- Main table header ----
-    start_row = 6
-    headers = ["Limit Name", "Exposure", "LimitAmount", "%Utilization", "Progress"]
-    for col_idx, h in enumerate(headers, start=1):
-        c = ws.cell(row=start_row, column=col_idx, value=h)
+    for j, col_name in enumerate(cols, start=1):
+        c = ws.cell(hdr_row, j, str(col_name))
         c.font = header_font
         c.fill = fill_header
-        c.alignment = Alignment(horizontal="left" if col_idx == 1 else "right", vertical="center")
-    ws.row_dimensions[start_row].height = 20
+        c.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center")
+    ws.row_dimensions[hdr_row].height = 18
 
-    # ---- Main table body ----
-    body_start = start_row + 1
-    for i, row in enumerate(df.itertuples(index=False), start=body_start):
-        name = row[df.columns.get_loc("Limit Name")]
-        exposure = row[df.columns.get_loc("Exposure")]
-        limit_amt = row[df.columns.get_loc("LimitAmount")]
-        util_pct = row[df.columns.get_loc("%Utilization")]
-
-        ws.cell(i, 1, str(name))
-        ws.cell(i, 2, float(exposure))
-        ws.cell(i, 3, float(limit_amt))
-
-        util_frac = None if pd.isna(util_pct) else float(util_pct) / 100.0
-        ws.cell(i, 4, util_frac)
-        ws.cell(i, 5, util_frac)
-
-        # Formats
-        ws.cell(i, 2).number_format = '$#,##0,,"bn"'
-        ws.cell(i, 3).number_format = '$#,##0,,"bn"'
-        ws.cell(i, 4).number_format = '0.0%'
-        ws.cell(i, 5).number_format = '0.0%'
-
-        # Base styling
-        for col in range(1, 6):
-            cell = ws.cell(i, col)
+    # Body
+    r = hdr_row + 1
+    for _, rr in tdf.iterrows():
+        for j, col_name in enumerate(cols, start=1):
+            v = rr[col_name]
+            cell = ws.cell(r, j, v)
             cell.font = body_font
             cell.fill = fill_white
             cell.border = border_bottom
-            cell.alignment = Alignment(horizontal="left" if col == 1 else "right", vertical="center")
+            cell.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center")
 
-        # Hierarchy formatting (indent + bold parents)
-        sname = str(name)
-        if sname.startswith("------"):
-            ws.cell(i, 1).alignment = Alignment(horizontal="left", indent=3, vertical="center")
-        elif sname.startswith("---"):
-            ws.cell(i, 1).alignment = Alignment(horizontal="left", indent=2, vertical="center")
-        else:
-            ws.cell(i, 1).font = Font(size=11, bold=True)
+            if isinstance(v, (int, float, np.integer, np.floating)) and j != 1:
+                cell.number_format = resolve_number_format(number_format, col_name)
 
-        ws.row_dimensions[i].height = 18
+        ws.row_dimensions[r].height = 16
+        r += 1
 
-    last_row = body_start + len(df) - 1
+    # Spacer
+    note_row = r
+    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=5)
+    ncell = ws.cell(note_row, 1, "")
+    ncell.font = small_grey
+    ncell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[note_row].height = 6
 
-    # ---- Conditional formatting: progress bar on Progress column (E) ----
-    progress_range = f"E{body_start}:E{last_row}"
-    ws.conditional_formatting.add(
-        progress_range,
-        DataBarRule(
-            start_type="num", start_value=0,
-            end_type="num", end_value=1,
-            color="4F81BD",
-            showValue=False
-        )
-    )
-
-    # ---- Conditional formatting: status icons on %Utilization (D) ----
-    g = green_threshold / 100.0
-    y = yellow_threshold / 100.0
-    util_range = f"D{body_start}:D{last_row}"
-    ws.conditional_formatting.add(
-        util_range,
-        IconSetRule(
-            icon_style="3TrafficLights1",
-            type="num",
-            values=[g, y],
-            showValue=True,
-            percent=False
-        )
-    )
-
-    # ---- Highlight breaches (>= 100%) ----
-    for r in range(body_start, last_row + 1):
-        util_val = ws[f"D{r}"].value
-        if util_val is not None and util_val >= 1:
-            for col in range(1, 6):
-                ws.cell(r, col).fill = breach_fill
-            ws.cell(r, 4).font = Font(size=11, bold=True, color="991B1B")
-
-    # ---- Freeze panes ----
-    ws.freeze_panes = f"A{body_start}"
-
-    # =====================================================================
-    # Helper to write summary tables below the main table
-    # =====================================================================
-    def write_section_table(title: str, table_df: pd.DataFrame, start_at_row: int) -> int:
-        """
-        Writes:
-          Title row (merged A:E)
-          Header row
-          Body rows
-        Returns: last written row index
-        """
-        if table_df is None or len(table_df) == 0:
-            return start_at_row - 1
-
-        # Normalize df (avoid weird dtypes)
-        tdf = table_df.copy()
-
-        # Section title
-        ws.merge_cells(start_row=start_at_row, start_column=1, end_row=start_at_row, end_column=5)
-        tcell = ws.cell(start_at_row, 1, title)
-        tcell.font = section_font
-        tcell.alignment = Alignment(horizontal="left", vertical="center")
-        ws.row_dimensions[start_at_row].height = 18
-
-        # Header row
-        hdr_row = start_at_row + 1
-        cols = list(tdf.columns)
-
-        for j, col_name in enumerate(cols, start=1):
-            c = ws.cell(hdr_row, j, str(col_name))
-            c.font = header_font
-            c.fill = fill_header
-            c.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center")
-        ws.row_dimensions[hdr_row].height = 18
-
-        # Body
-        r = hdr_row + 1
-        for _, rr in tdf.iterrows():
-            for j, col_name in enumerate(cols, start=1):
-                v = rr[col_name]
-                cell = ws.cell(r, j, v)
-                cell.font = body_font
-                cell.fill = fill_white
-                cell.border = border_bottom
-                cell.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center")
-
-                # Basic number formats (nice for manager view)
-                if isinstance(v, (int, float, np.integer, np.floating)) and j != 1:
-                    # if column name suggests percent -> show percent
-                    if "util" in str(col_name).lower() or "%" in str(col_name):
-                        cell.number_format = '0.0%'
-                    # if exposure -> show bn-ish
-                    elif "exposure" in str(col_name).lower() or "limit" in str(col_name).lower():
-                        cell.number_format = '$#,##0,,"bn"'
-                    else:
-                        cell.number_format = '#,##0'
-
-            ws.row_dimensions[r].height = 16
-            r += 1
-
-        # Small note line (optional)
-        note_row = r
-        ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=5)
-        ncell = ws.cell(note_row, 1, "")
-        ncell.font = small_grey
-        ncell.alignment = Alignment(horizontal="left", vertical="center")
-        ws.row_dimensions[note_row].height = 6
-
-        return note_row
-
-    # =====================================================================
-    # Append summaries
-    # =====================================================================
-    current_row = last_row + 2  # one blank row
-
-    # SubAsset Summary
-    if subasset_summary is not None and len(subasset_summary) > 0:
-        current_row = write_section_table("SubAsset Summary", subasset_summary, current_row) + 2
-
-    # MT Summary
-    if mt_summary is not None and len(mt_summary) > 0:
-        current_row = write_section_table("Master Trust Summary", mt_summary, current_row) + 1
-
-    # ---- Print area include appended tables ----
-    final_last_row = max(last_row, current_row - 1)
-    ws.print_area = f"A1:E{final_last_row}"
-
-    wb.save(output_path)
+    return note_row
 
 export_limit_onepager_excel(
-    report=limits_report_df,          # Twoja tabela limitów Parent/Asset/Sub
-    subasset_summary=subasset_summary, # z monitora issuer
-    mt_summary=mt_summary,            # z monitora MT
-    output_path="limit_onepager.xlsx",
-    as_of=date(2026, 2, 5),
-    exposure_label="USD"
+    report=limits_report,
+    subasset_summary=subasset_summary,
+    mt_summary=mt_summary,
+    output_path="limit_onepager.xlsx"
 )
+
+# Inside the function:
+current_row = write_section_table(
+    "SubAsset Summary",
+    subasset_summary,
+    current_row,
+    number_format="mn"        # 👈 show millions
+)
+
+current_row = write_section_table(
+    "Master Trust Summary",
+    mt_summary,
+    current_row,
+    number_format="accounting"  # 👈 full accounting
