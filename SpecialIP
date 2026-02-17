@@ -1,111 +1,133 @@
-Add this helper above write_section_table:
+import pandas as pd
+import numpy as np
+from typing import List, Optional
 
-def resolve_number_format(fmt: str, col_name: str) -> str:
+def issuer_cascading_limits(
+    DF: pd.DataFrame,
+    IssuerLimits: pd.DataFrame,
+    exposure_col: str = "Exposure(USD)",
+    issuer_col: str = "MM_ISSUER",
+    asset_col: str = "Asset_Class",                 # NEW
+    rating_col: str = "Lowest_Bucket_Rating",
+    buckets_order_best_to_worst: Optional[List[str]] = None,
+    exclude_mm_issuers: Optional[list] = None,
+    wildcard_value: str = "*",                      # NEW
+) -> pd.DataFrame:
     """
-    Returns Excel number format string based on requested format mode.
+    Cascading logic per (MM_ISSUER, Asset_Class):
+      - BBB exposure counts toward BBB limit AND toward A and AAA/AA limits
+      - A exposure counts toward A limit AND toward AAA/AA limit
+      - AAA/AA counts only toward AAA/AA
+
+    Limits:
+      - If IssuerLimits.Asset_Class == "*" -> applies to all asset classes (fallback)
+      - If IssuerLimits.Asset_Class == "<name>" -> overrides for that asset class (wins vs "*")
+
+    Returns one row per (MM_ISSUER, Asset_Class, Bucket) including:
+      Exposure_in_Bucket, Exposure_Cumulative_WorseOrEqual, Limit, Utilization, Breach
     """
-    fmt = (fmt or "").lower()
-    col = str(col_name).lower()
 
-    # Percent columns always percent
-    if "util" in col or "%" in col:
-        return "0.0%"
+    if buckets_order_best_to_worst is None:
+        buckets_order_best_to_worst = ["AAA/AA", "A", "BBB"]
 
-    if fmt == "bn":
-        return '0.00" bn"'
-    if fmt == "mn":
-        return '0.00" mn"'
-    if fmt == "accounting":
-        return '#,##0'
-    if fmt == "auto":
-        # fallback to your previous behavior
-        if "exposure" in col or "limit" in col:
-            return '$#,##0,,"bn"'
-        return '#,##0'
+    # checks
+    req_df = {issuer_col, asset_col, rating_col, exposure_col}
+    req_lim = {asset_col, rating_col, "IssuerLimit"}
+    missing_df = req_df - set(DF.columns)
+    missing_lim = req_lim - set(IssuerLimits.columns)
+    if missing_df:
+        raise SystemExit(f"Critical Error: DF missing columns: {sorted(missing_df)}")
+    if missing_lim:
+        raise SystemExit(f"Critical Error: IssuerLimits missing columns: {sorted(missing_lim)}")
 
-    # default safe fallback
-    return '#,##0'
+    df = DF.copy()
+    lim = IssuerLimits.copy()
 
-def write_section_table(
-    title: str,
-    table_df: pd.DataFrame,
-    start_at_row: int,
-    number_format: str = "auto",   # "bn" | "mn" | "accounting" | "auto"
-) -> int:
+    # normalize
+    for c in [issuer_col, asset_col, rating_col]:
+        df[c] = df[c].astype("string").str.strip()
+        lim[c] = lim[c].astype("string").str.strip()
 
-def write_section_table(
-    title: str,
-    table_df: pd.DataFrame,
-    start_at_row: int,
-    number_format: str = "auto",   # "bn" | "mn" | "accounting" | "auto"
-) -> int:
-    if table_df is None or len(table_df) == 0:
-        return start_at_row - 1
+    df[exposure_col] = pd.to_numeric(df[exposure_col], errors="coerce").fillna(0.0)
+    lim["IssuerLimit"] = pd.to_numeric(lim["IssuerLimit"], errors="coerce")
 
-    tdf = table_df.copy()
+    # optional exclude issuers
+    exclude_mm_issuers = exclude_mm_issuers or []
+    if len(exclude_mm_issuers) > 0:
+        exclude_set = set(pd.Series(exclude_mm_issuers, dtype="string").str.strip().tolist())
+        df = df[~df[issuer_col].isin(exclude_set)].copy()
 
-    # Section title
-    ws.merge_cells(start_row=start_at_row, start_column=1, end_row=start_at_row, end_column=5)
-    tcell = ws.cell(start_at_row, 1, title)
-    tcell.font = section_font
-    tcell.alignment = Alignment(horizontal="left", vertical="center")
-    ws.row_dimensions[start_at_row].height = 18
+    # keep only buckets we understand
+    df = df[df[rating_col].isin(buckets_order_best_to_worst)].copy()
+    lim = lim[lim[rating_col].isin(buckets_order_best_to_worst)].copy()
 
-    # Header row
-    hdr_row = start_at_row + 1
-    cols = list(tdf.columns)
+    # build rank: best=0 ... worst=last
+    rank_map = {b: i for i, b in enumerate(buckets_order_best_to_worst)}
+    df["_rank"] = df[rating_col].map(rank_map)
 
-    for j, col_name in enumerate(cols, start=1):
-        c = ws.cell(hdr_row, j, str(col_name))
-        c.font = header_font
-        c.fill = fill_header
-        c.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center")
-    ws.row_dimensions[hdr_row].height = 18
+    # =====================================================================================
+    # Exposure per (issuer, asset, bucket)
+    # =====================================================================================
+    exp = (
+        df.groupby([issuer_col, asset_col, rating_col], dropna=False)[exposure_col].sum()
+          .reset_index()
+          .rename(columns={exposure_col: "Exposure_in_Bucket"})
+    )
+    exp["_rank"] = exp[rating_col].map(rank_map)
 
-    # Body
-    r = hdr_row + 1
-    for _, rr in tdf.iterrows():
-        for j, col_name in enumerate(cols, start=1):
-            v = rr[col_name]
-            cell = ws.cell(r, j, v)
-            cell.font = body_font
-            cell.fill = fill_white
-            cell.border = border_bottom
-            cell.alignment = Alignment(horizontal="left" if j == 1 else "right", vertical="center")
+    # Full grid (issuer x asset x buckets) so missing buckets become 0
+    issuer_asset = exp[[issuer_col, asset_col]].drop_duplicates()
+    buckets = pd.DataFrame({rating_col: buckets_order_best_to_worst})
+    buckets["_rank"] = buckets[rating_col].map(rank_map)
 
-            if isinstance(v, (int, float, np.integer, np.floating)) and j != 1:
-                cell.number_format = resolve_number_format(number_format, col_name)
+    grid = issuer_asset.assign(_k=1).merge(buckets.assign(_k=1), on="_k").drop(columns="_k")
 
-        ws.row_dimensions[r].height = 16
-        r += 1
+    exp_full = grid.merge(exp, on=[issuer_col, asset_col, rating_col, "_rank"], how="left")
+    exp_full["Exposure_in_Bucket"] = exp_full["Exposure_in_Bucket"].fillna(0.0)
 
-    # Spacer
-    note_row = r
-    ws.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=5)
-    ncell = ws.cell(note_row, 1, "")
-    ncell.font = small_grey
-    ncell.alignment = Alignment(horizontal="left", vertical="center")
-    ws.row_dimensions[note_row].height = 6
+    # Cascading cumulative within (issuer, asset)
+    exp_full = exp_full.sort_values([issuer_col, asset_col, "_rank"], kind="stable")
+    exp_full["Exposure_Cumulative_WorseOrEqual"] = (
+        exp_full.groupby([issuer_col, asset_col])["Exposure_in_Bucket"]
+        .transform(lambda s: s.iloc[::-1].cumsum().iloc[::-1])
+    )
 
-    return note_row
+    # =====================================================================================
+    # Attach limits with override logic:
+    #   specific (Asset_Class == actual) wins over wildcard "*"
+    # =====================================================================================
+    lim_use = lim[[asset_col, rating_col, "IssuerLimit"]].drop_duplicates().copy()
 
-export_limit_onepager_excel(
-    report=limits_report,
-    subasset_summary=subasset_summary,
-    mt_summary=mt_summary,
-    output_path="limit_onepager.xlsx"
-)
+    # mark specificity: 1 = specific, 0 = wildcard
+    lim_use["_spec"] = np.where(lim_use[asset_col].eq(wildcard_value), 0, 1)
 
-# Inside the function:
-current_row = write_section_table(
-    "SubAsset Summary",
-    subasset_summary,
-    current_row,
-    number_format="mn"        # 👈 show millions
-)
+    out = exp_full.merge(
+        lim_use,
+        on=[asset_col, rating_col],
+        how="left",
+        suffixes=("", "_spec")
+    )
 
-current_row = write_section_table(
-    "Master Trust Summary",
-    mt_summary,
-    current_row,
-    number_format="accounting"  # 👈 full accounting
+    # For rows where no specific limit exists, try wildcard
+    # We'll do a second merge for wildcard and coalesce.
+    lim_wild = lim_use[lim_use[asset_col].eq(wildcard_value)][[rating_col, "IssuerLimit"]].drop_duplicates()
+    lim_wild = lim_wild.rename(columns={"IssuerLimit": "IssuerLimit_Wild"})
+
+    out = out.merge(lim_wild, on=rating_col, how="left")
+
+    # effective limit = specific if present else wildcard
+    out["Limit"] = out["IssuerLimit"].combine_first(out["IssuerLimit_Wild"])
+
+    # utilization + breach
+    out["Utilization"] = np.where(
+        pd.to_numeric(out["Limit"], errors="coerce").fillna(0.0) > 0,
+        out["Exposure_Cumulative_WorseOrEqual"] / out["Limit"],
+        np.nan
+    )
+    out["Breach"] = np.where(out["Utilization"] >= 1, 1, 0)
+
+    # tidy
+    out = out.drop(columns=["IssuerLimit", "IssuerLimit_Wild"])
+    out = out.sort_values([issuer_col, asset_col, "_rank"], kind="stable").drop(columns=["_rank"])
+
+    return out
