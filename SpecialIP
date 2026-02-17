@@ -1,296 +1,37 @@
-import pandas as pd
-import numpy as np
-from typing import Optional, List, Tuple
-
-def issuer_and_mt_monitor_cascading(
-    DF: pd.DataFrame,
-    IssuerLimits: pd.DataFrame,
-    MTDataframe: pd.DataFrame,
-    exclude_mm_issuers: Optional[list] = None,
-    exposure_col: str = "Exposure(USD)",
-    issuer_col: str = "MM_ISSUER",
-    mt_col: str = "MT_ISSUER",
-    rating_col: str = "Lowest_Bucket_Rating",
-    subasset_col: str = "Sub_Asset_Class",
-    asset_col: str = "Asset_Class",
-    parent_asset_col: str = "Parent_Asset_Class",
-    wildcard_value: str = "*",
-    buckets_order_best_to_worst: Optional[List[str]] = None,
-    mt_mm_lookup_col: str = "MM_ISSUER",  # MTDataframe column listing MM_ISSUERs to MT-test
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Returns:
-      1) issuer_bucket_detail: (MM_ISSUER, Asset_Class, Bucket) cascading exposure + IssuerLimit + breach
-      2) issuer_detail: (MM_ISSUER, Asset_Class) summary (Max_Utilization, Any_Breach)
-      3) subasset_summary
-      4) mt_detail: (MT_ISSUER, Asset_Class) shared MT exposure + MasterTrustLimit + breach   <-- LIMITS FROM IssuerLimits
-      5) mt_summary
-    """
-    if buckets_order_best_to_worst is None:
-        buckets_order_best_to_worst = ["AAA/AA", "A", "BBB"]
-
-    # ---- checks ----
-    req_df = {issuer_col, mt_col, rating_col, subasset_col, exposure_col, asset_col, parent_asset_col}
-    req_lim = {rating_col, asset_col, "IssuerLimit", "MasterTrustLimit"}
-    req_mt = {mt_mm_lookup_col}
-
-    missing_df = req_df - set(DF.columns)
-    missing_lim = req_lim - set(IssuerLimits.columns)
-    missing_mt = req_mt - set(MTDataframe.columns)
-
-    if missing_df:
-        raise SystemExit(f"Critical Error: DF missing columns: {sorted(missing_df)}")
-    if missing_lim:
-        raise SystemExit(f"Critical Error: IssuerLimits missing columns: {sorted(missing_lim)}")
-    if missing_mt:
-        raise SystemExit(f"Critical Error: MTDataframe missing columns: {sorted(missing_mt)}")
-
-    df = DF.copy()
-    lim = IssuerLimits.copy()
-    mt = MTDataframe.copy()
-
-    # ---- normalize strings ----
-    for c in [issuer_col, mt_col, rating_col, subasset_col, asset_col, parent_asset_col]:
-        df[c] = df[c].astype("string").str.strip()
-
-    for c in [rating_col, asset_col]:
-        lim[c] = lim[c].astype("string").str.strip()
-
-    mt[mt_mm_lookup_col] = mt[mt_mm_lookup_col].astype("string").str.strip()
-
-    df[exposure_col] = pd.to_numeric(df[exposure_col], errors="coerce").fillna(0.0)
-    lim["IssuerLimit"] = pd.to_numeric(lim["IssuerLimit"], errors="coerce")
-    lim["MasterTrustLimit"] = pd.to_numeric(lim["MasterTrustLimit"], errors="coerce")
-
-    # ---- Asset fallback: if Asset_Class blank -> Parent_Asset_Class ----
-    df[asset_col] = np.where(
-        df[asset_col].isna() | (df[asset_col] == ""),
-        df[parent_asset_col],
-        df[asset_col]
-    )
-
-    # ---- MT in-scope flag: MTDataframe lists MM_ISSUERs ----
-    mt_mm_set = set(mt[mt_mm_lookup_col].dropna().astype("string").str.strip().tolist())
-    df["_is_mt_row"] = df[issuer_col].isin(mt_mm_set)
-
-    # ---- EXCLUDE issuers ----
-    exclude_mm_issuers = exclude_mm_issuers or []
-    if len(exclude_mm_issuers) > 0:
-        exclude_set = set(pd.Series(exclude_mm_issuers, dtype="string").str.strip().tolist())
-        df = df[~df[issuer_col].isin(exclude_set)].copy()
-
-    # ---- keep only buckets we understand ----
-    df = df[df[rating_col].isin(buckets_order_best_to_worst)].copy()
-    lim = lim[lim[rating_col].isin(buckets_order_best_to_worst)].copy()
-
-    # ---- ranking for worst-rating logic (best=0 ... worst=last) ----
-    rank_map = {b: i for i, b in enumerate(buckets_order_best_to_worst)}
-    inv_rank = {v: k for k, v in rank_map.items()}
-    df["_rank"] = df[rating_col].map(rank_map)
-
-    # =============================================================================
-    # Helper: attach limits from IssuerLimits with Asset_Class override + wildcard fallback
-    # =============================================================================
-    def attach_limit_from_issuerlimits(base: pd.DataFrame, limit_col: str, out_col: str) -> pd.DataFrame:
-        """
-        base must contain columns: [asset_col, rating_col]
-        limit_col in IssuerLimits: 'IssuerLimit' or 'MasterTrustLimit'
-        """
-        base2 = base.copy()
-
-        lim_use = lim[[asset_col, rating_col, limit_col]].drop_duplicates().copy()
-
-        # specific match
-        base2 = base2.merge(lim_use, on=[asset_col, rating_col], how="left")
-
-        # wildcard fallback (only by rating)
-        lim_wild = (
-            lim_use[lim_use[asset_col].eq(wildcard_value)][[rating_col, limit_col]]
-            .drop_duplicates()
-            .rename(columns={limit_col: f"{limit_col}_WILD"})
+    # -----------------------------
+    # Subasset summary (issuer monitor)
+    # Optional: count breached ISSUERS only once per Sub_Asset_Class
+    # -----------------------------
+    if dedupe_issuer_breaches:
+        # one row per (issuer, asset) already exists in issuer_detail
+        # count breached issuers once (Any_Breach is 0/1)
+        subasset_summary = (
+            issuer_detail.groupby(subasset_col, dropna=False)
+            .agg(
+                **{
+                    "Count of Issuer": (issuer_col, "nunique"),
+                    "Max Exposure": ("IssuerExposure", "max"),
+                    "Breached Issuers": ("Any_Breach", "sum"),          # ✅ no double count
+                    "Max Issuer Utilization": ("Max_Utilization", "max"),
+                }
+            )
+            .reset_index()
+            .rename(columns={subasset_col: "Sub_Asset_Class"})
+            .sort_values(["Max Issuer Utilization", "Max Exposure"], ascending=[False, False], kind="stable")
         )
-        base2 = base2.merge(lim_wild, on=rating_col, how="left")
-
-        base2[out_col] = base2[limit_col].combine_first(base2[f"{limit_col}_WILD"])
-        base2 = base2.drop(columns=[limit_col, f"{limit_col}_WILD"])
-        return base2
-
-    # =====================================================================================
-    # 1) ISSUER cascading per (MM_ISSUER, Asset_Class, Bucket)
-    # =====================================================================================
-    exp = (
-        df.groupby([issuer_col, asset_col, subasset_col, rating_col], dropna=False)[exposure_col].sum()
-          .reset_index()
-          .rename(columns={exposure_col: "Exposure_in_Bucket"})
-    )
-    exp["_rank"] = exp[rating_col].map(rank_map)
-
-    issuer_asset = exp[[issuer_col, asset_col]].drop_duplicates()
-    buckets = pd.DataFrame({rating_col: buckets_order_best_to_worst})
-    buckets["_rank"] = buckets[rating_col].map(rank_map)
-    grid = issuer_asset.assign(_k=1).merge(buckets.assign(_k=1), on="_k").drop(columns="_k")
-
-    exp_full = grid.merge(
-        exp[[issuer_col, asset_col, rating_col, "_rank", "Exposure_in_Bucket"]],
-        on=[issuer_col, asset_col, rating_col, "_rank"],
-        how="left"
-    )
-    exp_full["Exposure_in_Bucket"] = exp_full["Exposure_in_Bucket"].fillna(0.0)
-
-    exp_full = exp_full.sort_values([issuer_col, asset_col, "_rank"], kind="stable")
-    exp_full["Exposure_Cumulative_WorseOrEqual"] = (
-        exp_full.groupby([issuer_col, asset_col])["Exposure_in_Bucket"]
-        .transform(lambda s: s.iloc[::-1].cumsum().iloc[::-1])
-    )
-
-    # attach IssuerLimit
-    exp_full = attach_limit_from_issuerlimits(exp_full, limit_col="IssuerLimit", out_col="Limit")
-
-    limit_num = pd.to_numeric(exp_full["Limit"], errors="coerce")
-    exp_cum = pd.to_numeric(exp_full["Exposure_Cumulative_WorseOrEqual"], errors="coerce").fillna(0.0)
-
-    exp_full["Utilization"] = np.where(
-        limit_num.fillna(0.0) > 0,
-        exp_cum / limit_num,
-        np.nan
-    )
-    exp_full["Breach"] = np.where(
-        (exp_cum > 0) & (limit_num.fillna(0.0) <= 0),
-        1,
-        np.where(exp_full["Utilization"] >= 1, 1, 0)
-    )
-
-    issuer_bucket_detail = exp_full.rename(columns={rating_col: "Bucket"}).copy()
-
-    # stable subasset per (issuer, asset)
-    issuer_asset_sub = (
-        df.groupby([issuer_col, asset_col, subasset_col], dropna=False)[exposure_col].sum()
-          .reset_index()
-          .sort_values([issuer_col, asset_col, exposure_col], ascending=[True, True, False], kind="stable")
-          .drop_duplicates(subset=[issuer_col, asset_col])[[issuer_col, asset_col, subasset_col]]
-    )
-    issuer_bucket_detail = issuer_bucket_detail.merge(issuer_asset_sub, on=[issuer_col, asset_col], how="left")
-
-    # issuer_detail summary
-    issuer_total = (
-        df.groupby([issuer_col, asset_col], dropna=False)[exposure_col].sum()
-          .reset_index()
-          .rename(columns={exposure_col: "IssuerExposure"})
-    )
-    issuer_detail = (
-        issuer_total
-        .merge(issuer_asset_sub, on=[issuer_col, asset_col], how="left")
-        .merge(
-            issuer_bucket_detail.groupby([issuer_col, asset_col], dropna=False)
-            .agg(Max_Utilization=("Utilization", "max"), Any_Breach=("Breach", "max"))
-            .reset_index(),
-            on=[issuer_col, asset_col],
-            how="left"
+    else:
+        # old behavior (can double count if you build it from bucket-level breaches)
+        subasset_summary = (
+            issuer_detail.groupby(subasset_col, dropna=False)
+            .agg(
+                **{
+                    "Count of Issuer": (issuer_col, "nunique"),
+                    "Max Exposure": ("IssuerExposure", "max"),
+                    "Issuer Breaches": ("Any_Breach", "sum"),
+                    "Max Issuer Utilization": ("Max_Utilization", "max"),
+                }
+            )
+            .reset_index()
+            .rename(columns={subasset_col: "Sub_Asset_Class"})
+            .sort_values(["Max Issuer Utilization", "Max Exposure"], ascending=[False, False], kind="stable")
         )
-    )
-
-    subasset_summary = (
-        issuer_detail.groupby(subasset_col, dropna=False)
-        .agg(
-            **{
-                "Count of Issuer": (issuer_col, "nunique"),
-                "Max Exposure": ("IssuerExposure", "max"),
-                "Issuer Breaches": ("Any_Breach", "sum"),
-                "Max Issuer Utilization": ("Max_Utilization", "max"),
-            }
-        )
-        .reset_index()
-        .rename(columns={subasset_col: "Sub_Asset_Class"})
-        .sort_values(["Max Issuer Utilization", "Max Exposure"], ascending=[False, False], kind="stable")
-    )
-
-    # =====================================================================================
-    # 2) MT MONITOR (additional): only rows where MM_ISSUER is in MTDataframe
-    #     - aggregate exposure by MT_ISSUER (shared)
-    #     - worst rating under MT_ISSUER
-    #     - compare vs MasterTrustLimit FROM IssuerLimits
-    # =====================================================================================
-    mt_rows = df[df["_is_mt_row"]].copy()
-
-    # must have MT_ISSUER to aggregate to trust; keep blanks out (or change if you prefer)
-    mt_rows = mt_rows[mt_rows[mt_col].notna() & (mt_rows[mt_col] != "")].copy()
-
-    # shared exposure per (MT_ISSUER, Asset_Class)
-    mt_exposure = (
-        mt_rows.groupby([mt_col, asset_col], dropna=False)[exposure_col].sum()
-               .reset_index()
-               .rename(columns={exposure_col: "MTExposure"})
-    )
-
-    # worst rating per (MT_ISSUER, Asset_Class)
-    mt_worst = (
-        mt_rows.groupby([mt_col, asset_col], dropna=False)["_rank"].max()
-               .reset_index()
-               .rename(columns={"_rank": "_worst_rank"})
-    )
-    mt_worst["Worst_Rating"] = mt_worst["_worst_rank"].map(inv_rank)
-
-    # choose subasset per MT_ISSUER (largest MT exposure)
-    mt_subasset = (
-        mt_rows.groupby([mt_col, subasset_col], dropna=False)[exposure_col].sum()
-               .reset_index()
-               .sort_values([mt_col, exposure_col], ascending=[True, False], kind="stable")
-               .drop_duplicates(subset=[mt_col])[[mt_col, subasset_col]]
-    )
-
-    # build mt_detail with a proper join key for limits
-    mt_detail = (
-        mt_exposure
-        .merge(mt_worst[[mt_col, asset_col, "Worst_Rating"]], on=[mt_col, asset_col], how="left")
-        .merge(mt_subasset, on=mt_col, how="left")
-    )
-
-    # attach MasterTrustLimit from IssuerLimits (using Asset_Class override + wildcard)
-    mt_detail = mt_detail.rename(columns={"Worst_Rating": rating_col})
-    mt_detail = attach_limit_from_issuerlimits(mt_detail, limit_col="MasterTrustLimit", out_col="MasterTrustLimit")
-    mt_detail = mt_detail.rename(columns={rating_col: "Worst_Rating"})
-
-    mt_limit_num = pd.to_numeric(mt_detail["MasterTrustLimit"], errors="coerce")
-    mt_exp = pd.to_numeric(mt_detail["MTExposure"], errors="coerce").fillna(0.0)
-
-    mt_detail["MTUtilization"] = np.where(
-        mt_limit_num.fillna(0.0) > 0,
-        mt_exp / mt_limit_num,
-        np.nan
-    )
-    mt_detail["MTBreach"] = np.where(
-        (mt_exp > 0) & (mt_limit_num.fillna(0.0) <= 0),
-        1,
-        np.where(mt_detail["MTUtilization"] >= 1, 1, 0)
-    )
-
-    mt_summary = (
-        mt_detail[mt_detail["MTExposure"] > 0]
-        .groupby(subasset_col, dropna=False)
-        .agg(
-            **{
-                "Count of MT": (mt_col, "nunique"),
-                "Max MT Exposure": ("MTExposure", "max"),
-                "MT Breaches": ("MTBreach", "sum"),
-                "Max MT Utilization": ("MTUtilization", "max"),
-            }
-        )
-        .reset_index()
-        .rename(columns={subasset_col: "Sub_Asset_Class"})
-        .sort_values(["Max MT Utilization", "Max MT Exposure"], ascending=[False, False], kind="stable")
-    )
-
-    issuer_bucket_detail = issuer_bucket_detail.sort_values([issuer_col, asset_col, "Bucket"], kind="stable")
-    return issuer_bucket_detail, issuer_detail, subasset_summary, mt_detail, mt_summary
-
-
-xclude_list = ["ISSUER_ABC", "ISSUER_XYZ"]
-
-issuer_bucket_detail, issuer_detail, subasset_summary, mt_detail, mt_summary = issuer_and_mt_monitor_cascading(
-    DF=DF,
-    IssuerLimits=IssuerLimits,
-    MTDataframe=MTDataframe,          # <- list of MM_ISSUERs to MT-test
-    exclude_mm_issuers=exclude_list,
-    buckets_order_best_to_worst=["AAA/AA", "A", "BBB"],
-    mt_mm_lookup_col="MM_ISSUER"
-)
