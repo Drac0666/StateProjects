@@ -1,133 +1,14 @@
-import pandas as pd
-import numpy as np
-from typing import List, Optional
+limit_num = pd.to_numeric(out["Limit"], errors="coerce")  # may be NaN
+exp_cum = pd.to_numeric(out["Exposure_Cumulative_WorseOrEqual"], errors="coerce").fillna(0.0)
 
-def issuer_cascading_limits(
-    DF: pd.DataFrame,
-    IssuerLimits: pd.DataFrame,
-    exposure_col: str = "Exposure(USD)",
-    issuer_col: str = "MM_ISSUER",
-    asset_col: str = "Asset_Class",                 # NEW
-    rating_col: str = "Lowest_Bucket_Rating",
-    buckets_order_best_to_worst: Optional[List[str]] = None,
-    exclude_mm_issuers: Optional[list] = None,
-    wildcard_value: str = "*",                      # NEW
-) -> pd.DataFrame:
-    """
-    Cascading logic per (MM_ISSUER, Asset_Class):
-      - BBB exposure counts toward BBB limit AND toward A and AAA/AA limits
-      - A exposure counts toward A limit AND toward AAA/AA limit
-      - AAA/AA counts only toward AAA/AA
+out["Utilization"] = np.where(
+    limit_num.fillna(0.0) > 0,
+    exp_cum / limit_num,
+    np.nan
+)
 
-    Limits:
-      - If IssuerLimits.Asset_Class == "*" -> applies to all asset classes (fallback)
-      - If IssuerLimits.Asset_Class == "<name>" -> overrides for that asset class (wins vs "*")
-
-    Returns one row per (MM_ISSUER, Asset_Class, Bucket) including:
-      Exposure_in_Bucket, Exposure_Cumulative_WorseOrEqual, Limit, Utilization, Breach
-    """
-
-    if buckets_order_best_to_worst is None:
-        buckets_order_best_to_worst = ["AAA/AA", "A", "BBB"]
-
-    # checks
-    req_df = {issuer_col, asset_col, rating_col, exposure_col}
-    req_lim = {asset_col, rating_col, "IssuerLimit"}
-    missing_df = req_df - set(DF.columns)
-    missing_lim = req_lim - set(IssuerLimits.columns)
-    if missing_df:
-        raise SystemExit(f"Critical Error: DF missing columns: {sorted(missing_df)}")
-    if missing_lim:
-        raise SystemExit(f"Critical Error: IssuerLimits missing columns: {sorted(missing_lim)}")
-
-    df = DF.copy()
-    lim = IssuerLimits.copy()
-
-    # normalize
-    for c in [issuer_col, asset_col, rating_col]:
-        df[c] = df[c].astype("string").str.strip()
-        lim[c] = lim[c].astype("string").str.strip()
-
-    df[exposure_col] = pd.to_numeric(df[exposure_col], errors="coerce").fillna(0.0)
-    lim["IssuerLimit"] = pd.to_numeric(lim["IssuerLimit"], errors="coerce")
-
-    # optional exclude issuers
-    exclude_mm_issuers = exclude_mm_issuers or []
-    if len(exclude_mm_issuers) > 0:
-        exclude_set = set(pd.Series(exclude_mm_issuers, dtype="string").str.strip().tolist())
-        df = df[~df[issuer_col].isin(exclude_set)].copy()
-
-    # keep only buckets we understand
-    df = df[df[rating_col].isin(buckets_order_best_to_worst)].copy()
-    lim = lim[lim[rating_col].isin(buckets_order_best_to_worst)].copy()
-
-    # build rank: best=0 ... worst=last
-    rank_map = {b: i for i, b in enumerate(buckets_order_best_to_worst)}
-    df["_rank"] = df[rating_col].map(rank_map)
-
-    # =====================================================================================
-    # Exposure per (issuer, asset, bucket)
-    # =====================================================================================
-    exp = (
-        df.groupby([issuer_col, asset_col, rating_col], dropna=False)[exposure_col].sum()
-          .reset_index()
-          .rename(columns={exposure_col: "Exposure_in_Bucket"})
-    )
-    exp["_rank"] = exp[rating_col].map(rank_map)
-
-    # Full grid (issuer x asset x buckets) so missing buckets become 0
-    issuer_asset = exp[[issuer_col, asset_col]].drop_duplicates()
-    buckets = pd.DataFrame({rating_col: buckets_order_best_to_worst})
-    buckets["_rank"] = buckets[rating_col].map(rank_map)
-
-    grid = issuer_asset.assign(_k=1).merge(buckets.assign(_k=1), on="_k").drop(columns="_k")
-
-    exp_full = grid.merge(exp, on=[issuer_col, asset_col, rating_col, "_rank"], how="left")
-    exp_full["Exposure_in_Bucket"] = exp_full["Exposure_in_Bucket"].fillna(0.0)
-
-    # Cascading cumulative within (issuer, asset)
-    exp_full = exp_full.sort_values([issuer_col, asset_col, "_rank"], kind="stable")
-    exp_full["Exposure_Cumulative_WorseOrEqual"] = (
-        exp_full.groupby([issuer_col, asset_col])["Exposure_in_Bucket"]
-        .transform(lambda s: s.iloc[::-1].cumsum().iloc[::-1])
-    )
-
-    # =====================================================================================
-    # Attach limits with override logic:
-    #   specific (Asset_Class == actual) wins over wildcard "*"
-    # =====================================================================================
-    lim_use = lim[[asset_col, rating_col, "IssuerLimit"]].drop_duplicates().copy()
-
-    # mark specificity: 1 = specific, 0 = wildcard
-    lim_use["_spec"] = np.where(lim_use[asset_col].eq(wildcard_value), 0, 1)
-
-    out = exp_full.merge(
-        lim_use,
-        on=[asset_col, rating_col],
-        how="left",
-        suffixes=("", "_spec")
-    )
-
-    # For rows where no specific limit exists, try wildcard
-    # We'll do a second merge for wildcard and coalesce.
-    lim_wild = lim_use[lim_use[asset_col].eq(wildcard_value)][[rating_col, "IssuerLimit"]].drop_duplicates()
-    lim_wild = lim_wild.rename(columns={"IssuerLimit": "IssuerLimit_Wild"})
-
-    out = out.merge(lim_wild, on=rating_col, how="left")
-
-    # effective limit = specific if present else wildcard
-    out["Limit"] = out["IssuerLimit"].combine_first(out["IssuerLimit_Wild"])
-
-    # utilization + breach
-    out["Utilization"] = np.where(
-        pd.to_numeric(out["Limit"], errors="coerce").fillna(0.0) > 0,
-        out["Exposure_Cumulative_WorseOrEqual"] / out["Limit"],
-        np.nan
-    )
-    out["Breach"] = np.where(out["Utilization"] >= 1, 1, 0)
-
-    # tidy
-    out = out.drop(columns=["IssuerLimit", "IssuerLimit_Wild"])
-    out = out.sort_values([issuer_col, asset_col, "_rank"], kind="stable").drop(columns=["_rank"])
-
-    return out
+out["Breach"] = np.where(
+    (exp_cum > 0) & (limit_num.fillna(0.0) <= 0),  # exposure but no/zero limit => breach
+    1,
+    np.where(out["Utilization"] >= 1, 1, 0)
+)
