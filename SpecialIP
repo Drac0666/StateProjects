@@ -1,14 +1,8 @@
-limit_num = pd.to_numeric(out["Limit"], errors="coerce")  # may be NaN
-exp_cum = pd.to_numeric(out["Exposure_Cumulative_WorseOrEqual"], errors="coerce").fillna(0.0)
+df[parent_asset_col] = df[parent_asset_col].astype("string").str.strip()
 
-out["Utilization"] = np.where(
-    limit_num.fillna(0.0) > 0,
-    exp_cum / limit_num,
-    np.nan
-)
-
-out["Breach"] = np.where(
-    (exp_cum > 0) & (limit_num.fillna(0.0) <= 0),  # exposure but no/zero limit => breach
-    1,
-    np.where(out["Utilization"] >= 1, 1, 0)
+# Replace blank / NaN Asset_Class with Parent_Asset_Class
+df[asset_col] = np.where(
+    df[asset_col].isna() | (df[asset_col] == "") | (df[asset_col].str.upper() == "NAN"),
+    df[parent_asset_col],
+    df[asset_col]
 )
