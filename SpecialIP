@@ -1,75 +1,8 @@
-    # =====================================================================================
-    # 2) MT MONITOR (additional): based on MM_ISSUER list, aggregate by MT_ISSUER (shared)
-    #     BUT grouping dimension is Parent_Asset_Class (NOT Sub_Asset_Class / Asset_Class)
-    # =====================================================================================
-    mt_rows = df[df["_is_mt_row"]].copy()
+International Collaboration Model
+The role does not require interaction with the team in Poland. Daily collaboration takes place with Mack Fak in Milan, the KGYZ Finance Team in Boston, and Matrix Manager Jan Sobieski. All key stakeholders are geographically distributed, and cooperation is conducted fully virtually.
 
-    # must have MT_ISSUER to aggregate to trust
-    mt_rows = mt_rows[mt_rows[mt_col].notna() & (mt_rows[mt_col] != "")].copy()
+Subject Matter Expertise Role
+Acts as Subject Matter Expert for key financial models, including KKK Model, GGG Model, and XXX Model. Responsibilities are analytical and outcome-based, with performance measured by quality and delivery rather than physical presence.
 
-    # For MT monitoring, use Parent_Asset_Class as the classification dimension
-    mt_rows["_mt_class"] = mt_rows[parent_asset_col]
-
-    # shared exposure per (MT_ISSUER, Parent_Asset_Class)
-    mt_exposure = (
-        mt_rows.groupby([mt_col, "_mt_class"], dropna=False)[exposure_col].sum()
-               .reset_index()
-               .rename(columns={exposure_col: "MTExposure"})
-    )
-
-    # worst rating per (MT_ISSUER, Parent_Asset_Class)
-    mt_worst = (
-        mt_rows.groupby([mt_col, "_mt_class"], dropna=False)["_rank"].max()
-               .reset_index()
-               .rename(columns={"_rank": "_worst_rank"})
-    )
-    mt_worst["Worst_Rating"] = mt_worst["_worst_rank"].map(inv_rank)
-
-    # build mt_detail (NO subasset here by design; you asked for parent_asset)
-    mt_detail = (
-        mt_exposure
-        .merge(mt_worst[[mt_col, "_mt_class", "Worst_Rating"]], on=[mt_col, "_mt_class"], how="left")
-        .rename(columns={"_mt_class": parent_asset_col})
-    )
-
-    # ---- attach MasterTrustLimit from IssuerLimits using Parent_Asset_Class as matching dimension ----
-    # We temporarily rename parent_asset_col -> asset_col so the attach_limit helper can be reused
-    mt_detail_for_join = mt_detail.rename(columns={parent_asset_col: asset_col, "Worst_Rating": rating_col})
-    mt_detail_for_join = attach_limit_from_issuerlimits(
-        mt_detail_for_join,
-        limit_col="MasterTrustLimit",
-        out_col="MasterTrustLimit"
-    )
-    mt_detail = mt_detail_for_join.rename(columns={asset_col: parent_asset_col, rating_col: "Worst_Rating"})
-
-    # utilization + breach (breach if limit<=0 and exposure>0)
-    mt_limit_num = pd.to_numeric(mt_detail["MasterTrustLimit"], errors="coerce")
-    mt_exp = pd.to_numeric(mt_detail["MTExposure"], errors="coerce").fillna(0.0)
-
-    mt_detail["MTUtilization"] = np.where(
-        mt_limit_num.fillna(0.0) > 0,
-        mt_exp / mt_limit_num,
-        np.nan
-    )
-    mt_detail["MTBreach"] = np.where(
-        (mt_exp > 0) & (mt_limit_num.fillna(0.0) <= 0),
-        1,
-        np.where(mt_detail["MTUtilization"] >= 1, 1, 0)
-    )
-
-    # mt_summary grouped by Parent_Asset_Class
-    mt_summary = (
-        mt_detail[mt_detail["MTExposure"] > 0]
-        .groupby(parent_asset_col, dropna=False)
-        .agg(
-            **{
-                "Count of MT": (mt_col, "nunique"),
-                "Max MT Exposure": ("MTExposure", "max"),
-                "MT Breaches": ("MTBreach", "sum"),
-                "Max MT Utilization": ("MTUtilization", "max"),
-            }
-        )
-        .reset_index()
-        .rename(columns={parent_asset_col: "Parent_Asset_Class"})
-        .sort_values(["Max MT Utilization", "Max MT Exposure"], ascending=[False, False], kind="stable")
-    )
+Operational Efficiency
+The nature of the role and global stakeholder structure make full remote work operationally effective, without impact on communication, productivity, or business continuity.
