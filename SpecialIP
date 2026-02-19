@@ -1,8 +1,347 @@
-International Collaboration Model
-The role does not require interaction with the team in Poland. Daily collaboration takes place with Mack Fak in Milan, the KGYZ Finance Team in Boston, and Matrix Manager Jan Sobieski. All key stakeholders are geographically distributed, and cooperation is conducted fully virtually.
+"""
+Excel File Comparator
+Usage: python compare_excel.py <new_file.xlsx> <old_file.xlsx> [output.xlsx]
 
-Subject Matter Expertise Role
-Acts as Subject Matter Expert for key financial models, including KKK Model, GGG Model, and XXX Model. Responsibilities are analytical and outcome-based, with performance measured by quality and delivery rather than physical presence.
+Compares two Excel workbooks sheet by sheet:
+- Green fill  = cells that match
+- Light red   = cells that differ (or exist in one file only)
+- "Differences" tab = detailed log of every difference found
+"""
 
-Operational Efficiency
-The nature of the role and global stakeholder structure make full remote work operationally effective, without impact on communication, productivity, or business continuity.
+import sys
+import openpyxl
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter, column_index_from_string
+from copy import copy
+import os
+
+# ── Fills ──────────────────────────────────────────────────────────────────
+GREEN      = PatternFill("solid", start_color="C6EFCE", end_color="C6EFCE")
+LIGHT_RED  = PatternFill("solid", start_color="FFCCCC", end_color="FFCCCC")
+HEADER_BG  = PatternFill("solid", start_color="2F4F8F", end_color="2F4F8F")
+ALT_ROW    = PatternFill("solid", start_color="F5F5F5", end_color="F5F5F5")
+WHITE      = PatternFill("solid", start_color="FFFFFF", end_color="FFFFFF")
+
+HEADER_FONT  = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+NORMAL_FONT  = Font(name="Arial", size=10)
+BOLD_FONT    = Font(name="Arial", bold=True, size=10)
+RED_FONT     = Font(name="Arial", size=10, color="CC0000")
+GREEN_FONT   = Font(name="Arial", size=10, color="1E7E34")
+
+thin = Side(style="thin", color="CCCCCC")
+THIN_BORDER = Border(left=thin, right=thin, top=thin, bottom=thin)
+CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+LEFT   = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+
+
+def cell_value(ws, row, col):
+    """Return display-friendly value of a cell (None → empty string)."""
+    v = ws.cell(row=row, column=col).value
+    return "" if v is None else v
+
+
+def normalize(v):
+    """Normalize for comparison: strip strings, keep numbers/dates as-is."""
+    if isinstance(v, str):
+        return v.strip()
+    return v
+
+
+def copy_cell_style(src_cell, dst_cell):
+    """Copy basic style attributes from one cell to another."""
+    if src_cell.font:
+        dst_cell.font = copy(src_cell.font)
+    if src_cell.alignment:
+        dst_cell.alignment = copy(src_cell.alignment)
+    if src_cell.border:
+        dst_cell.border = copy(src_cell.border)
+    if src_cell.number_format:
+        dst_cell.number_format = src_cell.number_format
+
+
+def compare_and_write(new_ws, old_ws, out_ws, differences, sheet_name):
+    """
+    Compare new_ws vs old_ws, write results to out_ws.
+    Appends difference records to `differences` list.
+    Returns (match_count, diff_count, only_in_new, only_in_old).
+    """
+    new_max_row = new_ws.max_row or 0
+    new_max_col = new_ws.max_column or 0
+    old_max_row = old_ws.max_row or 0
+    old_max_col = old_ws.max_column or 0
+
+    max_row = max(new_max_row, old_max_row)
+    max_col = max(new_max_col, old_max_col)
+
+    match_count = diff_count = only_new = only_old = 0
+
+    for row in range(1, max_row + 1):
+        for col in range(1, max_col + 1):
+            new_val = cell_value(new_ws, row, col)
+            old_val = cell_value(old_ws, row, col)
+            out_cell = out_ws.cell(row=row, column=col)
+
+            in_new = row <= new_max_row and col <= new_max_col
+            in_old = row <= old_max_row and col <= old_max_col
+
+            # Copy value from new file (preferred) or old
+            out_cell.value = new_val if in_new else old_val
+
+            # Copy style from new file source cell
+            src_cell = new_ws.cell(row=row, column=col) if in_new else old_ws.cell(row=row, column=col)
+            copy_cell_style(src_cell, out_cell)
+
+            cell_ref = f"{get_column_letter(col)}{row}"
+
+            if in_new and not in_old:
+                out_cell.fill = LIGHT_RED
+                only_new += 1
+                diff_count += 1
+                differences.append({
+                    "sheet": sheet_name,
+                    "cell": cell_ref,
+                    "new_value": new_val,
+                    "old_value": "(cell does not exist)",
+                    "change_type": "Added in NEW"
+                })
+            elif in_old and not in_new:
+                out_cell.fill = LIGHT_RED
+                only_old += 1
+                diff_count += 1
+                differences.append({
+                    "sheet": sheet_name,
+                    "cell": cell_ref,
+                    "new_value": "(cell does not exist)",
+                    "old_value": old_val,
+                    "change_type": "Removed in NEW"
+                })
+            elif normalize(new_val) == normalize(old_val):
+                out_cell.fill = GREEN
+                match_count += 1
+            else:
+                out_cell.fill = LIGHT_RED
+                diff_count += 1
+                differences.append({
+                    "sheet": sheet_name,
+                    "cell": cell_ref,
+                    "new_value": new_val,
+                    "old_value": old_val,
+                    "change_type": "Value Changed"
+                })
+
+    # Mirror column widths from new sheet
+    for col_letter, dim in new_ws.column_dimensions.items():
+        out_ws.column_dimensions[col_letter].width = dim.width
+    for row_num, dim in new_ws.row_dimensions.items():
+        out_ws.row_dimensions[row_num].height = dim.height
+
+    return match_count, diff_count, only_new, only_old
+
+
+def build_differences_sheet(wb, differences, sheet_stats):
+    """Create the 'Differences' summary sheet."""
+    ws = wb.create_sheet("Differences")
+
+    # ── Title row ──────────────────────────────────────────────────────────
+    ws.merge_cells("A1:G1")
+    title = ws["A1"]
+    title.value = "Excel Comparison — Differences Report"
+    title.font = Font(name="Arial", bold=True, size=14, color="FFFFFF")
+    title.fill = PatternFill("solid", start_color="1F3864", end_color="1F3864")
+    title.alignment = CENTER
+    ws.row_dimensions[1].height = 30
+
+    # ── Summary section ────────────────────────────────────────────────────
+    ws["A3"] = "SUMMARY"
+    ws["A3"].font = Font(name="Arial", bold=True, size=11, color="1F3864")
+
+    summary_headers = ["Sheet Name", "Matching Cells", "Different Cells",
+                       "Added (New only)", "Removed (Old only)", "Total Cells Compared"]
+    for ci, h in enumerate(summary_headers, 1):
+        c = ws.cell(row=4, column=ci, value=h)
+        c.font = HEADER_FONT
+        c.fill = HEADER_BG
+        c.alignment = CENTER
+        c.border = THIN_BORDER
+
+    for ri, stat in enumerate(sheet_stats, 5):
+        row_fill = ALT_ROW if ri % 2 == 0 else WHITE
+        for ci, val in enumerate([
+            stat["sheet"], stat["match"], stat["diff"],
+            stat["only_new"], stat["only_old"],
+            stat["match"] + stat["diff"]
+        ], 1):
+            c = ws.cell(row=ri, column=ci, value=val)
+            c.font = NORMAL_FONT
+            c.fill = row_fill
+            c.alignment = CENTER
+            c.border = THIN_BORDER
+
+    # Totals row
+    totals_row = 5 + len(sheet_stats)
+    ws.cell(row=totals_row, column=1, value="TOTAL").font = BOLD_FONT
+    for ci, key in enumerate(["match", "diff", "only_new", "only_old"], 2):
+        c = ws.cell(row=totals_row, column=ci, value=sum(s[key] for s in sheet_stats))
+        c.font = BOLD_FONT
+        c.fill = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
+        c.border = THIN_BORDER
+        c.alignment = CENTER
+
+    # ── Detailed differences table ─────────────────────────────────────────
+    detail_start = totals_row + 3
+    ws.cell(row=detail_start - 1, column=1, value="DETAILED DIFFERENCES").font = Font(
+        name="Arial", bold=True, size=11, color="1F3864")
+
+    detail_headers = ["#", "Sheet", "Cell", "Change Type", "New Value", "Old Value", "Notes"]
+    for ci, h in enumerate(detail_headers, 1):
+        c = ws.cell(row=detail_start, column=ci, value=h)
+        c.font = HEADER_FONT
+        c.fill = HEADER_BG
+        c.alignment = CENTER
+        c.border = THIN_BORDER
+
+    change_type_color = {
+        "Value Changed":     "FFCCCC",
+        "Added in NEW":      "CCE5FF",
+        "Removed in NEW":    "FFE5CC",
+    }
+
+    for ri, diff in enumerate(differences, 1):
+        excel_row = detail_start + ri
+        row_data = [
+            ri,
+            diff["sheet"],
+            diff["cell"],
+            diff["change_type"],
+            str(diff["new_value"]) if diff["new_value"] != "" else "(empty)",
+            str(diff["old_value"]) if diff["old_value"] != "" else "(empty)",
+            ""
+        ]
+        bg = change_type_color.get(diff["change_type"], "FFFFFF")
+        fill = PatternFill("solid", start_color=bg, end_color=bg)
+        for ci, val in enumerate(row_data, 1):
+            c = ws.cell(row=excel_row, column=ci, value=val)
+            c.font = NORMAL_FONT
+            c.fill = fill
+            c.alignment = LEFT if ci > 3 else CENTER
+            c.border = THIN_BORDER
+
+    # ── Column widths ──────────────────────────────────────────────────────
+    ws.column_dimensions["A"].width = 6
+    ws.column_dimensions["B"].width = 22
+    ws.column_dimensions["C"].width = 10
+    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["E"].width = 35
+    ws.column_dimensions["F"].width = 35
+    ws.column_dimensions["G"].width = 25
+
+    # ── Legend ─────────────────────────────────────────────────────────────
+    legend_row = detail_start + len(differences) + 3
+    ws.cell(row=legend_row, column=1, value="LEGEND").font = BOLD_FONT
+    legend_items = [
+        (GREEN,      "Cells match between NEW and OLD"),
+        (LIGHT_RED,  "Cells differ between NEW and OLD"),
+        (PatternFill("solid", start_color="CCE5FF", end_color="CCE5FF"), "Cell exists in NEW only (added)"),
+        (PatternFill("solid", start_color="FFE5CC", end_color="FFE5CC"), "Cell exists in OLD only (removed)"),
+    ]
+    for i, (fill, label) in enumerate(legend_items):
+        r = legend_row + 1 + i
+        c = ws.cell(row=r, column=1, value="  ")
+        c.fill = fill
+        c.border = THIN_BORDER
+        ws.cell(row=r, column=2, value=label).font = NORMAL_FONT
+
+    ws.sheet_view.showGridLines = True
+    ws.freeze_panes = ws.cell(row=detail_start + 1, column=1)
+
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python compare_excel.py <new_file.xlsx> <old_file.xlsx> [output.xlsx]")
+        sys.exit(1)
+
+    new_path = sys.argv[1]
+    old_path = sys.argv[2]
+    out_path = sys.argv[3] if len(sys.argv) > 3 else "comparison_output.xlsx"
+
+    print(f"Loading NEW: {new_path}")
+    print(f"Loading OLD: {old_path}")
+
+    new_wb = openpyxl.load_workbook(new_path, data_only=True)
+    old_wb = openpyxl.load_workbook(old_path, data_only=True)
+    out_wb = Workbook()
+    out_wb.remove(out_wb.active)  # remove default blank sheet
+
+    new_sheets = set(new_wb.sheetnames)
+    old_sheets = set(old_wb.sheetnames)
+    all_sheets = list(new_wb.sheetnames)  # keep new order as primary
+    for s in old_wb.sheetnames:
+        if s not in new_sheets:
+            all_sheets.append(s)
+
+    differences = []
+    sheet_stats = []
+
+    for sheet_name in all_sheets:
+        print(f"  Comparing sheet: {sheet_name}")
+        out_ws = out_wb.create_sheet(title=sheet_name)
+
+        if sheet_name in new_sheets and sheet_name in old_sheets:
+            match, diff, only_new, only_old = compare_and_write(
+                new_wb[sheet_name], old_wb[sheet_name], out_ws, differences, sheet_name
+            )
+        elif sheet_name in new_sheets:
+            # Sheet only in NEW — all cells marked as added
+            new_ws = new_wb[sheet_name]
+            for row in new_ws.iter_rows():
+                for cell in row:
+                    out_cell = out_ws.cell(row=cell.row, column=cell.column, value=cell.value)
+                    out_cell.fill = LIGHT_RED
+                    copy_cell_style(cell, out_cell)
+                    if cell.value not in (None, ""):
+                        differences.append({
+                            "sheet": sheet_name,
+                            "cell": cell.coordinate,
+                            "new_value": cell.value,
+                            "old_value": "(sheet not in OLD)",
+                            "change_type": "Added in NEW"
+                        })
+            match, diff, only_new, only_old = 0, new_ws.max_row * new_ws.max_column, new_ws.max_row * new_ws.max_column, 0
+        else:
+            # Sheet only in OLD — all cells marked as removed
+            old_ws = old_wb[sheet_name]
+            for row in old_ws.iter_rows():
+                for cell in row:
+                    out_cell = out_ws.cell(row=cell.row, column=cell.column, value=cell.value)
+                    out_cell.fill = LIGHT_RED
+                    copy_cell_style(cell, out_cell)
+                    if cell.value not in (None, ""):
+                        differences.append({
+                            "sheet": sheet_name,
+                            "cell": cell.coordinate,
+                            "new_value": "(sheet not in NEW)",
+                            "old_value": cell.value,
+                            "change_type": "Removed in NEW"
+                        })
+            match, diff, only_new, only_old = 0, old_ws.max_row * old_ws.max_column, 0, old_ws.max_row * old_ws.max_column
+
+        sheet_stats.append({
+            "sheet": sheet_name, "match": match, "diff": diff,
+            "only_new": only_new, "only_old": only_old
+        })
+
+    build_differences_sheet(out_wb, differences, sheet_stats)
+
+    out_wb.save(out_path)
+
+    total_diff = sum(s["diff"] for s in sheet_stats)
+    total_match = sum(s["match"] for s in sheet_stats)
+    print(f"\n✅ Done! Output saved to: {out_path}")
+    print(f"   Matching cells : {total_match}")
+    print(f"   Different cells: {total_diff}")
+    print(f"   Total differences logged: {len(differences)}")
+
+
+if __name__ == "__main__":
+    main()
