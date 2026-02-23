@@ -491,7 +491,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Excel File Comparator")
-        self.resizable(False, False)
+        self.resizable(True, True)
         self.configure(bg=BG)
 
         # ── State vars (must exist before _build_ui) ──
@@ -505,9 +505,14 @@ class App(tk.Tk):
 
     def _center(self):
         self.update_idletasks()
-        w, h = self.winfo_width(), self.winfo_height()
-        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
+        sw, sh   = self.winfo_screenwidth(), self.winfo_screenheight()
+        max_h    = int(sh * 0.90)          # cap at 90 % of screen height
+        win_w    = self.winfo_reqwidth()
+        win_h    = min(self.winfo_reqheight(), max_h)
+        x        = (sw - win_w) // 2
+        y        = (sh - win_h) // 2
+        self.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        self.minsize(win_w, 400)
 
     def _section(self, parent, title, **kw):
         """Labelled card section."""
@@ -522,16 +527,59 @@ class App(tk.Tk):
         return inner
 
     def _build_ui(self):
-        # ── Header ──
+        # ── Header (fixed, never scrolls) ──
         hdr = tk.Frame(self, bg=ACCENT, pady=20)
-        hdr.pack(fill="x")
+        hdr.pack(fill="x", side="top")
         tk.Label(hdr, text="Excel File Comparator", font=FONT_H1,
                  bg=ACCENT, fg="white").pack()
         tk.Label(hdr, text="Compare two workbooks cell-by-cell with flexible comparison modes",
                  font=FONT_SMALL, bg=ACCENT, fg="#BFDBFE").pack(pady=(4, 0))
 
-        body = tk.Frame(self, bg=BG, padx=24, pady=20)
-        body.pack(fill="both", expand=True)
+        # ── Status bar (fixed at bottom, also never scrolls) ──
+        tk.Frame(self, bg=BORDER_CLR, height=1).pack(fill="x", side="bottom")
+        self.status_lbl = tk.Label(self,
+                                    text="Ready — select a NEW file and an OLD file to begin",
+                                    font=FONT_SMALL, bg=BG, fg=TEXT_SUB, pady=6)
+        self.status_lbl.pack(fill="x", side="bottom")
+
+        # ── Scrollable body ──
+        scroll_outer = tk.Frame(self, bg=BG)
+        scroll_outer.pack(fill="both", expand=True, side="top")
+
+        self._canvas = tk.Canvas(scroll_outer, bg=BG, highlightthickness=0)
+        vbar = tk.Scrollbar(scroll_outer, orient="vertical",
+                             command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=vbar.set)
+        vbar.pack(side="right", fill="y")
+        self._canvas.pack(side="left", fill="both", expand=True)
+
+        # Inner frame that holds all widgets
+        body = tk.Frame(self._canvas, bg=BG, padx=24, pady=20)
+        self._body_window = self._canvas.create_window(
+            (0, 0), window=body, anchor="nw")
+
+        # Resize canvas scroll-region when body changes size
+        def _on_frame_configure(e):
+            self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+        body.bind("<Configure>", _on_frame_configure)
+
+        # Stretch inner frame to canvas width
+        def _on_canvas_configure(e):
+            self._canvas.itemconfig(self._body_window, width=e.width)
+        self._canvas.bind("<Configure>", _on_canvas_configure)
+
+        # Mouse-wheel scrolling (Windows, macOS, Linux)
+        def _on_mousewheel(e):
+            if e.num == 4:
+                self._canvas.yview_scroll(-1, "units")
+            elif e.num == 5:
+                self._canvas.yview_scroll(1, "units")
+            else:
+                self._canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
+        self._canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self._canvas.bind_all("<Button-4>",   _on_mousewheel)
+        self._canvas.bind_all("<Button-5>",   _on_mousewheel)
 
         # ── File zones ──
         drop_row = tk.Frame(body, bg=BG)
@@ -686,13 +734,6 @@ class App(tk.Tk):
         self.log_text.tag_config("info",  foreground="#94A3B8")
         self.log_text.tag_config("warn",  foreground="#FCD34D")
         self.log_text.tag_config("error", foreground="#F87171")
-
-        # ── Status bar ──
-        tk.Frame(self, bg=BORDER_CLR, height=1).pack(fill="x")
-        self.status_lbl = tk.Label(self,
-                                    text="Ready — select a NEW file and an OLD file to begin",
-                                    font=FONT_SMALL, bg=BG, fg=TEXT_SUB, pady=6)
-        self.status_lbl.pack(fill="x")
 
     # ── Widget helpers ────────────────────────────────────────────────────
 
