@@ -176,7 +176,7 @@ def compare_and_write(new_ws, old_ws, out_ws, differences, sheet_name,
 # ── Differences sheet ──────────────────────────────────────────────────────
 
 def build_differences_sheet(wb, differences, sheet_stats, mode, threshold, override_values):
-    ws = wb.create_sheet("Differences")
+    ws = wb["Differences"]   # sheet was pre-created at index 0 in run_comparison
 
     # ── Title ──
     ws.merge_cells("A1:H1")
@@ -348,6 +348,10 @@ def run_comparison(new_path, old_path, out_path, log_fn, mode, threshold, overri
 
     differences = []
     sheet_stats = []
+
+    # Pre-create the Differences sheet at position 0 so it appears first.
+    # We'll populate it later once all comparisons are done.
+    diff_ws_placeholder = out_wb.create_sheet(title="Differences", index=0)
 
     for sheet_name in all_sheets:
         log_fn(f"  Comparing: {sheet_name}")
