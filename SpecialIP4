@@ -270,13 +270,21 @@ def build_differences_sheet(wb, differences, sheet_stats, mode, threshold, overr
             c.font = NORMAL_FONT; c.fill = fill
             c.alignment = CENTER if ci in (1, 3, 7) else LEFT
             c.border = THIN_BORDER
+
+            # ── Cell column → clickable hyperlink to the source sheet/cell ──
+            if ci == 3 and val and not val.startswith("("):
+                sheet_name_safe = diff["sheet"].replace("'", "''")
+                c.hyperlink = f"#{sheet_name_safe}!{val}"
+                c.font = Font(name="Arial", size=10, underline="single",
+                               color="1155CC")
+
             # Colour-code the variance cell
-            if ci == 7 and val and val not in ("N/A (old=0)", ""):
+            elif ci == 7 and val and val not in ("N/A (old=0)", ""):
                 is_pos = val.startswith("+")
                 c.font = Font(name="Arial", size=10, bold=True,
                                color="16A34A" if is_pos else "DC2626")
             # Style the "within threshold" note
-            if ci == 8 and within:
+            elif ci == 8 and within:
                 c.font = Font(name="Arial", size=10, italic=True, color="16A34A")
 
     # Column widths
