@@ -273,8 +273,20 @@ def build_differences_sheet(wb, differences, sheet_stats, mode, threshold, overr
 
             # ── Cell column → clickable hyperlink to the source sheet/cell ──
             if ci == 3 and val and not val.startswith("("):
-                sheet_name_safe = diff["sheet"].replace("'", "''")
-                c.hyperlink = f"#{sheet_name_safe}!{val}"
+                # Excel needs single-quote wrapping when the sheet name
+                # contains spaces, special chars, or starts with a digit.
+                # Internal apostrophes must be escaped as '' inside the quotes.
+                sn = diff["sheet"]
+                needs_quotes = (
+                    " " in sn or
+                    not sn[0].isalpha() or
+                    any(ch in sn for ch in r"[]*/\:?")
+                )
+                if needs_quotes:
+                    sn_safe = "'" + sn.replace("'", "''") + "'"
+                else:
+                    sn_safe = sn
+                c.hyperlink = f"#{sn_safe}!{val}"
                 c.font = Font(name="Arial", size=10, underline="single",
                                color="1155CC")
 
