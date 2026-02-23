@@ -1,0 +1,831 @@
+"""
+Excel File Comparator — GUI Version
+Requires: pip install openpyxl
+
+Run: python compare_excel_gui.py
+
+Features:
+  - Mode A: Value Changed  — flag any difference red/green (original method)
+  - Mode B: Numeric Variance — calculate % change for numeric cells
+  - Optional variance threshold: only flag red if |variance| > X%, otherwise green
+"""
+
+import os
+import sys
+import threading
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from tkinter import ttk
+
+import openpyxl
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from copy import copy
+
+# ── Excel fill styles ──────────────────────────────────────────────────────
+
+GREEN        = PatternFill("solid", start_color="C6EFCE", end_color="C6EFCE")
+LIGHT_RED    = PatternFill("solid", start_color="FFCCCC", end_color="FFCCCC")
+ORANGE       = PatternFill("solid", start_color="FFE5CC", end_color="FFE5CC")   # within-threshold
+HEADER_BG    = PatternFill("solid", start_color="2F4F8F", end_color="2F4F8F")
+ALT_ROW      = PatternFill("solid", start_color="F5F5F5", end_color="F5F5F5")
+WHITE        = PatternFill("solid", start_color="FFFFFF", end_color="FFFFFF")
+
+HEADER_FONT  = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+NORMAL_FONT  = Font(name="Arial", size=10)
+BOLD_FONT    = Font(name="Arial", bold=True, size=10)
+
+thin         = Side(style="thin", color="CCCCCC")
+THIN_BORDER  = Border(left=thin, right=thin, top=thin, bottom=thin)
+CENTER       = Alignment(horizontal="center", vertical="center", wrap_text=True)
+LEFT         = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+
+
+# ── Pure helpers ───────────────────────────────────────────────────────────
+
+def cell_value(ws, row, col):
+    v = ws.cell(row=row, column=col).value
+    return "" if v is None else v
+
+def normalize(v):
+    return v.strip() if isinstance(v, str) else v
+
+def is_numeric(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+def calc_variance_pct(new_val, old_val):
+    """Return (pct_float_or_None, display_str)."""
+    if old_val == 0:
+        return None, "N/A (old=0)"
+    pct = (new_val - old_val) / abs(old_val) * 100
+    sign = "+" if pct >= 0 else ""
+    return pct, f"{sign}{pct:.2f}%"
+
+def copy_cell_style(src, dst):
+    for attr in ("font", "alignment", "border", "number_format"):
+        val = getattr(src, attr, None)
+        if val:
+            if attr == "number_format":
+                dst.number_format = val
+            else:
+                setattr(dst, attr, copy(val))
+
+
+# ── Core comparison ────────────────────────────────────────────────────────
+
+def compare_and_write(new_ws, old_ws, out_ws, differences, sheet_name,
+                      mode, threshold, override_values):
+    """
+    mode           : "value"    → original flag-any-change method
+                     "variance" → compute % change for numeric pairs
+    threshold      : float or None
+                     If not None (variance mode only): |pct| > threshold → red,
+                     otherwise → green (within-tolerance).
+    override_values: bool — when True and mode=="variance", replace the cell
+                     value in the output sheet with the variance % string instead
+                     of the NEW value.  Non-numeric changed cells keep their
+                     NEW value.  Matching / structural cells are unaffected.
+    """
+    new_max_row = new_ws.max_row or 0
+    new_max_col = new_ws.max_column or 0
+    old_max_row = old_ws.max_row or 0
+    old_max_col = old_ws.max_column or 0
+    max_row = max(new_max_row, old_max_row)
+    max_col = max(new_max_col, old_max_col)
+    match_count = diff_count = only_new = only_old = 0
+
+    for row in range(1, max_row + 1):
+        for col in range(1, max_col + 1):
+            new_val  = cell_value(new_ws, row, col)
+            old_val  = cell_value(old_ws, row, col)
+            out_cell = out_ws.cell(row=row, column=col)
+            in_new   = row <= new_max_row and col <= new_max_col
+            in_old   = row <= old_max_row and col <= old_max_col
+
+            out_cell.value = new_val if in_new else old_val
+            src = new_ws.cell(row=row, column=col) if in_new else old_ws.cell(row=row, column=col)
+            copy_cell_style(src, out_cell)
+            cell_ref = f"{get_column_letter(col)}{row}"
+
+            # ── Cell only in NEW ──
+            if in_new and not in_old:
+                out_cell.fill = LIGHT_RED
+                only_new += 1; diff_count += 1
+                differences.append({
+                    "sheet": sheet_name, "cell": cell_ref,
+                    "new_value": new_val, "old_value": "(cell does not exist)",
+                    "change_type": "Added in NEW", "variance": "", "within_threshold": False
+                })
+
+            # ── Cell only in OLD ──
+            elif in_old and not in_new:
+                out_cell.fill = LIGHT_RED
+                only_old += 1; diff_count += 1
+                differences.append({
+                    "sheet": sheet_name, "cell": cell_ref,
+                    "new_value": "(cell does not exist)", "old_value": old_val,
+                    "change_type": "Removed in NEW", "variance": "", "within_threshold": False
+                })
+
+            # ── Cells match ──
+            elif normalize(new_val) == normalize(old_val):
+                out_cell.fill = GREEN
+                match_count += 1
+
+            # ── Cells differ ──
+            else:
+                diff_count += 1
+                variance_str    = ""
+                within_threshold = False
+
+                if mode == "variance" and is_numeric(new_val) and is_numeric(old_val):
+                    pct_float, variance_str = calc_variance_pct(new_val, old_val)
+                    change_type = "Numeric Variance"
+
+                    if override_values:
+                        out_cell.value = variance_str
+                        # Clear inherited number format so % string displays cleanly
+                        out_cell.number_format = "@"
+
+                    if threshold is not None and pct_float is not None:
+                        within_threshold = abs(pct_float) <= threshold
+                        out_cell.fill = GREEN if within_threshold else LIGHT_RED
+                    else:
+                        out_cell.fill = LIGHT_RED
+
+                else:
+                    change_type   = "Value Changed"
+                    out_cell.fill = LIGHT_RED
+
+                differences.append({
+                    "sheet": sheet_name, "cell": cell_ref,
+                    "new_value": new_val, "old_value": old_val,
+                    "change_type": change_type, "variance": variance_str,
+                    "within_threshold": within_threshold
+                })
+
+    for col_letter, dim in new_ws.column_dimensions.items():
+        out_ws.column_dimensions[col_letter].width = dim.width
+    for row_num, dim in new_ws.row_dimensions.items():
+        out_ws.row_dimensions[row_num].height = dim.height
+
+    return match_count, diff_count, only_new, only_old
+
+
+# ── Differences sheet ──────────────────────────────────────────────────────
+
+def build_differences_sheet(wb, differences, sheet_stats, mode, threshold, override_values):
+    ws = wb.create_sheet("Differences")
+
+    # ── Title ──
+    ws.merge_cells("A1:H1")
+    t = ws["A1"]
+    t.value = "Excel Comparison — Differences Report"
+    t.font  = Font(name="Arial", bold=True, size=14, color="FFFFFF")
+    t.fill  = PatternFill("solid", start_color="1F3864", end_color="1F3864")
+    t.alignment = CENTER
+    ws.row_dimensions[1].height = 30
+
+    # ── Settings row ──
+    ws["A3"] = "COMPARISON SETTINGS"
+    ws["A3"].font = Font(name="Arial", bold=True, size=11, color="1F3864")
+    ws["A4"] = "Mode:"
+    ws["A4"].font = BOLD_FONT
+    ws["B4"] = "Value Changed (original)" if mode == "value" else "Numeric Variance (%)"
+    ws["B4"].font = NORMAL_FONT
+    ws["C4"] = "Variance Threshold:"
+    ws["C4"].font = BOLD_FONT
+    if mode == "variance" and threshold is not None:
+        ws["D4"] = f"±{threshold:.1f}%  (green if within, red if exceeded)"
+    else:
+        ws["D4"] = "Not applied"
+    ws["D4"].font = NORMAL_FONT
+    ws["E4"] = "Override Cell Values:"
+    ws["E4"].font = BOLD_FONT
+    ws["F4"] = ("Yes — cells replaced with variance %" if (mode == "variance" and override_values) else "No")
+    ws["F4"].font = NORMAL_FONT
+
+    # ── Summary ──
+    ws["A6"] = "SUMMARY"
+    ws["A6"].font = Font(name="Arial", bold=True, size=11, color="1F3864")
+    for ci, h in enumerate(["Sheet Name", "Matching Cells", "Different Cells",
+                             "Added (New only)", "Removed (Old only)", "Total Cells Compared"], 1):
+        c = ws.cell(row=7, column=ci, value=h)
+        c.font = HEADER_FONT; c.fill = HEADER_BG; c.alignment = CENTER; c.border = THIN_BORDER
+
+    for ri, stat in enumerate(sheet_stats, 8):
+        row_fill = ALT_ROW if ri % 2 == 0 else WHITE
+        for ci, val in enumerate([stat["sheet"], stat["match"], stat["diff"],
+                                   stat["only_new"], stat["only_old"],
+                                   stat["match"] + stat["diff"]], 1):
+            c = ws.cell(row=ri, column=ci, value=val)
+            c.font = NORMAL_FONT; c.fill = row_fill; c.alignment = CENTER; c.border = THIN_BORDER
+
+    totals_row = 8 + len(sheet_stats)
+    ws.cell(row=totals_row, column=1, value="TOTAL").font = BOLD_FONT
+    for ci, key in enumerate(["match", "diff", "only_new", "only_old"], 2):
+        c = ws.cell(row=totals_row, column=ci, value=sum(s[key] for s in sheet_stats))
+        c.font = BOLD_FONT
+        c.fill = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
+        c.border = THIN_BORDER; c.alignment = CENTER
+
+    # ── Detailed table ──
+    detail_start = totals_row + 3
+    ws.cell(row=detail_start - 1, column=1, value="DETAILED DIFFERENCES").font = Font(
+        name="Arial", bold=True, size=11, color="1F3864")
+
+    headers = ["#", "Sheet", "Cell", "Change Type", "Old Value", "New Value", "Variance %", "Notes"]
+    for ci, h in enumerate(headers, 1):
+        c = ws.cell(row=detail_start, column=ci, value=h)
+        c.font = HEADER_FONT; c.fill = HEADER_BG; c.alignment = CENTER; c.border = THIN_BORDER
+
+    change_type_color = {
+        "Numeric Variance": "FFCCCC",
+        "Value Changed":    "FFE5CC",
+        "Added in NEW":     "CCE5FF",
+        "Removed in NEW":   "FFE5CC",
+    }
+
+    fmt_val = lambda v: str(v) if v not in ("", None) else "(empty)"
+
+    for ri, diff in enumerate(differences, 1):
+        er   = detail_start + ri
+        within = diff.get("within_threshold", False)
+
+        # Row background: green if within threshold, otherwise use type colour
+        if within:
+            bg   = "C6EFCE"
+        else:
+            bg   = change_type_color.get(diff["change_type"], "FFFFFF")
+        fill = PatternFill("solid", start_color=bg, end_color=bg)
+
+        row_data = [
+            ri, diff["sheet"], diff["cell"], diff["change_type"],
+            fmt_val(diff["old_value"]), fmt_val(diff["new_value"]),
+            diff.get("variance", ""), "✓ within threshold" if within else ""
+        ]
+        for ci, val in enumerate(row_data, 1):
+            c = ws.cell(row=er, column=ci, value=val)
+            c.font = NORMAL_FONT; c.fill = fill
+            c.alignment = CENTER if ci in (1, 3, 7) else LEFT
+            c.border = THIN_BORDER
+            # Colour-code the variance cell
+            if ci == 7 and val and val not in ("N/A (old=0)", ""):
+                is_pos = val.startswith("+")
+                c.font = Font(name="Arial", size=10, bold=True,
+                               color="16A34A" if is_pos else "DC2626")
+            # Style the "within threshold" note
+            if ci == 8 and within:
+                c.font = Font(name="Arial", size=10, italic=True, color="16A34A")
+
+    # Column widths
+    widths = {"A": 6, "B": 22, "C": 10, "D": 20, "E": 30, "F": 30, "G": 16, "H": 24}
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = w
+
+    # ── Legend ──
+    legend_row = detail_start + len(differences) + 3
+    ws.cell(row=legend_row, column=1, value="LEGEND").font = BOLD_FONT
+    legend_items = [
+        (GREEN,     "Cells match  /  Numeric variance within threshold"),
+        (LIGHT_RED, "Cells differ  /  Numeric variance exceeds threshold"),
+        (PatternFill("solid", start_color="CCE5FF", end_color="CCE5FF"), "Cell added in NEW only"),
+        (PatternFill("solid", start_color="FFE5CC", end_color="FFE5CC"), "Cell removed (OLD only) or text change"),
+    ]
+    for i, (fill, label) in enumerate(legend_items):
+        r = legend_row + 1 + i
+        ws.cell(row=r, column=1, value="  ").fill = fill
+        ws.cell(row=r, column=1).border = THIN_BORDER
+        ws.cell(row=r, column=2, value=label).font = NORMAL_FONT
+
+    ws.freeze_panes = ws.cell(row=detail_start + 1, column=1)
+
+
+# ── Orchestrator ───────────────────────────────────────────────────────────
+
+def run_comparison(new_path, old_path, out_path, log_fn, mode, threshold, override_values):
+    log_fn(f"Mode           : {'Numeric Variance' if mode == 'variance' else 'Value Changed'}")
+    if mode == "variance" and threshold is not None:
+        log_fn(f"Threshold      : ±{threshold:.1f}%")
+    else:
+        log_fn("Threshold      : not applied")
+    if mode == "variance":
+        log_fn(f"Override values: {'yes — cells replaced with variance %' if override_values else 'no — keep NEW values'}")
+    log_fn("Loading workbooks…")
+
+    new_wb = openpyxl.load_workbook(new_path, data_only=True)
+    old_wb = openpyxl.load_workbook(old_path, data_only=True)
+    out_wb = Workbook()
+    out_wb.remove(out_wb.active)
+
+    new_sheets = set(new_wb.sheetnames)
+    old_sheets = set(old_wb.sheetnames)
+    all_sheets = list(new_wb.sheetnames)
+    for s in old_wb.sheetnames:
+        if s not in new_sheets:
+            all_sheets.append(s)
+
+    differences = []
+    sheet_stats = []
+
+    for sheet_name in all_sheets:
+        log_fn(f"  Comparing: {sheet_name}")
+        out_ws = out_wb.create_sheet(title=sheet_name)
+
+        if sheet_name in new_sheets and sheet_name in old_sheets:
+            m, d, on, oo = compare_and_write(
+                new_wb[sheet_name], old_wb[sheet_name], out_ws,
+                differences, sheet_name, mode, threshold, override_values)
+
+        elif sheet_name in new_sheets:
+            nws = new_wb[sheet_name]
+            for row in nws.iter_rows():
+                for cell in row:
+                    oc = out_ws.cell(row=cell.row, column=cell.column, value=cell.value)
+                    oc.fill = LIGHT_RED; copy_cell_style(cell, oc)
+                    if cell.value not in (None, ""):
+                        differences.append({
+                            "sheet": sheet_name, "cell": cell.coordinate,
+                            "new_value": cell.value, "old_value": "(sheet not in OLD)",
+                            "change_type": "Added in NEW", "variance": "", "within_threshold": False
+                        })
+            m, d, on, oo = (0, (nws.max_row or 0) * (nws.max_column or 0),
+                            (nws.max_row or 0) * (nws.max_column or 0), 0)
+        else:
+            ows = old_wb[sheet_name]
+            for row in ows.iter_rows():
+                for cell in row:
+                    oc = out_ws.cell(row=cell.row, column=cell.column, value=cell.value)
+                    oc.fill = LIGHT_RED; copy_cell_style(cell, oc)
+                    if cell.value not in (None, ""):
+                        differences.append({
+                            "sheet": sheet_name, "cell": cell.coordinate,
+                            "new_value": "(sheet not in NEW)", "old_value": cell.value,
+                            "change_type": "Removed in NEW", "variance": "", "within_threshold": False
+                        })
+            m, d, on, oo = (0, (ows.max_row or 0) * (ows.max_column or 0),
+                            0, (ows.max_row or 0) * (ows.max_column or 0))
+
+        sheet_stats.append({"sheet": sheet_name, "match": m, "diff": d,
+                             "only_new": on, "only_old": oo})
+
+    log_fn("Building Differences sheet…")
+    build_differences_sheet(out_wb, differences, sheet_stats, mode, threshold, override_values)
+    out_wb.save(out_path)
+
+    total_diff  = sum(s["diff"]  for s in sheet_stats)
+    total_match = sum(s["match"] for s in sheet_stats)
+    log_fn(f"✅  Done!  Matching: {total_match}  |  Different: {total_diff}  |  Diffs logged: {len(differences)}")
+    log_fn(f"📄  Saved to: {out_path}")
+    return total_match, total_diff, len(differences)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# GUI
+# ══════════════════════════════════════════════════════════════════════════
+
+ACCENT       = "#2563EB"
+ACCENT_DARK  = "#1D4ED8"
+BG           = "#F1F5F9"
+CARD_BG      = "#FFFFFF"
+BORDER_CLR   = "#CBD5E1"
+TEXT_MAIN    = "#1E293B"
+TEXT_SUB     = "#64748B"
+SUCCESS      = "#16A34A"
+DANGER       = "#DC2626"
+DROP_IDLE    = "#EFF6FF"
+DROP_READY   = "#DCFCE7"
+SECTION_BG   = "#F8FAFC"
+
+FONT_H1    = ("Segoe UI", 18, "bold")
+FONT_H2    = ("Segoe UI", 11, "bold")
+FONT_H3    = ("Segoe UI", 10, "bold")
+FONT_BODY  = ("Segoe UI", 10)
+FONT_SMALL = ("Segoe UI", 9)
+FONT_MONO  = ("Consolas", 9)
+
+
+class DropZone(tk.Frame):
+    def __init__(self, parent, label, color_tag, on_file_set=None, **kwargs):
+        super().__init__(parent, bg=CARD_BG, bd=0, **kwargs)
+        self.label       = label
+        self.color_tag   = color_tag
+        self.on_file_set = on_file_set
+        self._file_path  = ""
+        self._build()
+
+    def _build(self):
+        self.border_frame = tk.Frame(self, bg=BORDER_CLR, padx=1, pady=1)
+        self.border_frame.pack(fill="both", expand=True)
+        self.inner = tk.Frame(self.border_frame, bg=DROP_IDLE, cursor="hand2")
+        self.inner.pack(fill="both", expand=True)
+
+        tag_colors = {"new": ("#DCFCE7", "#16A34A"), "old": ("#FEF3C7", "#D97706")}
+        tag_bg, tag_fg = tag_colors.get(self.color_tag, ("#EFF6FF", ACCENT))
+        tag_frame = tk.Frame(self.inner, bg=DROP_IDLE)
+        tag_frame.pack(pady=(18, 0))
+        tk.Label(tag_frame, text=f"  {self.label}  ", bg=tag_bg, fg=tag_fg,
+                 font=("Segoe UI", 9, "bold"), padx=6, pady=3).pack()
+
+        tk.Label(self.inner, text="📂", font=("Segoe UI", 28),
+                 bg=DROP_IDLE, fg=TEXT_SUB).pack(pady=(8, 4))
+        self.prompt_lbl = tk.Label(self.inner, text="Click to browse for file",
+                                    font=FONT_SMALL, bg=DROP_IDLE, fg=TEXT_SUB,
+                                    justify="center")
+        self.prompt_lbl.pack()
+        self.file_lbl = tk.Label(self.inner, text="",
+                                  font=("Segoe UI", 9, "bold"),
+                                  bg=DROP_IDLE, fg=SUCCESS,
+                                  wraplength=220, justify="center")
+        self.file_lbl.pack(pady=(6, 14))
+
+        for w in (self.inner, self.prompt_lbl, self.file_lbl):
+            w.bind("<Button-1>", lambda e: self._browse())
+            w.bind("<Enter>",    lambda e: self._hover(True))
+            w.bind("<Leave>",    lambda e: self._hover(False))
+
+    def _hover(self, entering):
+        if not self._file_path:
+            bg = "#DBEAFE" if entering else DROP_IDLE
+            self.inner.config(bg=bg)
+            for w in (self.prompt_lbl, self.file_lbl):
+                w.config(bg=bg)
+
+    def _browse(self):
+        path = filedialog.askopenfilename(
+            title=f"Select {self.label} file",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")])
+        if path:
+            self.set_file(path)
+
+    def set_file(self, path):
+        self._file_path = path
+        self.file_lbl.config(text=f"✓  {os.path.basename(path)}")
+        self.prompt_lbl.config(text="Click to change file")
+        for w in (self.inner, self.prompt_lbl, self.file_lbl):
+            w.config(bg=DROP_READY)
+        self.border_frame.config(bg=SUCCESS)
+        if self.on_file_set:
+            self.on_file_set()
+
+    def get_file(self):   return self._file_path
+    def clear(self):
+        self._file_path = ""
+        self.file_lbl.config(text="")
+        self.prompt_lbl.config(text="Click to browse for file")
+        for w in (self.inner, self.prompt_lbl, self.file_lbl):
+            w.config(bg=DROP_IDLE)
+        self.border_frame.config(bg=BORDER_CLR)
+
+
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Excel File Comparator")
+        self.resizable(False, False)
+        self.configure(bg=BG)
+
+        # ── State vars (must exist before _build_ui) ──
+        self.mode_var       = tk.StringVar(value="value")   # "value" | "variance"
+        self.thresh_enabled = tk.BooleanVar(value=False)
+        self.thresh_var     = tk.StringVar(value="5.0")
+        self.override_var   = tk.BooleanVar(value=False)
+
+        self._build_ui()
+        self._center()
+
+    def _center(self):
+        self.update_idletasks()
+        w, h = self.winfo_width(), self.winfo_height()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"+{(sw - w) // 2}+{(sh - h) // 2}")
+
+    def _section(self, parent, title, **kw):
+        """Labelled card section."""
+        outer = tk.Frame(parent, bg=CARD_BG, bd=0)
+        outer.pack(fill="x", pady=(0, 10), **kw)
+        border = tk.Frame(outer, bg=BORDER_CLR, padx=1, pady=1)
+        border.pack(fill="both", expand=True)
+        inner = tk.Frame(border, bg=SECTION_BG, padx=16, pady=12)
+        inner.pack(fill="both", expand=True)
+        tk.Label(inner, text=title, font=FONT_H3, bg=SECTION_BG,
+                 fg=ACCENT).pack(anchor="w", pady=(0, 8))
+        return inner
+
+    def _build_ui(self):
+        # ── Header ──
+        hdr = tk.Frame(self, bg=ACCENT, pady=20)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="Excel File Comparator", font=FONT_H1,
+                 bg=ACCENT, fg="white").pack()
+        tk.Label(hdr, text="Compare two workbooks cell-by-cell with flexible comparison modes",
+                 font=FONT_SMALL, bg=ACCENT, fg="#BFDBFE").pack(pady=(4, 0))
+
+        body = tk.Frame(self, bg=BG, padx=24, pady=20)
+        body.pack(fill="both", expand=True)
+
+        # ── File zones ──
+        drop_row = tk.Frame(body, bg=BG)
+        drop_row.pack(fill="x", pady=(0, 14))
+
+        self.new_zone = DropZone(drop_row, "NEW FILE", "new",
+                                  on_file_set=self._check_ready, width=250, height=190)
+        self.new_zone.pack(side="left", fill="both", expand=True, padx=(0, 8))
+
+        vs = tk.Frame(drop_row, bg=BG, width=44)
+        vs.pack(side="left")
+        vs.pack_propagate(False)
+        tk.Label(vs, text="VS", font=("Segoe UI", 14, "bold"),
+                 bg=BG, fg=BORDER_CLR).place(relx=0.5, rely=0.5, anchor="center")
+
+        self.old_zone = DropZone(drop_row, "OLD FILE", "old",
+                                  on_file_set=self._check_ready, width=250, height=190)
+        self.old_zone.pack(side="left", fill="both", expand=True, padx=(8, 0))
+
+        # ── Comparison Mode section ──
+        mode_frame = self._section(body, "⚙   Comparison Mode")
+
+        rb_row = tk.Frame(mode_frame, bg=SECTION_BG)
+        rb_row.pack(fill="x")
+
+        self._make_radio(rb_row, "Value Changed  (flag any difference)",
+                         "value", side="left", padx=(0, 30))
+        self._make_radio(rb_row, "Numeric Variance  (calculate % change for numbers)",
+                         "variance", side="left")
+
+        # Subtle description label that updates with selection
+        self.mode_desc = tk.Label(mode_frame,
+                                   text=self._mode_desc("value"),
+                                   font=FONT_SMALL, bg=SECTION_BG, fg=TEXT_SUB,
+                                   justify="left", wraplength=520)
+        self.mode_desc.pack(anchor="w", pady=(6, 0))
+
+        # ── Variance Threshold section ──
+        thresh_frame = self._section(body, "📊   Variance Threshold  (optional — applies to Numeric Variance mode only)")
+
+        chk_row = tk.Frame(thresh_frame, bg=SECTION_BG)
+        chk_row.pack(fill="x")
+
+        self.thresh_chk = tk.Checkbutton(chk_row,
+                                          text="Enable threshold",
+                                          variable=self.thresh_enabled,
+                                          command=self._on_thresh_toggle,
+                                          bg=SECTION_BG, fg=TEXT_MAIN,
+                                          activebackground=SECTION_BG,
+                                          font=FONT_BODY, cursor="hand2",
+                                          selectcolor=CARD_BG)
+        self.thresh_chk.pack(side="left")
+
+        tk.Label(chk_row, text="  Flag red if |variance| >",
+                 font=FONT_BODY, bg=SECTION_BG, fg=TEXT_MAIN).pack(side="left")
+
+        vcmd = (self.register(self._validate_pct), "%P")
+        self.thresh_entry = tk.Entry(chk_row, textvariable=self.thresh_var,
+                                      width=7, font=FONT_BODY,
+                                      relief="solid", bd=1,
+                                      validate="key", validatecommand=vcmd,
+                                      state="disabled",
+                                      disabledbackground="#E2E8F0",
+                                      disabledforeground="#94A3B8")
+        self.thresh_entry.pack(side="left", padx=(6, 0))
+        tk.Label(chk_row, text=" %    (green if within, red if exceeded)",
+                 font=FONT_BODY, bg=SECTION_BG, fg=TEXT_MAIN).pack(side="left")
+
+        self.thresh_note = tk.Label(thresh_frame,
+                                     text="Threshold is ignored when mode is 'Value Changed'.",
+                                     font=FONT_SMALL, bg=SECTION_BG, fg=TEXT_SUB)
+        self.thresh_note.pack(anchor="w", pady=(6, 0))
+
+        # ── Override Values section ──
+        override_frame = self._section(body, "🔁   Override Values with Variance  (optional — applies to Numeric Variance mode only)")
+
+        ov_row = tk.Frame(override_frame, bg=SECTION_BG)
+        ov_row.pack(fill="x")
+
+        self.override_chk = tk.Checkbutton(
+            ov_row,
+            text="Replace cell values with variance %",
+            variable=self.override_var,
+            bg=SECTION_BG, fg=TEXT_MAIN,
+            activebackground=SECTION_BG,
+            font=FONT_BODY, cursor="hand2",
+            selectcolor=CARD_BG)
+        self.override_chk.pack(side="left")
+
+        tk.Label(override_frame,
+                 text=("When enabled, any numeric cell that changed will show its variance %\n"
+                       "(e.g. +12.50%) instead of the NEW value in the output worksheet.\n"
+                       "Matching cells and non-numeric cells are unaffected."),
+                 font=FONT_SMALL, bg=SECTION_BG, fg=TEXT_SUB,
+                 justify="left").pack(anchor="w", pady=(6, 0))
+
+        # ── Output path ──
+        info_frame = tk.Frame(body, bg=BG)
+        info_frame.pack(fill="x", pady=(0, 4))
+        tk.Label(info_frame, text="📁  Output:", font=FONT_SMALL,
+                 bg=BG, fg=TEXT_SUB).pack(side="left")
+        script_dir = os.path.dirname(os.path.abspath(sys.argv[0])) or os.getcwd()
+        tk.Label(info_frame,
+                 text=os.path.join(script_dir, "comparison_output.xlsx"),
+                 font=("Segoe UI", 9, "italic"), bg=BG, fg=ACCENT).pack(side="left", padx=(4, 0))
+
+        # ── Buttons ──
+        btn_frame = tk.Frame(body, bg=BG)
+        btn_frame.pack(pady=(10, 0))
+
+        self.run_btn = tk.Button(btn_frame, text="▶   Run Comparison",
+                                  font=("Segoe UI", 12, "bold"),
+                                  bg=ACCENT, fg="white",
+                                  activebackground=ACCENT_DARK, activeforeground="white",
+                                  relief="flat", padx=36, pady=12,
+                                  cursor="hand2", state="disabled",
+                                  command=self._start_comparison)
+        self.run_btn.pack(side="left", padx=(0, 10))
+
+        self.clear_btn = tk.Button(btn_frame, text="✕  Clear",
+                                    font=FONT_BODY, bg="#F1F5F9", fg=TEXT_SUB,
+                                    activebackground="#E2E8F0", activeforeground=TEXT_MAIN,
+                                    relief="flat", padx=18, pady=12,
+                                    cursor="hand2", command=self._clear)
+        self.clear_btn.pack(side="left")
+
+        # ── Progress ──
+        self.progress = ttk.Progressbar(body, mode="indeterminate", length=560)
+        self.progress.pack(pady=(12, 0))
+        ttk.Style().configure("TProgressbar", troughcolor=BORDER_CLR, background=ACCENT)
+
+        # ── Log ──
+        log_outer = tk.Frame(body, bg=CARD_BG, bd=0)
+        log_outer.pack(fill="both", expand=True, pady=(12, 0))
+        log_border = tk.Frame(log_outer, bg=BORDER_CLR, padx=1, pady=1)
+        log_border.pack(fill="both", expand=True)
+        log_inner = tk.Frame(log_border, bg=CARD_BG, padx=14, pady=10)
+        log_inner.pack(fill="both", expand=True)
+        tk.Label(log_inner, text="Log", font=FONT_H2,
+                 bg=CARD_BG, fg=TEXT_MAIN).pack(anchor="w")
+        txt_frame = tk.Frame(log_inner, bg=CARD_BG)
+        txt_frame.pack(fill="both", expand=True, pady=(6, 0))
+        self.log_text = tk.Text(txt_frame, height=9, font=FONT_MONO,
+                                 bg="#0F172A", fg="#94A3B8",
+                                 insertbackground="white", relief="flat",
+                                 state="disabled", wrap="word")
+        scroll = tk.Scrollbar(txt_frame, command=self.log_text.yview)
+        self.log_text.config(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        self.log_text.pack(fill="both", expand=True)
+        self.log_text.tag_config("ok",    foreground="#4ADE80")
+        self.log_text.tag_config("info",  foreground="#94A3B8")
+        self.log_text.tag_config("warn",  foreground="#FCD34D")
+        self.log_text.tag_config("error", foreground="#F87171")
+
+        # ── Status bar ──
+        tk.Frame(self, bg=BORDER_CLR, height=1).pack(fill="x")
+        self.status_lbl = tk.Label(self,
+                                    text="Ready — select a NEW file and an OLD file to begin",
+                                    font=FONT_SMALL, bg=BG, fg=TEXT_SUB, pady=6)
+        self.status_lbl.pack(fill="x")
+
+    # ── Widget helpers ────────────────────────────────────────────────────
+
+    def _make_radio(self, parent, text, value, **pack_kw):
+        rb = tk.Radiobutton(parent, text=text, variable=self.mode_var,
+                             value=value, command=self._on_mode_change,
+                             bg=SECTION_BG, fg=TEXT_MAIN,
+                             activebackground=SECTION_BG,
+                             selectcolor=CARD_BG,
+                             font=FONT_BODY, cursor="hand2")
+        rb.pack(**pack_kw)
+
+    def _mode_desc(self, mode):
+        if mode == "value":
+            return ("Any change between OLD and NEW is flagged red. "
+                    "Non-changed cells are green. Simple and strict.")
+        return ("For numeric cells, calculates (NEW−OLD)/|OLD|×100 and shows the % change. "
+                "Text/non-numeric changes are still flagged as 'Value Changed'.")
+
+    def _validate_pct(self, val):
+        """Allow empty, digits, and a single decimal point."""
+        if val == "":
+            return True
+        try:
+            float(val)
+            return True
+        except ValueError:
+            return val.count(".") <= 1 and all(c.isdigit() or c == "." for c in val)
+
+    # ── Event handlers ────────────────────────────────────────────────────
+
+    def _on_mode_change(self):
+        mode = self.mode_var.get()
+        self.mode_desc.config(text=self._mode_desc(mode))
+        # Dim threshold + override sections when mode is "value"
+        state = "normal" if mode == "variance" else "disabled"
+        self.thresh_chk.config(state=state)
+        self.override_chk.config(state=state)
+        if mode == "variance" and self.thresh_enabled.get():
+            self.thresh_entry.config(state="normal")
+        else:
+            self.thresh_entry.config(state="disabled")
+
+    def _on_thresh_toggle(self):
+        if self.thresh_enabled.get() and self.mode_var.get() == "variance":
+            self.thresh_entry.config(state="normal")
+        else:
+            self.thresh_entry.config(state="disabled")
+
+    def _check_ready(self):
+        both = bool(self.new_zone.get_file() and self.old_zone.get_file())
+        self.run_btn.config(state="normal" if both else "disabled",
+                             bg=ACCENT if both else "#93C5FD")
+
+    def _clear(self):
+        self.new_zone.clear(); self.old_zone.clear()
+        self.run_btn.config(state="disabled", bg="#93C5FD")
+        self._log("Cleared.", "info")
+        self.status_lbl.config(
+            text="Ready — select a NEW file and an OLD file to begin", fg=TEXT_SUB)
+
+    def _log(self, msg, tag="info"):
+        self.log_text.config(state="normal")
+        self.log_text.insert("end", msg + "\n", tag)
+        self.log_text.see("end")
+        self.log_text.config(state="disabled")
+
+    def _start_comparison(self):
+        new_path = self.new_zone.get_file()
+        old_path = self.old_zone.get_file()
+        if not new_path or not old_path:
+            messagebox.showwarning("Missing files", "Please select both NEW and OLD Excel files.")
+            return
+
+        mode = self.mode_var.get()
+        override_values = (mode == "variance") and self.override_var.get()
+
+        # Resolve threshold
+        threshold = None
+        if mode == "variance" and self.thresh_enabled.get():
+            raw = self.thresh_var.get().strip()
+            try:
+                threshold = float(raw)
+                if threshold < 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Invalid threshold",
+                                      "Please enter a positive number for the variance threshold.")
+                return
+
+        script_dir = os.path.dirname(os.path.abspath(sys.argv[0])) or os.getcwd()
+        out_path   = os.path.join(script_dir, "comparison_output.xlsx")
+
+        self.run_btn.config(state="disabled", text="⏳  Running…")
+        self.progress.start(12)
+        self.status_lbl.config(text="Comparing files…", fg=ACCENT)
+        self._log(f"NEW : {new_path}", "info")
+        self._log(f"OLD : {old_path}", "info")
+        self._log(f"OUT : {out_path}", "info")
+        self._log("─" * 55, "info")
+
+        def worker():
+            try:
+                run_comparison(new_path, old_path, out_path,
+                               lambda m: self.after(0, self._log, m, "info"),
+                               mode, threshold, override_values)
+                self.after(0, self._on_success, out_path)
+            except Exception as e:
+                self.after(0, self._on_error, str(e))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_success(self, out_path):
+        self.progress.stop()
+        self.run_btn.config(state="normal", text="▶   Run Comparison")
+        self._log("=" * 55, "ok")
+        self.status_lbl.config(
+            text=f"✅  Complete! Saved: {os.path.basename(out_path)}", fg=SUCCESS)
+        if messagebox.askyesno("Done!",
+                                f"Comparison complete!\n\nOutput saved to:\n{out_path}\n\nOpen the file now?"):
+            self._open_file(out_path)
+
+    def _on_error(self, err):
+        self.progress.stop()
+        self.run_btn.config(state="normal", text="▶   Run Comparison")
+        self._log(f"ERROR: {err}", "error")
+        self.status_lbl.config(text=f"❌  Error: {err}", fg=DANGER)
+        messagebox.showerror("Comparison failed", err)
+
+    def _open_file(self, path):
+        import subprocess, platform
+        try:
+            if platform.system() == "Windows":
+                os.startfile(path)
+            elif platform.system() == "Darwin":
+                subprocess.call(["open", path])
+            else:
+                subprocess.call(["xdg-open", path])
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    App().mainloop()
