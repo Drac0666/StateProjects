@@ -1,60 +1,30 @@
-import customtkinter
-import psutil 
+"""Fetch daily EUR/USD spot rate from ECB using the sdmx1 library."""
 
-# --- Constants ---
-PROCESS_NAMES = ["Intex", "EXCEL", "POWERPNT", "WINWORD"]
+import sdmx
+import pandas as pd
 
-# --- Placeholder functions ---
-def custom_function1():
-    # Your custom code here
-    pass
+# Connect to ECB
+ecb = sdmx.Client("ECB")
 
-def custom_function2():
-    # Your custom code here
-    pass
+# Fetch EXR data: Daily, USD, EUR denominator, spot rate, average
+key = {"CURRENCY": "USD", "CURRENCY_DENOM": "EUR", "EXR_TYPE": "SP00", "EXR_SUFFIX": "A", "FREQ": "D"}
+params = {"startPeriod": "2024-01-01"}
 
-# ... Add custom_function3 to custom_function8
+resp = ecb.data("EXR", key=key, params=params)
 
-# --- Process killing function ---
-def kill_process(process_name):
-    for proc in psutil.process_iter():
-        if proc.name().lower() == process_name.lower():
-            proc.kill()
+# Convert to pandas Series then DataFrame
+df = (
+    sdmx.to_pandas(resp)
+    .reset_index()
+    [["TIME_PERIOD", "value"]]
+    .rename(columns={"TIME_PERIOD": "date", "value": "eurusd"})
+    .sort_values("date")
+    .reset_index(drop=True)
+)
 
-# --- Create button with command ---
-def create_button(container, text, command):
-    button = customtkinter.CTkButton(container, text=text, command=command)
-    button.pack(side="left", padx=5)
+# Print
+print(df.to_string(index=False))
 
-# --- CustomTkinter setup ---
-customtkinter.set_appearance_mode("dark") 
-customtkinter.set_default_color_theme("blue") 
-
-root = customtkinter.CTk()
-root.title("Process Killer & Custom Actions")
-root.geometry("600x200")  # Increased width for more buttons
-
-# Create rows
-row1 = customtkinter.CTkFrame(root)
-row1.pack(pady=10)
-row2 = customtkinter.CTkFrame(root)
-row2.pack(pady=10)
-row3 = customtkinter.CTkFrame(root)
-row3.pack(pady=10)
-
-# Process killer buttons (Row 1)
-for process_name in PROCESS_NAMES:
-    create_button(row1, f"Kill {process_name}", lambda p=process_name: kill_process(p))
-
-# Custom function buttons (Row 2 & 3)
-create_button(row2, "Custom 1", custom_function1)
-create_button(row2, "Custom 2", custom_function2)
-create_button(row2, "Custom 3", custom_function3)
-create_button(row2, "Custom 4", custom_function4)
-
-create_button(row3, "Custom 5", custom_function5)
-create_button(row3, "Custom 6", custom_function6)
-create_button(row3, "Custom 7", custom_function7)
-create_button(row3, "Custom 8", custom_function8)
-
-root.mainloop()
+# Save
+df.to_csv("eurusd.csv", index=False)
+print(f"\n{len(df)} rows saved to eurusd.csv")
