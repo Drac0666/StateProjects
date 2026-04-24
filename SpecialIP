@@ -1,4 +1,29 @@
-from openpyxl.chart import LineChart, Reference
+from lxml import etree
+
+C_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+
+def _apply_no_fill(element):
+    spPr_tag = f"{{{C_NS}}}spPr"
+    spPr = element.find(spPr_tag)
+    if spPr is None:
+        spPr = etree.SubElement(element, spPr_tag)
+
+    fill_tags = [
+        f"{{{A_NS}}}noFill", f"{{{A_NS}}}solidFill",
+        f"{{{A_NS}}}gradFill", f"{{{A_NS}}}pattFill",
+    ]
+    for child in list(spPr):
+        if child.tag in fill_tags:
+            spPr.remove(child)
+
+    etree.SubElement(spPr, f"{{{A_NS}}}noFill")
+
+# Chart area
+_apply_no_fill(chart._element)
+
+# Plot area
+_apply_no_fill(chart.plot_area._element)from openpyxl.chart import LineChart, Reference
 from openpyxl.chart.shapes import GraphicalProperties
 from lxml import etree
 
