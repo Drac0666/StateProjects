@@ -1,0 +1,114 @@
+# TASK: Monthly portfolio BPV (DV01) dashboard over one year
+
+Build an analysis and an interactive dashboard showing how the portfolio's BPV changed month by month over a year, WHY it changed (decisions vs. mechanical effects), and how it looked against the rates market.
+
+====================================================================
+## 0. CONFIGURATION (fill in before running; do not guess missing fields, ask)
+====================================================================
+
+### A. Data sources
+- Portfolio snapshots (end of each month):
+  - path / format: [e.g. /data/snapshots/*.csv or a single .xlsx, sheet X]
+  - columns (name in file → meaning):
+    - valuation date: [column]
+    - position identifier (ISIN/ID): [column]
+    - position BPV: [column]
+    - market value (MV): [column or "n/a"]
+    - notional: [column or "n/a"]
+    - maturity date / WAL / expected repayment date: [column] (state which one to use for buckets)
+    - instrument type (government / RMBS / ABS / swap / futures / cash): [column or "n/a"]
+    - currency: [column or "n/a"]
+- Transactions and events (with exact day):
+  - path / format: [...]
+  - columns: date, position ID, event type (BUY / SELL / MATURITY / AMORT / PARTIAL_SELL), transaction notional, BPV on transaction date [column names]
+  - values denoting each event type: [e.g. "B"=buy, "S"=sell, "M"=maturity]
+- Market rates:
+  - source / file: [e.g. CSV with columns date, 2Y, 5Y, 10Y, or "fetch from X"]
+  - frequency: [daily / monthly]; month-end value = [data from that day / last available]
+  - curve type: [Bund / EUR swap / Polish government / ...]
+- (optional) Spread / CS01: [file and columns or "skip"]
+- (optional) Hedges (swaps, futures): [are they in the snapshots? how flagged? show gross and net BPV: yes/no]
+
+### B. Parameters
+- Analysis period: [from YYYY-MM-DD to YYYY-MM-DD]
+- BPV unit in the data: [per 1 bp for the whole position / per 100 notional / per 1m notional / per 1 percentage point (then divide by 100)]
+- Reporting currency: [EUR/PLN/...]
+- Maturity buckets (fixed for the whole period): [e.g. 0–2Y, 2–5Y, 5–10Y, 10Y+]
+- Bucket axis: [remaining time to maturity / WAL / model expected repayment date]
+- Floaters: [separate bucket / included in the buckets]
+- Reference rate for the chart and rate effect: [e.g. 5Y; or "BPV-weighted point"]
+- Additional chart series: [e.g. 2s10s slope, spread, none]
+- Benchmark for evaluating decisions: [constant start-of-period BPV in instrument X / cash / none]
+
+### C. Output
+- Format: [standalone HTML file with Plotly / PNG / Excel with tables / all]
+- Label language: English
+- Save path: [...]
+
+### D. Business rules (defaults, change if needed)
+- Amortisation and prepayments (RMBS/ABS): separate category, NOT maturity and NOT drift.
+- Partial sales: BPV split proportionally to notional before/after.
+- Migration between buckets (roll-down) without trades: separate category.
+- For a position bought during the month: drift = BPV_end − BPV_on_purchase_date.
+- For a position sold during the month: drift = BPV_on_sale_date − BPV_start.
+
+====================================================================
+## 1. WHAT YOU SHOULD DO
+====================================================================
+
+### Step 1: load and validate the data
+- Load the data per the configuration, unify column names, dates and BPV units (convert everything to "per 1 bp, whole position").
+- Print a data quality report: number of positions and months, missing values, duplicates, positions in snapshots without trades and vice versa, positions with BPV = 0 or negative.
+- If anything is missing or the configuration is ambiguous, STOP and ask me specific questions (a few at a time). Do not invent anything.
+
+### Step 2: decompose the BPV change, per position, per month
+For each month m:
+
+BPV_end = BPV_start + purchases − sales − maturities − amortisation + net_migration (bucket view only) + drift
+
+- Purchases = BPV on purchase date. Sales = BPV on sale date (as negative). Maturities and amortisation = BPV lost due to maturity / principal repayment.
+- Drift (market + time) = residual computed per position using the rules in section D.
+- Aggregate to portfolio level. If hedges exist, show both gross and net versions.
+
+### Step 3: maturity buckets
+- Assign each position to a bucket by remaining term on the valuation date (using the axis from the configuration); trades by their state on the trade date.
+- Compute BPV per bucket at each month-end and at the start of the period.
+- Compute migration between buckets (a position moves to a shorter bucket without trading) and show it as a separate category in the per-bucket view.
+
+### Step 4: market
+- Build the reference rate series at each month-end (plus additional series from the configuration).
+- Compute the approximate rate effect for the month: effect = −BPV_start_of_month × Δrate (in bp). State clearly that this is an approximation excluding carry, roll-down, spread and prepayments.
+- (If a benchmark is configured) compute the benchmark result for the same BPV and the difference versus the portfolio as an approximate value added by decisions.
+
+### Step 5: consistency tests (must pass; print results in the report)
+1. Sum of position BPVs = portfolio BPV in every month.
+2. Sum of buckets = portfolio BPV in every month.
+3. BPV_start + all decomposition components = BPV_end (report the residual per month; if > [tolerance, e.g. 1%], flag the month and the positions responsible).
+4. Drift signs: check whether drift is positive in months when rates fell and negative when rates rose (for a predominantly long-duration exposure); describe deviations as a potential methodology issue (different curve, conventions, prepayment model), do not hide them.
+
+====================================================================
+## 2. OUTPUT: dashboard (month by month, full year)
+====================================================================
+
+One page, top to bottom, shared X axis = months:
+0. Summary cards: BPV at start, net decisions (purchases − sales), maturities (+ amortisation), drift, BPV at end, duration (if MV available).
+1. Portfolio BPV by maturity bucket (stacked bars, month-end, sequential single-hue palette from short to long end).
+2. Monthly BPV change decomposition (stacked bars: purchases, sales, maturities, amortisation, drift; distinct colours, fixed legend).
+3. Reference rate (and additional series from the configuration) at month-end.
+4. Approximate rate effect for the month (bars: gain / loss; caption stating it is an approximation).
+5. (If configured) start vs end of year per bucket, and the benchmark.
+6. Monthly table below the charts: BPV start, purchases, sales, maturities, amortisation, drift, BPV end, Δrate (bp), rate effect, residual difference from the consistency tests.
+
+Technical requirements:
+- Python (pandas, plotly); modular code: separate functions for loading, decomposition, buckets and plotting; the entire config in one dict / YAML file at the top so I can change parameters without touching the code.
+- Interactive hover tooltips, readable on both light and dark backgrounds.
+- One Y axis per chart (do not mix BPV and % scales), shared X axis across all panels.
+- Labels in English, units next to axes.
+
+====================================================================
+## 3. WORKING RULES
+====================================================================
+- Do not invent data and do not fill gaps with defaults without asking; if you must make an assumption, list it at the top of the report.
+- Separate: what is a FACT from the data, what is a CALCULATION with an assumption, and what is an APPROXIMATION (e.g. the rate effect).
+- At the end, give a short summary in 5–7 sentences: what drove BPV changes, whether decisions went with the market, where the data is weakest and what is worth adding (key rate BPV, CS01, benchmark).
+- Show me the data quality report and consistency test results first, and only then generate the dashboard.
